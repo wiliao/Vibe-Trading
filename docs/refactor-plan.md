@@ -102,9 +102,9 @@ Canada today is **market-data + backtest only**. The plan must state explicitly 
 
 After the refactor:
 
-- **Markets:** `us_equity`, `ca_equity`. Everything else gone.
+- **Markets:** `us_equity`, `ca_equity` (the two settlement markets), plus the region-neutral `index` chain for `^SPX`/`^GSPC`/`^VIX` benchmark inputs (decision **D1**). Everything else gone.
 - **Loaders registered:** `yahoo`, `yfinance`, `stooq`, `sina`, `eastmoney` (US only), `local`, plus the key-gated US REST sources `finnhub`, `alphavantage`, `tiingo`, `fmp`. Optional: `akshare`/`longbridge` US-only branches (decision **D2**).
-- **Engines:** `GlobalEquityEngine` (already parameterised `market="us" | "ca"`) and `CompositeEngine` reduced to a two-market router. Ordering/execution rule modules for other markets deleted.
+- **Engines:** `GlobalEquityEngine` (parameterised `market="us" | "ca"`) and `CompositeEngine` reduced to a US/CA router — the `index` key (D1) folds into `GlobalEquityEngine(market="us")`. Ordering/execution rule modules for other markets deleted.
 - **Brokers:** `alpaca`, `ibkr`, `robinhood`, `tiger`, `longbridge`, `futu` (reconfigured to US), `etoro` (decision **D4**). India/Korea/EU/crypto connectors deleted.
 - **Tools:** SEC/options/fundamentals/market-data/search/backtest/trading kept; the 11 A-share + Taiwan tools deleted.
 - **Universe:** `gtja191` deleted (A-share only); `alpha101` / `qlib158` / `academic` / `fundamental` universe lists trimmed to `equity_us` where they can run on a US panel.
@@ -161,25 +161,26 @@ Ten phases. Each is independently reviewable and leaves the tree green.
    ```python
    "us_equity": ["yahoo", "stooq", "sina", "eastmoney", "yfinance", "tiingo", "fmp", "finnhub", "alphavantage", "local"],
    "ca_equity": ["yahoo", "yfinance", "local"],
+   "index": ["yahoo", "yfinance", "local"],   # kept per decision D1 (^SPX/^VIX benchmark input)
    ```
-   Keep `local` in both — it is the user's own CSV path and is currency-agnostic. Remove `a_share`, `hk_equity`, `india_equity`, `kr_equity`, `ar_equity`, `uk_equity`, `vietnam_equity`, `crypto`, `futures`, `fund`, `macro`, `forex`, and `index` (pending decision **D1**).
+   Keep `local` in both — it is the user's own CSV path and is currency-agnostic. Remove `a_share`, `hk_equity`, `india_equity`, `kr_equity`, `ar_equity`, `uk_equity`, `vietnam_equity`, `crypto`, `futures`, `fund`, `macro`, and `forex`. `index` is retained per decision **D1** — it is US-native benchmark input, not a settlement market.
 2. **Trim `VALID_SOURCES`** (`registry.py:36-63`) and `_loader_modules` (`:78-130`) to the surviving set. The test `test_valid_sources_covers_all_registered_loaders` enforces that these two stay in sync.
 3. **Extract the deletion set into a replayable script** — `agent/scripts/us_ca_prune.py` (or `scripts/us-ca-prune.sh`) listing every path this plan deletes with a one-line reason. This is what makes re-running the refactor after an upstream sync cheap.
-4. **Trim `_MARKET_CURRENCY`** (`_market_hooks.py:163-181`) to `us_equity: USD`, `ca_equity: CAD`. Remove `hk_counter_currency` (`:209`), `_HK_COUNTER_CURRENCY_RANGES` (`:195`), and `_FUTURES_EXCHANGE_CURRENCY` (`:186`) once their callers are gone.
+4. **Trim `_MARKET_CURRENCY`** (`_market_hooks.py:163-179`) to `us_equity: USD`, `ca_equity: CAD`. Remove `hk_counter_currency` (`:209`), `_HK_COUNTER_CURRENCY_RANGES` (`:195`), `_FUTURES_EXCHANGE_CURRENCY` (`:185`), and the now-orphaned `_HK_CODE` (`:206`) once their callers are gone.
 5. **Trim `_MARKET_PATTERNS`** (`_market_hooks.py:51-160`) to keep only:
    - `^[A-Z0-9&.\-]+\.US$` → `us_equity`
    - `^[A-Z0-9&.\-]+\.(TO|V)$` → `ca_equity`
    - the bare-ticker rule `^[A-Z]{1,5}$` → `us_equity` (must stay last)
-   - Remove `_CN_FUTURES_PRODUCTS` (`:31`) and `_is_china_futures`.
-6. **Change the fallback default** from `"a_share"` (`_market_hooks.py:301`) to an explicit rejection. A code that matches no pattern in a US/CA-only build is a user error, not an A-share; failing loud is the correct behaviour and matches the repo's "misconfiguration fails loud" convention.
+   - Remove `_CN_FUTURES_PRODUCTS` (`:31`), `_is_china_futures`, and the now-orphaned `_CHINA_EXCHANGES` (`:152`) / `_EXCHANGE_ALIASES` (`:156`).
+6. **Change the fallback default** from `"a_share"` (`_market_hooks.py:298`) to an explicit rejection. A code that matches no pattern in a US/CA-only build is a user error, not an A-share; failing loud is the correct behaviour and matches the repo's "misconfiguration fails loud" convention.
 7. **Same for `detect_source()`** (`agent/src/market_data.py:67-73`): default `"tushare"` → raise or return `"yahoo"`. Trim `_SOURCE_PATTERNS` (`:21-63`) to `.US` → `yahoo`, `.TO`/`.V` → `yahoo`, `local:`, `^index`. Delete the `nobitex`/`wallex`/`okx`/`ccxt`/`mt5`/`pykrx` rows.
 8. **Keep** `_CA_SUFFIX_RE` / `_ca_venue_sibling` (`agent/src/market_data.py:130-146`, used at `:431-483`) — this is the `.TO`↔`.V` venue-alias fallback and is the one piece of Canada-specific routing that must survive intact.
 9. **Fix or delete `infer_market()`** (`agent/backtest/correlation.py:20-70`). It is a second, hand-rolled classifier that has already drifted from `_detect_market`. Preferred: make it call `_detect_market` so there is one source of truth. Fallback: trim its suffix table to `.US`/`.TO`/`.V`.
-10. **Trim `DataConfig`** (`env_schema.py:255-269`) to `market_data_order_us_equity` and `market_data_order_ca_equity`. Remove `tushare_token`, `gildata_token`, `qveris_api_key`, `tickerall_api_key`, `longbridge_*` once their loaders go. Keep `fmp_api_key`, `tiingo`, `finnhub`, `alphavantage`, and `fred_api_key` (macro tool, region-neutral).
+10. **Trim `DataConfig`** (`env_schema.py:255-269`) to `market_data_order_us_equity`, `market_data_order_ca_equity`, and `market_data_order_index` (kept per **D1**). Remove `tushare_token`, `gildata_token`, `qveris_api_key`, `tickerall_api_key`, `longbridge_*` once their loaders go. Keep `fmp_api_key`, `tiingo`, `finnhub`, `alphavantage`, and `fred_api_key` (macro tool, region-neutral).
 11. **Update `agent/tests/conftest.py:87-98`**, which scrubs `MARKET_DATA_ORDER_*` for the whole session — it hardcodes the 15-field list.
 12. **Update `agent/src/api/settings_routes.py`**: `_build_source_orders` (`:408-435`) iterates `registry._DEFAULT_CHAINS`, so it follows automatically; verify `_validate_source_order_update` (`:438-470`) still accepts a permutation of the two remaining chains.
 
-**Exit criteria:** importing `backtest.loaders.registry` yields exactly the US/CA chains; `_detect_market("AAPL")`, `("AAPL.US")`, `("TD.TO")`, `("PNG.V")` are correct and `_detect_market("600519.SH")` fails loud.
+**Exit criteria:** importing `backtest.loaders.registry` yields exactly the US/CA chains plus the `index` chain (D1); `_detect_market("AAPL")`, `("AAPL.US")`, `("TD.TO")`, `("PNG.V")`, `("^SPX")` are correct and `_detect_market("600519.SH")` fails loud.
 
 ---
 
@@ -203,7 +204,7 @@ Also required:
 4. **`agent/requirements.txt:34-40`** lists `tushare`, `akshare`, `ccxt` under "Data Providers" → update. Regenerate `requirements-lock.txt` and `requirements-channels-lock.txt`.
 5. **`agent/SKILL.md`** states "28 sources" and "10 engines" — recount after this phase.
 
-**Exit criteria:** `python -c "from backtest.loaders.registry import FALLBACK_CHAINS; print(FALLBACK_CHAINS)"` shows only two chains; every surviving loader declares `markets ⊆ {us_equity, ca_equity}`; no `tushare`/`akshare` import remains in a US/CA code path.
+**Exit criteria:** `python -c "from backtest.loaders.registry import FALLBACK_CHAINS; print(FALLBACK_CHAINS)"` shows only the US/CA chains plus `index`; every surviving loader declares `markets ⊆ {us_equity, ca_equity}`; no `tushare`/`akshare` import remains in a US/CA code path.
 
 ---
 
@@ -218,10 +219,10 @@ Also required:
 
 Then rewire the two dispatch points:
 
-1. **`agent/backtest/runner.py:1513-1608`** (`_select_engine`): keep the composite branch, the `us_equity`/`ca_equity` `GlobalEquityEngine` branch, the `options_portfolio` branch, and the `index` branch if **D1** keeps it. Delete the `china_futures`/`global_futures`, `forex`, `india_equity`, `korea_equity`, `vietnam_equity`, `crypto`, and `china_a` branches.
-2. **`agent/backtest/engines/composite.py:27-83`** (`_build_rule_engines`): reduce to the `us_equity` and `ca_equity` branches. The `ar_equity` `raise ValueError(...)` branch becomes an unknown-market rejection.
+1. **`agent/backtest/runner.py:1513-1608`** (`_select_engine`): keep the composite branch, the `us_equity`/`ca_equity` `GlobalEquityEngine` branch, the `options_portfolio` branch, and the `index` branch (**D1** keeps it). Delete the `china_futures`/`global_futures`, `forex`, `india_equity`, `korea_equity`, `vietnam_equity`, `crypto`, and `china_a` branches.
+2. **`agent/backtest/engines/composite.py:27-83`** (`_build_rule_engines`): reduce to the `us_equity`, `ca_equity`, and `index` (→ `GlobalEquityEngine(market="us")`) branches. The `ar_equity` `raise ValueError(...)` branch becomes an unknown-market rejection.
 3. **`_MARKET_TO_SOURCE`** (`runner.py:846-875`): trim to the two markets; the `"tushare"` default (`:875`) must change to a failing default.
-4. **`MARKET_BENCHMARKS`** (`benchmark.py:22-31`): keep `us_equity: "SPY"`, `ca_equity: "XIC.TO"`; delete `hk_equity`, `a_share`, `crypto`, `futures`. Keep `forex: None` only if the key survives.
+4. **`MARKET_BENCHMARKS`** (`benchmark.py:22-31`): keep `us_equity: "SPY"`, `ca_equity: "XIC.TO"`; delete `hk_equity`, `a_share`, `crypto`, `futures`, and `forex`.
 5. **Composite currency guard** (`composite.py:87-126`, `_reject_mixed_currency`): this is the mechanism that refuses a USD/CAD mix. It becomes *more* important after slimming, because US+CA is the only remaining cross-currency pair. Keep it, and add a test that a `["AAPL", "TD.TO"]` basket is refused rather than summing USD and CAD.
 6. **`agent/backtest/binance_*` / `perpetual_*`** (`binance_account_reconciliation.py`, `binance_shadow_evidence.py`, `binance_tolerance_calibration.py`, `perpetual_evidence.py`, `perpetual_risk.py`): **delete all five**. They are crypto-only.
 7. **Annualisation / trading calendars**: `agent/backtest/metrics.py` and any `bars_per_year` table containing China/HK/India/Korea/Vietnam exchange holidays → trim. `agent/src/live/runtime/triggers.py:66-110` keeps `_US_EQUITY_HOLIDAYS`; add a Canadian holiday set if **D3** enables CA live triggers.
@@ -298,7 +299,7 @@ Then rewire the two dispatch points:
 
 **Keep 7:** `alpaca/` (US), `ibkr/` (the only Canada-capable one), `robinhood/` (US), `tiger/` (US branch), `longbridge/` (US branch), `futu/` (reconfigure to US), `etoro/` (pending **D4**).
 
-**Reconfigure `futu/`:** `profiles.py:34,45` and `sdk.py:117` default `filter_trdmarket="HK"`. That default becomes a US market filter, or the connector is deleted.
+**Reconfigure `futu/`:** `profiles.py:34,50,65,82` and `sdk.py:90,117` default `filter_trdmarket="HK"`. That default becomes a US market filter, or the connector is deleted.
 
 **Cross-cutting files that enumerate all 18 connectors and will break on import:**
 
@@ -306,19 +307,24 @@ Then rewire the two dispatch points:
 |---|---|---|
 | `agent/src/trading/profiles.py` | 8-46 | trim imports; `BUILTIN_PROFILES` → 6-7 entries |
 | `agent/src/trading/service.py` | 16-32 (`_SDK_CONNECTOR_MODULES`), 663-695 (`_order_classification`), 792-1240 (eToro copy-trading) | trim module list; `_order_classification` keeps US/CA only; eToro block depends on **D4** |
-| `agent/src/trading/onboarding.py` | 52-204 (`_BUILTIN`) | trim dict; **add missing `ibkr` entry** |
+| `agent/src/trading/onboarding.py` | 52-204 (`_BUILTIN`) | trim dict; **add missing `ibkr` and `robinhood` entries** (both kept; see §2.4 gap 5) |
 | `agent/src/live/registry.py` | 26-43 (imports), 50-70 (`_BROKER_CURATED_MAPS`) | trim |
 | `agent/src/config/schema.py` | 15 (`LIVE_BROKER_SERVER_KEYS = {"robinhood","ibkr","scalable"}`) | drop `scalable`; also trim the scaled seed at `:240+` |
 | `agent/src/portfolio/compatibility.py` | 47-112 (`_COMPATIBILITY`) | trim to surviving brokers |
+| `agent/src/portfolio/service.py` | 49 (`_LOADER_MARKET_SUFFIXES`) | trim suffix set to `{"US", "TO", "V"}` — the last of the drifting classifiers from §2.2 |
 | `agent/src/tools/trading_connector_tool.py` | 847-1200 (`etoro_*` block) | depends on **D4** |
 | `agent/backtest/loaders/registry.py` | — | `futu`/`longbridge` loader entries follow Phase 2 |
 
-**Close the Canada gaps (§2.4):**
+**Close the Canada gaps (§2.4):** under the recommended **D3 (data + backtest only)**, this is a documentation step, not a code step:
 
-1. Add `CA_EQUITY` and `CA_ETF` to `AssetClass` (`agent/src/live/mandate/model.py:34-42`).
-2. Add the `CA_EQUITY` row to `_ASSET_CLASS_MARKET` (`agent/src/live/enforcement.py:58-66`).
-3. Add a `ca_equity` entry to `MARKET_SPECS` (`agent/src/live/runtime/triggers.py:96-110`) — TSX regular hours 09:30-16:00 America/Toronto, plus a Canadian holiday set (mirror `_US_EQUITY_HOLIDAYS` at `:66-88`).
-4. Decide whether `PreTradeAdvisoryInterface`, `pending_action.py:145` (`broker: Literal["alpaca"]`), and `flatten.py:96` (hardcoded `"broker": "robinhood"`) need a Canada/IBKR path. **Decision D3.**
+1. Record the limitation in the docs/skill surface: Canada is **market-data + backtest only**; there is no live-trading path. §2.4 gaps 1–4 stay open as documented limitations.
+2. Do **not** add `CA_EQUITY`/`CA_ETF`, the `_ASSET_CLASS_MARKET` row, or the `ca_equity` `MARKET_SPECS` entry in this refactor.
+
+   *Only if D3 is later flipped to build a Canada live path* (a follow-on, not part of this plan):
+   1. Add `CA_EQUITY` and `CA_ETF` to `AssetClass` (`agent/src/live/mandate/model.py:34-42`).
+   2. Add the `CA_EQUITY` row to `_ASSET_CLASS_MARKET` (`agent/src/live/enforcement.py:58-66`).
+   3. Add a `ca_equity` entry to `MARKET_SPECS` (`agent/src/live/runtime/triggers.py:96-110`) — TSX regular hours 09:30-16:00 America/Toronto, plus a Canadian holiday set (mirror `_US_EQUITY_HOLIDAYS` at `:66-88`).
+   4. Decide whether `PreTradeAdvisoryInterface`, `pending_action.py:145` (`broker: Literal["alpaca"]`), and `flatten.py:96` (hardcoded `"broker": "robinhood"`) need a Canada/IBKR path.
 
 **Regenerate the README broker matrix:** it is generated by `agent/src/trading/capability_matrix.py` between markers at `README.md:423-497`. Run `PYTHONPATH=agent python -m src.trading.capability_matrix` after editing profiles; `agent/tests/test_readme_counts.py` fails otherwise.
 
@@ -444,11 +450,12 @@ Then rewire the two dispatch points:
 
 ```
 a_share  hk_equity  india_equity  kr_equity  vietnam_equity  ar_equity  uk_equity
-csi300   TUSHARE_TOKEN  AKSHARE  pykrx  mootdx  baostock  gildata  tickertall
-600519.SH  0700.HK  RELIANCE.NS  005930.KS  VIC.VN  -USDT  BTCUSDT
+csi300   tushare  akshare  pykrx  mootdx  baostock  gildata  tickerall  qveris
+nobitex  wallex  okx  binance  ccxt  mt5  TUSHARE_TOKEN
+600519.SH  000300.SH  000001.SZ  0700.HK  RELIANCE.NS  005930.KS  VIC.VN  -USDT  BTCUSDT
 ```
 
-Make the deny-list a **single file** (e.g. `tools/us-ca-scope-allowlist.json` for intentional mentions with reasons) so it is auditable and extensible.
+The gate greps case-insensitively (`grep -in`), so the lowercase entries match `akshare`/`tushare`/`pykrx` as they appear in code and `TUSHARE_TOKEN` stays in env-var case for clarity. Make the deny-list a **single file** (e.g. `tools/us-ca-scope-allowlist.json` for intentional mentions with reasons) so it is auditable and extensible.
 
 **Exit criteria:** the scope gate passes; the rewritten routing tests cover US accept, CA accept, non-US/CA reject.
 
@@ -461,7 +468,7 @@ Make the deny-list a **single file** (e.g. `tools/us-ca-scope-allowlist.json` fo
 | **D0** | Delete vs. gate vs. hybrid | **Hybrid** — delete region-only modules, keep the dispatch tables in their current shape |
 | **D1** | Keep the `index` market and `^SPX`/`^VIX` symbols? | **Keep.** Benchmarks resolve through `yfinance`, but index symbols are used by correlation and regime analysis and are US-native |
 | **D2** | Keep `akshare` and `longbridge` for their US branches? | **Drop both.** Their US coverage duplicates `yahoo`/`yfinance`; the loading cost and dependency weight outweigh the fallback value. Drop `eastmoney_loader` too if its US path is unexercised |
-| **D3** | Canada live trading, or data + backtest only? | **Data + backtest only for now.** Closes §2.4 as "documented limitation" rather than building a Canada live path against a single broker. Requires `AssetClass.CA_EQUITY` and a `ca_equity` `MARKET_SPECS` entry only if live is wanted |
+| **D3** | Canada live trading, or data + backtest only? | **Data + backtest only for now.** Closes §2.4 as "documented limitation" rather than building a Canada live path against a single broker. The `AssetClass.CA_EQUITY` / `_ASSET_CLASS_MARKET` / `ca_equity` `MARKET_SPECS` additions in Phase 6 are deferred — do them only if a live CA path is later wanted |
 | **D4** | Keep `etoro`? | **Drop.** It is a global multi-asset connector that is neither US-primary nor Canada-capable, and it carries a large copy-trading surface (`service.py:792-1240`) |
 | **D5** | Delete `screen_market` or port it to SP500? | **Port it.** A US market screen is a genuine capability and the SP500 universe code already exists for `alpha_bench` |
 | **D6** | Keep Aliyun IQS for web search? | **Keep as a secondary backend** (it is a search provider, not a market). Review only for credential/maintenance cost |
@@ -503,7 +510,7 @@ Per phase, run the smallest covering set (see the repo's own `AGENTS.md` / `dsh-
 
 **Acceptance criteria for the whole refactor:**
 
-1. `FALLBACK_CHAINS` has exactly `us_equity` and `ca_equity`.
+1. `FALLBACK_CHAINS` has exactly `us_equity`, `ca_equity`, and the region-neutral `index` chain (D1).
 2. An end-to-end backtest runs on a US basket and on a Canada basket, and a mixed USD/CAD basket is refused with the existing currency error.
 3. Every non-US/CA symbol is rejected with an actionable message, not silently routed.
 4. `list_profiles()` returns only brokers that can trade at least one of the two markets.
