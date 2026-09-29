@@ -455,7 +455,7 @@ nobitex  wallex  okx  binance  ccxt  mt5  TUSHARE_TOKEN
 600519.SH  000300.SH  000001.SZ  0700.HK  RELIANCE.NS  005930.KS  VIC.VN  -USDT  BTCUSDT
 ```
 
-The gate greps case-insensitively (`grep -in`), so the lowercase entries match `akshare`/`tushare`/`pykrx` as they appear in code and `TUSHARE_TOKEN` stays in env-var case for clarity. Make the deny-list a **single file** (e.g. `tools/us-ca-scope-allowlist.json` for intentional mentions with reasons) so it is auditable and extensible.
+The gate greps case-insensitively (`grep -in`), so the lowercase entries match `akshare`/`tushare`/`pykrx` as they appear in code and `TUSHARE_TOKEN` stays in env-var case for clarity. Make the deny-list a **single file** (`tools/us-ca-scope-deny.json`, created in Phase 0) so it is auditable and extensible; intentional mentions with reasons can be recorded as an allowlist alongside it.
 
 **Exit criteria:** the scope gate passes; the rewritten routing tests cover US accept, CA accept, non-US/CA reject.
 

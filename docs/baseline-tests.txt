@@ -1,0 +1,25 @@
+# Baseline test run — US/CA refactor (Phase 0)
+
+- Date: 2026-09-29 18:11 -0400
+- Branch: `refactor/us-ca-only`
+- Base commit: `78cb4cc0b8f49403bb31b9dacdad440fd33fd61e` — "docs(refactor-plan): reconcile D1/D3 decisions and close review gaps"
+- Command: `PYTHONPATH=agent python -m pytest agent/tests -q --tb=no --timeout=600 -p no:cacheprovider`
+
+## Summary
+
+```
+15971 passed, 1 failed, 79 skipped, 1 xfailed, 11 warnings in 494.33s (0:08:14)
+```
+
+## Currently failing tests
+
+- `agent/tests/test_signal_alignment_perf.py::TestAlignPerformance::test_5000bars_50symbols_under_35ms`
+  (latency-budget benchmark; timing-sensitive / machine-dependent — not a functional regression)
+
+## Notes
+
+- The 1 `xfailed` entry is the US/CA scope gate (`agent/tests/test_us_ca_scope_gate.py`), written in
+  Phase 0 as a *failing* xfail. It is expected to fail until the refactor removes every denied
+  market/source string; `strict=True` will then flag it for promotion to an enforcing gate.
+- Per the plan, a red baseline is not a blocker. The sole failure is a performance threshold, and
+  loader/locale tests are environment-sensitive (79 skipped here).
