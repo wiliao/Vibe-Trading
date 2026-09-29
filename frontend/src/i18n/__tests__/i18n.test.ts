@@ -46,10 +46,9 @@ const localeModules = import.meta.glob<Record<string, unknown>>("../locales/*.js
   import: "default",
 });
 
-const localeCodes = Object.keys(localeModules)
-  .map((path) => path.slice(path.lastIndexOf("/") + 1, -".json".length))
-  // The locales directory also holds its own tsconfig.json.
-  .filter((code) => code !== "tsconfig");
+const localeCodes = Object.keys(localeModules).map((path) =>
+  path.slice(path.lastIndexOf("/") + 1, -".json".length),
+);
 
 const locales: Record<string, Record<string, unknown>> = Object.fromEntries(
   localeCodes
