@@ -1,7 +1,7 @@
 ---
 name: vibe-trading
 version: 0.1.15
-description: Professional finance research toolkit — backtesting (10 engines + benchmark comparison panel), factor analysis, Alpha Zoo (462 pre-built alphas across qlib158/alpha101/gtja191/academic/fundamental), options pricing, 90 finance skills, 30 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 10 market-data sources (yahoo, yfinance, stooq, sina, eastmoney, local, plus optional-key finnhub/alphavantage/tiingo/fmp).
+description: Professional finance research toolkit — backtesting (10 engines + benchmark comparison panel), factor analysis, Alpha Zoo (271 pre-built alphas across qlib158/alpha101/academic/fundamental), options pricing, 90 finance skills, 30 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 10 market-data sources (yahoo, yfinance, stooq, sina, eastmoney, local, plus optional-key finnhub/alphavantage/tiingo/fmp).
 dependencies:
   python: ">=3.11"
   pip:
@@ -23,7 +23,7 @@ mcp:
 
 # Vibe-Trading
 
-Professional finance research toolkit with AI-powered backtesting (10 engines), multi-agent teams, 90 specialized skills, the **Alpha Zoo** (462 pre-built quantitative alphas across qlib158 / alpha101 / gtja191 / academic / fundamental with one-line CLI benchmarking), and the Shadow Account loop — extract your implicit trading rules from a journal, backtest them across A股/港股/美股/crypto, then see where they would have served you better.
+Professional finance research toolkit with AI-powered backtesting (10 engines), multi-agent teams, 90 specialized skills, the **Alpha Zoo** (271 pre-built quantitative alphas across qlib158 / alpha101 / academic / fundamental with one-line CLI benchmarking), and the Shadow Account loop — extract your implicit trading rules from a journal, backtest them across US/Canada equities, then see where they would have served you better.
 
 ## Setup
 
@@ -53,7 +53,7 @@ Add to your agent's MCP config:
 
 ### API Key Requirements
 
-Core research MCP tools work with zero API keys for HK/US/Canada/crypto. After `pip install`, backtesting, market data, factor analysis, options pricing, chart patterns, web search, document reading, trade journal analysis, shadow-account extraction/backtest/report, the Alpha Zoo (462 pre-built alphas), and all 90 skills are ready to use. IBKR tools require a local TWS / IB Gateway session; `run_swarm` requires an LLM key.
+Core research MCP tools work with zero API keys for US/Canada research. After `pip install`, backtesting, market data, factor analysis, options pricing, chart patterns, web search, document reading, trade journal analysis, shadow-account extraction/backtest/report, the Alpha Zoo (271 pre-built alphas), and all 90 skills are ready to use. IBKR tools require a local TWS / IB Gateway session; `run_swarm` requires an LLM key.
 
 | Feature | Key needed | When |
 |---------|-----------|------|
@@ -110,11 +110,10 @@ Example workflow:
 
 Use `list_swarm_presets()` to see all teams, then `run_swarm()` to execute.
 
-### Alpha Zoo (462 pre-built alphas)
+### Alpha Zoo (271 pre-built alphas)
 One-line cross-sectional IC / IR / alive-reversed-dead categorisation across five bundled zoos:
 - **qlib158** (154 alphas) — Microsoft Qlib's `Alpha158` feature handler, Apache-2.0 with pinned commit SHA.
 - **alpha101** (101 alphas) — Kakushadze (2015) "101 Formulaic Alphas" (arXiv:1601.00991), written from the paper appendix.
-- **gtja191** (191 alphas) — Guotai Junan 2014 "191 Short-period Trading Alpha Factors" research report.
 - **academic** (12 factors) — Fama-French 5 + Carhart momentum + Jegadeesh reversal + George-Hwang 52-week-high + Amihud illiquidity + Harvey-Siddique skew + Frazzini-Pedersen betting-against-beta (price-based proxies) + a correlation-rewiring stability score (from the in-repo correlation-regime skill).
 - **fundamental** (4 factors) — PIT-safe earnings yield, ROE, gross profitability, and asset growth from daily fundamental panels.
 
@@ -133,7 +132,7 @@ Comprehensive knowledge base covering:
 
 Use `load_skill(name)` to access full methodology docs with code templates.
 
-## Available MCP Tools (74)
+## Available MCP Tools (64)
 
 | Tool | Description | API Key |
 |------|-------------|---------|
@@ -152,14 +151,6 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `pattern_recognition` | Detect chart patterns (H&S, double top, etc.) | None |
 | `get_market_data` | Fetch OHLCV data (auto-detect + ordered fallback across 10 sources) | None* |
 | `get_fund_flow` | Capital fund-flow (main/retail net inflow) | None* |
-| `get_dragon_tiger` | Dragon-tiger list (龙虎榜) top buyer/seller seats | None* |
-| `get_northbound_flow` | Northbound (Stock Connect) net flow | None* |
-| `get_margin_trading` | Margin trading & short-selling balances | None* |
-| `get_block_trades` | Block-trade (大宗交易) records | None* |
-| `get_shareholder_count` | Shareholder-count history per symbol | None* |
-| `get_lockup_expiry` | Restricted-share lockup release schedule | None* |
-| `get_sector_info` | Sector / industry constituents & performance | None* |
-| `get_research_reports` | Sell-side analyst research reports | None* |
 | `get_stock_news` | Market & company news headlines | None* |
 | `get_sec_filings` | SEC EDGAR filings (10-K/10-Q/8-K, etc.) | None |
 | `get_financial_statements` | Income / balance / cash-flow statements | None* |
@@ -168,7 +159,6 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `screen_market` | Market screener with fundamental/technical filters | None* |
 | `search_symbol` | Symbol / ticker search across markets | None |
 | `get_macro_series` | FRED macroeconomic series | FRED_API_KEY |
-| `iwencai_search` | A-share natural-language research search | IWENCAI_KEY |
 | `qveris_search` | Search QVeris premium data/tool marketplace (free discovery) | QVERIS_API_KEY + paid mode |
 | `qveris_inspect` | Inspect QVeris tool schemas before executing (free) | QVERIS_API_KEY + paid mode |
 | `qveris_execute` | Execute a QVeris capability; budget-bounded, may be billable | QVERIS_API_KEY + paid mode |
@@ -207,7 +197,6 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `research_papers` | arXiv + OpenAlex search/read with source-anchored claim extraction | None |
 | `quantlib_call` | Pure-compute finance math — 265 functions across 19 quantlib modules | None |
 | `cashflow_performance` | XIRR / MOIC / DPI / TVPI / TWR / Modified Dietz over dated cash flows | None |
-| `orderbook_depth` | Crypto L2 ladder — spread bps, depth imbalance, impact cost | None |
 | `sentiment` | Local lexicon text scoring + crypto Fear & Greed Index | None |
 | `technical_indicators` | RSI / MACD / Bollinger / SMA / EMA through the existing loaders | None* |
 | `get_fundamentals` | PIT-safe SEC fundamentals panels (filed-date anchored) | None |

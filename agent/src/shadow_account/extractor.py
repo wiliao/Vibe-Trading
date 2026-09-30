@@ -52,11 +52,8 @@ _PRICE_LOOKBACK_DAYS = 40
 # Journal market label → backtest loader-registry market key. Labels with no
 # mapping (e.g. "other") skip the price fetch and degrade to NaN.
 _MARKET_KEY_MAP = {
-    "china_a": "a_share",
     "us": "us_equity",
-    "hk": "hk_equity",
-    "uk": "uk_equity",
-    "crypto": "crypto",
+    "ca": "ca_equity",
 }
 
 
@@ -189,7 +186,7 @@ def _fetch_price_history(
     Args:
         symbol: Journal symbol, passed to the loader as-is (no cross-market
             normalization in v1).
-        market: Journal market label (e.g. ``"china_a"``).
+        market: Journal market label (e.g. ``"us"``).
         start: Inclusive fetch start (already buffered for indicator warmup).
         end: Inclusive fetch end. Entry features still exclude the buy date
             because this loader returns completed daily bars, not intraday
@@ -550,11 +547,8 @@ def _heuristic_single_rule(
 # ---------------- Natural-language translation ----------------
 
 _MARKET_LABELS = {
-    "china_a": "China A-share",
     "us": "US equity",
-    "hk": "HK equity",
-    "uk": "UK equity",
-    "crypto": "Crypto",
+    "ca": "Canada equity",
     "other": "Other",
 }
 

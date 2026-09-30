@@ -1,18 +1,17 @@
 """Read-only symbol-search tool: resolve a name/ticker to symbols + market.
 
-Backed by the selected Binance connector for exact crypto pairs plus three
-frozen, IP-throttled public-API clients so the agent never hits a provider
-un-throttled and never re-implements transport plumbing:
+Backed by the selected Binance connector for exact crypto pairs plus frozen,
+IP-throttled public-API clients so the agent never hits a provider un-throttled
+and never re-implements transport plumbing:
 
 * The active Binance profile resolves exact spot-pair spellings against its
   exchange market catalog. It does not guess asset names from prose.
 
 * :mod:`backtest.loaders.eastmoney_client` — Eastmoney's free suggest endpoint
-  matches Chinese/English names and tickers across A-shares (.SH/.SZ/.BJ),
-  Hong Kong (.HK) and U.S. (.US) listings, each carrying a fully-qualified
-  ``secid`` already in ``<market>.<code>`` form.
+  matches U.S. (``.US``) listings, each carrying a fully-qualified ``secid``
+  already in ``<market>.<code>`` form.
 * :mod:`backtest.loaders.yahoo_client` — Yahoo's v1 search endpoint matches
-  global tickers/company names (US, HK, Canada, crypto, indices, FX, ...).
+  US / Canada tickers and company names (plus crypto, indices and FX).
 * :mod:`backtest.loaders.sec_edgar_client` — the SEC company-tickers table
   enriches a resolved U.S. equity ticker with its zero-padded CIK.
 
@@ -57,8 +56,8 @@ _EASTMONEY_SUGGEST_URL = "https://searchapi.eastmoney.com/api/suggest/get"
 # Vancouver", not just a bare "BTO.TO". ``.TO``/``.V`` are exclusively
 # Canadian suffixes, so a leading one is unambiguous and Eastmoney can never
 # serve it. Bare names with no suffix (e.g. "BTO", "B2Gold BTO") carry no
-# venue signal and may be legit non-Canadian lookups (A-share/HK/US), so they
-# are deliberately left to the normal fan-out.
+# venue signal and may be legit non-Canadian lookups, so they are deliberately
+# left to the normal fan-out.
 _CANADIAN_SYMBOL_RE = re.compile(r"^[A-Z0-9&.\-]+\.(?:TO|V)\b", re.IGNORECASE)
 
 # Explicit exchange-pair spellings are not equity/name searches. Restrict the
@@ -136,9 +135,6 @@ _CRYPTO_PAIR_RE = re.compile(
 # Eastmoney market-number -> our symbol suffix. Anything else is left unmapped
 # (those candidates are skipped rather than emitted with a wrong suffix).
 _EASTMONEY_SUFFIX_BY_MARKET: Dict[str, str] = {
-    "1": "SH",   # Shanghai
-    "0": "SZ",   # Shenzhen / Beijing share the 0 prefix on Eastmoney
-    "116": "HK",
     "105": "US",  # NASDAQ
     "106": "US",  # NYSE
     "107": "US",  # AMEX
@@ -148,20 +144,9 @@ _EASTMONEY_SUFFIX_BY_MARKET: Dict[str, str] = {
 # market the data layer routes has a row, so none is labelled "global";
 # test_market_identity_parity derives that list from the backtest's table.
 _MARKET_BY_SUFFIX: Dict[str, str] = {
-    "SH": "cn",
-    "SZ": "cn",
-    "BJ": "cn",
-    "HK": "hk",
     "US": "us",
-    "NS": "in",
-    "BO": "in",
-    "KS": "kr",
-    "KQ": "kr",
     "TO": "ca",
     "V": "ca",
-    "BA": "ar",
-    "L": "uk",
-    "VN": "vn",
 }
 
 # Hard caps so a broad query cannot bloat the envelope.
@@ -190,14 +175,13 @@ class SymbolSearchTool(BaseTool):
     name = "search_symbol"
     description = (
         "Resolve a company name or ticker fragment to candidate trading symbols "
-        "with their market, in the project's symbol convention (A-shares "
-        "600519.SH, Hong Kong 00700.HK, U.S. AAPL.US, Canada TD.TO/PNG.V, plus "
-        "crypto/index/FX from "
-        "Yahoo). Exact crypto pairs are checked against the active Binance "
-        "profile; other queries search Eastmoney (China/HK/US names and tickers) and Yahoo "
-        "(global) and, for U.S. equities, attaches the SEC CIK. Use this to turn "
-        "an ambiguous name into a concrete symbol before calling get_market_data "
-        'or get_sec_filings. Example: search_symbol(query="apple", limit=5).'
+        "with their market, in the project's symbol convention (U.S. AAPL.US, "
+        "Canada TD.TO/PNG.V, plus crypto/index/FX from Yahoo). Exact crypto "
+        "pairs are checked against the active Binance profile; other queries "
+        "search Eastmoney (US names and tickers) and Yahoo, and for U.S. "
+        "equities the SEC CIK is attached. Use this to turn an ambiguous name "
+        "into a concrete symbol before calling get_market_data or "
+        'get_sec_filings. Example: search_symbol(query="apple", limit=5).'
     )
     parameters = {
         "type": "object",

@@ -514,7 +514,7 @@ def _apply_filter(df: pd.DataFrame, expr: str) -> pd.DataFrame:
     Supports:
         - "YYYY-MM to YYYY-MM" or "YYYY-MM-DD to YYYY-MM-DD" (date range)
         - "symbol=XXX" (exact match)
-        - "market=china_a|us|hk|crypto"
+        - "market=us|ca"
 
     Args:
         df: Standardized DataFrame.
@@ -567,7 +567,7 @@ def analyze_trade_journal(file_path: str, analysis_type: str = "full", filter_ex
             "profile" and "behavior" are fully implemented; "strategy" still
             returns a Phase 4c placeholder.
         filter_expr: Optional filter. Examples: "2026-01 to 2026-03",
-            "symbol=600519.SH", "market=china_a".
+            "symbol=AAPL.US", "market=ca".
 
     Returns:
         JSON string. Keys: status, file, format_detected, total_records,
@@ -669,7 +669,7 @@ class TradeJournalTool(BaseTool):
             },
             "filter_expr": {
                 "type": "string",
-                "description": "Optional filter, e.g. '2026-01 to 2026-03', 'symbol=600519.SH', 'market=china_a'.",
+                "description": "Optional filter, e.g. '2026-01 to 2026-03', 'symbol=AAPL.US', 'market=ca'.",
                 "default": "",
             },
         },

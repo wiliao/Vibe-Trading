@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import time
 from typing import Any
@@ -39,9 +38,7 @@ _PRESET_KEYWORDS: list[tuple[str, list[str], float]] = [
             "三市场",
             "全球配置",
             "资产配置",
-            "港美.*A股",
-            "A股.*加密",
-            "加密.*A股",
+            "美股.*加股",
             "多市场",
         ],
         1.0,
@@ -342,10 +339,8 @@ _PRESET_KEYWORDS: list[tuple[str, list[str], float]] = [
 
 # Market labels used in YAML templates (English, compatible with {market} placeholders).
 _MARKET_PATTERNS: list[tuple[str, list[str]]] = [
-    ("A-shares", [r"A股", r"a股", "沪深", "上证", "深证", "创业板", "科创板", "中证", r"\bCSI\b"]),
-    ("crypto", ["加密", r"\bcrypto\b", r"\bBTC\b", r"\bETH\b", "币", "USDT", "数字货币"]),
-    ("Hong Kong", ["港股", "恒生", r"H股", "港交所", r"\.HK\b"]),
     ("US", ["美股", "纳斯达克", "标普", "道琼斯", r"S&P", r"\.US\b"]),
+    ("Canada", ["加拿大", "多伦多", r"TSX", r"\.TO\b", r"\.V\b"]),
 ]
 
 # Risk tolerance for global_allocation_committee (English).
@@ -502,13 +497,13 @@ def _extract_market(prompt: str) -> str:
         prompt: User's natural language prompt.
 
     Returns:
-        Market label for template variables, default A-shares.
+        Market label for template variables, default US.
     """
     for market, patterns in _MARKET_PATTERNS:
         for pat in patterns:
             if re.search(pat, prompt, re.IGNORECASE):
                 return market
-    return "A-shares"
+    return "US"
 
 
 def _extract_risk_tolerance(prompt: str) -> str:
@@ -637,13 +632,7 @@ def _build_variables(preset_name: str, prompt: str) -> dict[str, str]:
         "event_driven_task_force": {"market": market, "event_type": "all types"},
         "etf_allocation_desk": {"risk_profile": _risk_to_etf_profile(risk), "market": market},
         "derivatives_strategy_desk": {"target": g, "view": "neutral"},
-        "crypto_research_lab": {"target": "BTC, ETH, SOL", "timeframe": "medium-term 1-3 months"},
-        "credit_research_team": {"target": g, "market": "China credit bonds"},
-        "convertible_bond_team": {
-            "market": "A-share convertible bonds",
-            "goal": g,
-            "strategy_type": _extract_strategy_type(prompt),
-        },
+        "credit_research_team": {"target": g, "market": "US investment-grade credit"},
         "fundamental_research_team": {"target": g, "market": market},
         "commodity_research_team": {"commodity": "gold", "horizon": "3 months"},
         "fund_selection_panel": {"fund_type": "equity", "goal": g},
@@ -677,7 +666,7 @@ class SwarmTool(BaseTool):
         "Provide a natural language prompt and, when known, an explicit preset_name from agent/src/swarm/presets "
         "(e.g. equity_research_team, quant_strategy_desk, global_allocation_committee, risk_committee) "
         "so follow-up/continuation prompts do not lose routing context. "
-        "Example: run_swarm(prompt='Analyze A-share new energy opportunities for Q2 2026', preset_name='equity_research_team')"
+        "Example: run_swarm(prompt='Analyze US semiconductor opportunities for Q2 2026', preset_name='equity_research_team')"
     )
     parameters = {
         "type": "object",

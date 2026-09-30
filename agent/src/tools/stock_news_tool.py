@@ -1,24 +1,12 @@
-"""Read-only news tool: per-stock and global financial headlines.
+"""Read-only news tool: per-stock financial headlines.
 
-Two public, no-auth news surfaces are wrapped behind one BaseTool contract:
-
-* China A-share (and general China-market finance) headlines come from
-  Eastmoney's free ``search-api`` news-list endpoint. Like every Eastmoney
-  surface it rate-limits by source IP, so the request routes through the frozen,
-  IP-throttled :mod:`backtest.loaders.eastmoney_client` rather than touching the
-  host directly.
-* US / HK headlines come from Yahoo Finance's public v1 search-news surface via
-  the frozen, IP-throttled :mod:`backtest.loaders.yahoo_client`.
+US headlines come from Yahoo Finance's public v1 search-news surface via the
+frozen, IP-throttled :mod:`backtest.loaders.yahoo_client`.
 
 The tool never re-implements provider plumbing and never issues an un-throttled
 request: every outbound call goes through a frozen client.
 
-Scopes:
-
-* ``stock`` (default) — headlines for a single security named by ``code``.
-* ``global`` — broad market headlines, no ``code`` required.
-
-A failure for one upstream is reported as an error envelope; the tool never
+A failure from the upstream is reported as an error envelope; the tool never
 raises out of :meth:`StockNewsTool.execute`.
 """
 
@@ -29,23 +17,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from backtest.loaders import eastmoney_client, yahoo_client
+from backtest.loaders import yahoo_client
 
 from src.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 
-# Eastmoney free news search endpoint (JSON list of CMS articles). It is the
-# same surface the site's search box calls; no auth, IP-throttled.
-_EM_NEWS_URL = "https://search-api-web.eastmoney.com/search/jsonp"
-
-# A-share / China-market suffixes that route to the Eastmoney news surface.
-_EM_SUFFIXES = ("SH", "SZ", "BJ")
 # Suffixes that route to Yahoo's search-news surface.
-_YAHOO_SUFFIXES = ("US", "HK")
-
-# Default broad-market query used when ``scope='global'`` carries no code.
-_GLOBAL_QUERY = "财经"
+_YAHOO_SUFFIXES = ("US",)
 
 # Bounds so a noisy upstream can never return an unbounded payload.
 _DEFAULT_LIMIT = 20
@@ -103,100 +82,6 @@ def _snippet(text: Any) -> str:
     return collapsed[:_SNIPPET_CHARS].rstrip() + "…"
 
 
-def _decode_jsonp(payload: Any) -> Any:
-    """Decode an Eastmoney response that may arrive JSON or JSONP-wrapped.
-
-    The search endpoint usually returns a JSON object, but can echo a
-    ``callback(...)`` JSONP envelope. A single outer call wrapper is stripped
-    before parsing.
-
-    Args:
-        payload: The decoded body from the throttled client (``dict`` already, or
-            a raw ``str`` when JSONP-wrapped).
-
-    Returns:
-        The decoded object, or ``None`` when nothing parseable is found.
-    """
-    if isinstance(payload, dict):
-        return payload
-    if not isinstance(payload, str):
-        return None
-    start = payload.find("(")
-    end = payload.rfind(")")
-    inner = payload[start + 1 : end] if start != -1 and end > start else payload
-    try:
-        return json.loads(inner)
-    except (ValueError, TypeError):
-        return None
-
-
-def _em_article(raw: dict[str, Any]) -> dict[str, Any]:
-    """Project one Eastmoney CMS article into a compact, named record.
-
-    Args:
-        raw: A single article dict from ``result.cmsArticleWebOld``.
-
-    Returns:
-        A flat ``{title, url, source, published, snippet}`` record.
-    """
-    return {
-        "title": _snippet(raw.get("title")),
-        "url": raw.get("url"),
-        "source": raw.get("mediaName"),
-        "published": raw.get("date"),
-        "snippet": _snippet(raw.get("content")),
-    }
-
-
-def _fetch_eastmoney_news(query: str, limit: int) -> list[dict[str, Any]]:
-    """Fetch China-market news headlines for a query from Eastmoney.
-
-    Args:
-        query: Free-text search term (bare code or keyword).
-        limit: Maximum number of articles to return.
-
-    Returns:
-        A capped list of compact article records; empty when none.
-
-    Raises:
-        requests.RequestException: Network failure, propagated to the caller.
-        requests.HTTPError: Non-2xx response status.
-        ValueError: Body is not valid JSON.
-    """
-    param = json.dumps(
-        {
-            "uid": "",
-            "keyword": query,
-            "type": ["cmsArticleWebOld"],
-            "client": "web",
-            "clientType": "web",
-            "param": {
-                "cmsArticleWebOld": {
-                    "searchScope": "default",
-                    "sort": "default",
-                    "pageIndex": 1,
-                    "pageSize": limit,
-                }
-            },
-        },
-        ensure_ascii=False,
-    )
-    payload = eastmoney_client.get_json(
-        _EM_NEWS_URL,
-        params={"cb": "", "param": param, "_": "0"},
-    )
-    decoded = _decode_jsonp(payload)
-    if not isinstance(decoded, dict):
-        return []
-    result = decoded.get("result")
-    if not isinstance(result, dict):
-        return []
-    articles = result.get("cmsArticleWebOld")
-    if not isinstance(articles, list):
-        return []
-    return [_em_article(a) for a in articles if isinstance(a, dict)][:limit]
-
-
 def _yahoo_article(raw: dict[str, Any]) -> dict[str, Any]:
     """Project one Yahoo search-news item into the shared article shape.
 
@@ -224,7 +109,7 @@ def _yahoo_article(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _fetch_yahoo_news(query: str, limit: int) -> list[dict[str, Any]]:
-    """Fetch US/HK news articles for a query via Yahoo search.
+    """Fetch US news articles for a query via Yahoo search.
 
     Args:
         query: Free-text search term (bare ticker or keyword).
@@ -243,17 +128,15 @@ def _fetch_yahoo_news(query: str, limit: int) -> list[dict[str, Any]]:
 
 
 class StockNewsTool(BaseTool):
-    """Read-only per-stock and global financial news headlines."""
+    """Read-only per-stock financial news headlines."""
 
     name = "get_stock_news"
     description = (
-        "Fetch recent financial news headlines, read-only and no auth. Markets: "
-        "China A-share (SH/SZ/BJ) returns Eastmoney news ARTICLES "
-        "(title/url/source/published/snippet) under 'articles'. US (.US) and Hong "
-        "Kong (.HK) return Yahoo Finance news articles with the same fields. Use "
-        "scope 'stock' with a 'code', or scope 'global' (no code) for broad "
-        "China-market finance articles. "
-        'Example: {"code": "600519.SH", "scope": "stock", "limit": 10}.'
+        "Fetch recent financial news headlines for a US-listed stock, read-only "
+        "and no auth, from Yahoo Finance. Returns ARTICLES "
+        "(title/url/source/published/snippet) under 'articles'. Use scope "
+        "'stock' with a 'code'. "
+        'Example: {"code": "AAPL.US", "scope": "stock", "limit": 10}.'
     )
     parameters = {
         "type": "object",
@@ -261,18 +144,15 @@ class StockNewsTool(BaseTool):
             "code": {
                 "type": "string",
                 "description": (
-                    "Symbol whose news to fetch, e.g. '600519.SH', 'AAPL.US', "
-                    "'00700.HK'. Required when scope='stock'; ignored when "
-                    "scope='global'. The exchange suffix selects the upstream: "
-                    "SH/SZ/BJ -> Eastmoney, US/HK -> Yahoo Finance."
+                    "US symbol whose news to fetch, e.g. 'AAPL.US'. Required "
+                    "when scope='stock'. The '.US' exchange suffix is required."
                 ),
             },
             "scope": {
                 "type": "string",
-                "enum": ["stock", "global"],
+                "enum": ["stock"],
                 "description": (
-                    "'stock' (default) for one security named by 'code'; "
-                    "'global' for broad China-market finance headlines."
+                    "'stock' (default) for one security named by 'code'."
                 ),
                 "default": "stock",
             },
@@ -288,11 +168,11 @@ class StockNewsTool(BaseTool):
     }
 
     def execute(self, **kwargs: Any) -> str:
-        """Fetch news headlines for one stock or the broad market.
+        """Fetch news headlines for one stock.
 
         Args:
-            **kwargs: ``scope`` ('stock' | 'global', default 'stock'), ``code``
-                (required when scope='stock'), and optional ``limit`` (1-50).
+            **kwargs: ``scope`` ('stock', default 'stock'), ``code`` (required
+                when scope='stock'), and optional ``limit`` (1-50).
 
         Returns:
             A JSON string envelope. On success:
@@ -300,34 +180,12 @@ class StockNewsTool(BaseTool):
             "data": {...}}``. On failure: ``{"ok": false, "error": "..."}``.
         """
         scope = kwargs.get("scope", "stock")
-        if scope not in ("stock", "global"):
-            return self._error(
-                f"invalid scope: {scope!r}; expected 'stock' or 'global'"
-            )
+        if scope != "stock":
+            return self._error(f"invalid scope: {scope!r}; expected 'stock'")
 
         limit = _clamp_limit(kwargs.get("limit"))
 
-        if scope == "global":
-            return self._run_global(limit)
         return self._run_stock(kwargs.get("code"), limit)
-
-    def _run_global(self, limit: int) -> str:
-        """Fetch broad China-market headlines from Eastmoney.
-
-        Args:
-            limit: Maximum number of headlines.
-
-        Returns:
-            A success or error JSON envelope.
-        """
-        try:
-            articles = _fetch_eastmoney_news(_GLOBAL_QUERY, limit)
-        except Exception as exc:  # noqa: BLE001 - surface any fetch failure as envelope
-            logger.warning("global news fetch failed: %s", exc)
-            return self._error(f"eastmoney news fetch failed: {exc}")
-        return self._ok(
-            "global", "eastmoney", {"scope": "global", "articles": articles}
-        )
 
     def _run_stock(self, code_arg: Any, limit: int) -> str:
         """Fetch single-security headlines, routing by exchange suffix.
@@ -350,38 +208,22 @@ class StockNewsTool(BaseTool):
         if not query:
             return self._error(f"invalid code: {code!r}")
 
-        if suffix in _EM_SUFFIXES:
-            return self._stock_via_eastmoney(code, query, limit)
         if suffix in _YAHOO_SUFFIXES:
             return self._stock_via_yahoo(code, query, limit)
         return self._error(
-            f"unsupported market for code {code!r}; expected suffix in "
-            f"{_EM_SUFFIXES + _YAHOO_SUFFIXES}"
-        )
-
-    def _stock_via_eastmoney(self, code: str, query: str, limit: int) -> str:
-        """Fetch A-share headlines from Eastmoney for one code."""
-        try:
-            articles = _fetch_eastmoney_news(query, limit)
-        except Exception as exc:  # noqa: BLE001 - surface any fetch failure as envelope
-            logger.warning("eastmoney news fetch failed for %s: %s", code, exc)
-            return self._error(f"eastmoney news fetch failed: {exc}")
-        return self._ok(
-            "a_share",
-            "eastmoney",
-            {"scope": "stock", "code": code, "articles": articles},
+            f"unsupported market for code {code!r}; expected suffix "
+            f"{_YAHOO_SUFFIXES[0]}"
         )
 
     def _stock_via_yahoo(self, code: str, query: str, limit: int) -> str:
-        """Fetch US/HK news articles from Yahoo for one code."""
-        market = "hk" if _suffix_of(code) == "HK" else "us"
+        """Fetch US news articles from Yahoo for one code."""
         try:
             articles = _fetch_yahoo_news(query, limit)
         except Exception as exc:  # noqa: BLE001 - surface any fetch failure as envelope
             logger.warning("yahoo news fetch failed for %s: %s", code, exc)
             return self._error(f"yahoo news fetch failed: {exc}")
         return self._ok(
-            market,
+            "us",
             "yahoo",
             {"scope": "stock", "code": code, "articles": articles},
         )
@@ -391,8 +233,8 @@ class StockNewsTool(BaseTool):
         """Render a success envelope as a JSON string.
 
         Args:
-            market: Market label (e.g. ``"a_share"``, ``"us"``, ``"global"``).
-            source: Upstream provider name (``"eastmoney"`` or ``"yahoo"``).
+            market: Market label (e.g. ``"us"``).
+            source: Upstream provider name (``"yahoo"``).
             data: The payload mapping.
 
         Returns:

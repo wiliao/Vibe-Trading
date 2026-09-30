@@ -103,39 +103,12 @@ class TestPerSymbolIsolation:
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
         ), patch(
             "src.tools.fund_flow_tool.get_json", side_effect=RuntimeError("HTTP 429")
-        ), patch(
-            "src.tools.fund_flow_tool.tushare_fallbacks.fetch_fund_flow",
-            side_effect=RuntimeError("no fallback"),
         ):
             text = FundFlowTool().execute(codes=["600519.SH"])
 
         payload = json.loads(text)
         assert payload["ok"] is True
         assert "429" in payload["data"]["600519.SH"]["error"]
-
-    def test_http_failure_uses_tushare_fallback_when_available(self):
-        fallback = {
-            "symbol": "600519.SH",
-            "ts_code": "600519.SH",
-            "source": "tushare",
-            "rows": [{"timestamp": "2024-01-03", "main": 100.0}],
-        }
-        with patch(
-            "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
-        ), patch(
-            "src.tools.fund_flow_tool.get_json", side_effect=RuntimeError("HTTP 429")
-        ), patch(
-            "src.tools.fund_flow_tool.tushare_fallbacks.fetch_fund_flow",
-            return_value=fallback,
-        ) as fallback_fetch:
-            text = FundFlowTool().execute(codes=["600519.SH"], period="daily", days=5)
-
-        fallback_fetch.assert_called_once_with("600519.SH", days=5)
-        payload = json.loads(text)
-        result = payload["data"]["600519.SH"]
-        assert result["source"] == "tushare"
-        assert result["rows"][0]["timestamp"] == "2024-01-03"
-        assert "used tushare fallback" in result["warning"]
 
     def test_malformed_row_skipped(self):
         bad = {"data": {"klines": ["garbage", "2024-01-03,-50.0,20.0,-5.0,-30.0,-20.0"]}}
@@ -188,10 +161,9 @@ class TestErrorEnvelope:
 class TestRoutingDescription:
     """Description must scope to PER-STOCK flow so vague prompts don't misroute.
 
-    Regression for B10-routing-desc: get_fund_flow and get_northbound_flow both
-    used to open on a generic 'net capital flow' phrase, so a vague prompt could
-    route to either. The fund-flow description must lead with the per-stock,
-    order-level scope and point market-wide intent at get_northbound_flow.
+    Regression for B10-routing-desc: the tool used to open on a generic 'net
+    capital flow' phrase. It must lead with the per-stock, order-level scope so
+    a vague prompt cannot read it as a market-wide aggregate request.
     """
 
     def test_description_leads_with_per_stock_order_level(self):
@@ -199,8 +171,8 @@ class TestRoutingDescription:
         # Leads with the per-stock, order-level scope, not a generic phrase.
         assert desc.startswith("PER-STOCK order-level net inflow")
         assert "market-wide" not in desc.lower().split("not market-wide")[0]
-        # Disambiguates against the market-wide tool.
-        assert "get_northbound_flow" in desc
+        # Says outright that it is not the market-wide aggregate view.
+        assert "NOT market-wide aggregate flow" in desc
 
     def test_description_keeps_a_concrete_example(self):
-        assert '{"codes": ["600519.SH"' in FundFlowTool().description
+        assert '{"codes": ["AAPL.US"' in FundFlowTool().description

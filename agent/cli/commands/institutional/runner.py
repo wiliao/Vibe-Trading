@@ -140,10 +140,9 @@ def build_prompt(playbook: Playbook, subject: str) -> str:
     lines.append("")
 
     lines.append(f"Preferred tools: {', '.join(playbook.tools)}.")
-    # Some of these are key-gated (``get_macro_series`` needs FRED_API_KEY,
-    # ``iwencai_search`` needs VIBE_TRADING_IWENCAI_KEY) and are absent from the
-    # registry unless configured. Say so explicitly: an unavailable tool must
-    # become a declared gap, never a remembered number.
+    # Some of these are key-gated (``get_macro_series`` needs FRED_API_KEY) and
+    # are absent from the registry unless configured. Say so explicitly: an
+    # unavailable tool must become a declared gap, never a remembered number.
     lines.append(
         "Any preferred tool that is not registered in this session is simply "
         "unavailable — skip it, record what it would have supplied as a gap under "

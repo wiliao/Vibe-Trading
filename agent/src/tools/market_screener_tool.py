@@ -6,8 +6,9 @@ per listed instrument with the latest price plus the common ranking metrics —
 percent change, traded volume, turnover value (amount) and turnover rate — and
 serves them already sorted server-side by a chosen field (``fid``). This tool
 wraps that endpoint to answer "what are today's biggest movers / most-traded
-names" questions across A-share, US and Hong Kong markets without writing raw
-provider scripts.
+names" questions across the US listing venues without writing raw provider
+scripts. (Decision D5: the US screen is kept; the retired Greater-China
+universes went with the rest of that surface.)
 
 Every request routes through :mod:`backtest.loaders.eastmoney_client` so it
 goes through the shared per-host throttle (Eastmoney rate-limits by IP and
@@ -29,13 +30,10 @@ logger = logging.getLogger(__name__)
 # Eastmoney push2 full-market quote list endpoint.
 _CLIST_URL = "https://push2.eastmoney.com/api/qt/clist/get"
 
-# Per-market universe selectors (``fs``). A-share covers the SH/SZ main+ChiNext
-# boards plus the Beijing exchange; US covers NASDAQ/NYSE/AMEX; HK covers the
-# main-board and GEM equity markets.
+# Market universe selector (``fs``): NASDAQ / NYSE / AMEX. The keys stay a map
+# so the selector is a named value rather than a bare constant at the call site.
 _MARKET_FS: dict[str, str] = {
-    "a": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048",
     "us": "m:105,m:106,m:107",
-    "hk": "m:116,m:113,m:114,m:115,m:128",
 }
 
 # Sort-key -> Eastmoney field id. f3 = change percent, f5 = traded volume (lots),
@@ -121,7 +119,7 @@ def _screen_market(market: str, *, sort_by: str, top_n: int) -> list[dict[str, A
     """Fetch the ``top_n`` instruments of ``market`` ranked by ``sort_by``.
 
     Args:
-        market: One of :data:`_MARKET_FS` keys (``a`` / ``us`` / ``hk``).
+        market: One of :data:`_MARKET_FS` keys (``us``).
         sort_by: One of :data:`_SORT_FID` keys.
         top_n: Number of rows to request (already validated/capped).
 
@@ -169,24 +167,22 @@ class MarketScreenerTool(BaseTool):
 
     name = "screen_market"
     description = (
-        "Screen a whole market's listed instruments and return the top names "
+        "Screen the US market's listed instruments and return the top names "
         "ranked by a chosen metric: percent change, traded volume, turnover "
         "value (amount) or turnover rate. Use this to find today's biggest "
         "movers or most-actively-traded names without fetching every symbol. "
-        "Markets: A-share ('a'), US ('us'), Hong Kong ('hk'). "
-        'Example: {"market": "a", "sort_by": "change_pct", "top_n": 20}.'
+        "Example: {\"sort_by\": \"change_pct\", \"top_n\": 20}."
     )
     parameters = {
         "type": "object",
         "properties": {
             "market": {
                 "type": "string",
-                "enum": ["a", "us", "hk"],
+                "enum": ["us"],
                 "description": (
-                    "Market universe to screen: 'a' = China A-share "
-                    "(SH/SZ/ChiNext/Beijing), 'us' = US (NASDAQ/NYSE/AMEX), "
-                    "'hk' = Hong Kong."
+                    "Market universe to screen: 'us' = US (NASDAQ/NYSE/AMEX)."
                 ),
+                "default": "us",
             },
             "sort_by": {
                 "type": "string",
@@ -206,7 +202,7 @@ class MarketScreenerTool(BaseTool):
                 "default": _DEFAULT_TOP_N,
             },
         },
-        "required": ["market"],
+        "required": [],
     }
     repeatable = True
 
@@ -214,7 +210,7 @@ class MarketScreenerTool(BaseTool):
         """Validate inputs, screen the market, and return a JSON envelope.
 
         Args:
-            **kwargs: ``market`` (str, required, one of a/us/hk), ``sort_by``
+            **kwargs: ``market`` (str, default "us"), ``sort_by``
                 (str, default "change_pct"), ``top_n`` (int, default 30).
 
         Returns:
@@ -224,7 +220,7 @@ class MarketScreenerTool(BaseTool):
             a validation or request failure. The row list nests under ``data``
             so the envelope matches every other tool's ``data:{...}`` shape.
         """
-        market = kwargs.get("market")
+        market = kwargs.get("market", "us")
         if not isinstance(market, str) or market not in _MARKET_FS:
             return _error(f"market must be one of {list(_MARKET_FS)}")
 

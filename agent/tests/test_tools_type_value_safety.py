@@ -24,19 +24,12 @@ import pytest
 from src.tools import qveris_tool as qt
 from src.tools import shadow_account_tool as sat
 from src.tools.alpha_zoo_tool import run_alpha_zoo
-from src.tools.block_trades_tool import _clamp_days as block_trades_clamp_days
 from src.tools.fred_macro_tool import _clamp_limit as fred_clamp_limit
-from src.tools.iwencai_tool import _coerce_limit as iwencai_coerce_limit
-from src.tools.lockup_expiry_tool import _clamp_horizon as lockup_clamp_horizon
-from src.tools.margin_trading_tool import _clamp_days as margin_clamp_days
-from src.tools.northbound_tool import _clamp_lookback
 from src.tools.options_chain_tool import _coerce_expiration
 from src.tools.options_pricing_tool import OptionsPricingTool
 from src.tools.report_audit_tool import ReportAuditTool
-from src.tools.research_reports_tool import _clamp_limit as research_clamp_limit
 from src.tools.sec_filings_tool import _clamp_limit as sec_clamp_limit
 from src.tools.session_search_tool import SessionSearchTool
-from src.tools.shareholder_count_tool import _clamp_periods as shareholder_clamp_periods
 from src.tools.stock_news_tool import _clamp_limit as stock_news_clamp_limit
 from src.tools.symbol_search_tool import _clamp_limit as symbol_clamp_limit
 from src.tools.trading_connector_tool import (
@@ -66,17 +59,8 @@ def test_clamp_helpers_survive_non_finite_and_preserve_finite_values() -> None:
     helpers now absorb. A huge *integer* needs no absorbing: ``int()`` accepts it
     and the normal range clamp applies.
     """
-    assert _clamp_lookback(float("inf")) == 30
-    assert _clamp_lookback(float("-inf")) == 30
-    assert _clamp_lookback(_UNREPRESENTABLE_INT) == 250  # clamped to the max lookback
-    assert block_trades_clamp_days(float("inf")) == 30
     assert fred_clamp_limit(float("inf")) == 2000
-    assert iwencai_coerce_limit(float("inf")) == 20
-    assert lockup_clamp_horizon(float("inf")) == 90
-    assert margin_clamp_days(float("inf")) == 30
-    assert research_clamp_limit(float("inf")) == 20
     assert sec_clamp_limit(float("inf")) == 20
-    assert shareholder_clamp_periods(float("inf")) == 24
     assert stock_news_clamp_limit(float("inf")) == 20
     assert symbol_clamp_limit(float("inf")) == 10
     assert _coerce_expiration(float("inf")) is None
@@ -85,8 +69,6 @@ def test_clamp_helpers_survive_non_finite_and_preserve_finite_values() -> None:
     assert _coerce_expiration(False) is None
 
     # Finite requests must be untouched by the hardening.
-    assert _clamp_lookback(7) == 7
-    assert _clamp_lookback("7") == 7
     assert fred_clamp_limit(50) == 50
     assert _coerce_expiration(3) == 3
 

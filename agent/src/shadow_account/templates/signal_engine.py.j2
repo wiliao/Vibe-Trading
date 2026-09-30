@@ -18,13 +18,9 @@ RULES = {{ rules | py_literal }}
 def _market_of(code: str) -> str:
     """Infer a coarse market bucket from a symbol (matches backtest.runner)."""
     c = (code or "").upper()
-    if c.endswith(".SH") or c.endswith(".SZ") or c.endswith(".BJ"):
-        return "china_a"
-    if c.endswith(".HK"):
-        return "hk"
-    if "-USDT" in c or "-USD" in c or "/" in c:
-        return "crypto"
-    if c and c[0].isalpha():
+    if c.endswith(".TO") or c.endswith(".V"):
+        return "ca"
+    if c.endswith(".US") or (c and c[0].isalpha()):
         return "us"
     return "other"
 

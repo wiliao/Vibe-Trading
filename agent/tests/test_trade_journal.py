@@ -18,11 +18,8 @@ from src.tools.trade_journal_parsers import (
     TradeRecord,
     _infer_market_from_symbol,
     _normalize_side,
-    _qualify_a_share,
     _to_float,
     load_dataframe,
-    parse_tonghuashun,
-    parse_eastmoney,
     parse_futu,
     parse_generic,
     detect_format,
@@ -67,23 +64,6 @@ def allow_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 # --------------------------------------------------------------------------
 # Parser pure helpers
 # --------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "code,expected",
-    [
-        ("600519", "600519.SH"),  # Shanghai main
-        ("688981", "688981.SH"),  # STAR
-        ("000001", "000001.SZ"),  # Shenzhen main
-        ("300750", "300750.SZ"),  # ChiNext
-        ("430139", "430139.BJ"),  # BSE (4-prefix)
-        ("830799", "830799.BJ"),  # BSE (8-prefix)
-        ("600519.SH", "600519.SH"),  # already qualified -> passthrough
-        ("1", "000001.SZ"),  # zero-padded to 6 then mapped
-    ],
-)
-def test_qualify_a_share(code: str, expected: str) -> None:
-    assert _qualify_a_share(code) == expected
 
 
 @pytest.mark.parametrize(
@@ -133,19 +113,6 @@ def test_normalize_side_dividend_tokens(raw: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "raw", ["红股入账", "转股入账", "配股缴款", "配股上市", "利息归本", "利息"]
-)
-def test_tonghuashun_corporate_action_rows_are_skipped(raw: str) -> None:
-    """Known non-trade corporate-action rows drop out instead of raising."""
-    df = pd.DataFrame([{
-        "成交时间": "2026-01-10 09:00:00", "证券代码": "600519", "证券名称": "贵州茅台",
-        "操作": raw, "成交数量": "100", "成交价格": "", "成交金额": "",
-        "手续费": "", "印花税": "", "过户费": "",
-    }])
-    assert parse_tonghuashun(df) == []
-
-
-@pytest.mark.parametrize(
     "raw", ["stock dividend", "stock split", "bonus issue", "rights issue", "interest"]
 )
 def test_generic_corporate_action_rows_are_skipped(raw: str) -> None:
@@ -159,19 +126,12 @@ def test_generic_corporate_action_rows_are_skipped(raw: str) -> None:
 @pytest.mark.parametrize(
     "symbol,expected",
     [
-        ("00700.HK", "hk"),
-        ("600519.SH", "china_a"),
-        ("000001.SZ", "china_a"),
-        ("VOD.L", "uk"),
-        ("HSBA.L", "uk"),
-        ("BARC.L", "uk"),
-        ("vod.l", "uk"),
         ("AAPL", "us"),
-        ("BTC-USDT", "crypto"),
-        ("ETH-USD", "crypto"),
-        ("BTCUSDT", "crypto"),
-        ("ethusdc", "crypto"),
-        ("SOLBUSD", "crypto"),
+        ("AAPL.US", "us"),
+        ("TD.TO", "ca"),
+        ("PNG.V", "ca"),
+        ("00700.HK", "other"),
+        ("600519.SH", "other"),
         ("123456", "other"),
     ],
 )
@@ -180,12 +140,6 @@ def test_infer_market_from_symbol(symbol: str, expected: str) -> None:
 
 
 def test_detect_format_signatures() -> None:
-    ths = pd.DataFrame(columns=["成交时间", "证券代码", "操作", "成交数量"])
-    assert detect_format(ths) == "tonghuashun"
-
-    em = pd.DataFrame(columns=["成交日期", "买卖标志", "股票代码"])
-    assert detect_format(em) == "eastmoney"
-
     futu = pd.DataFrame(columns=["Date", "Symbol", "Side", "Quantity"])
     assert detect_format(futu) == "futu"
 
@@ -232,43 +186,6 @@ def test_parse_file_generic_csv(tmp_path: Path) -> None:
     assert records[0].market == "us"
 
 
-def test_parse_file_tonghuashun_csv(tmp_path: Path) -> None:
-    csv = tmp_path / "ths.csv"
-    csv.write_text(
-        "成交时间,证券代码,证券名称,操作,成交数量,成交价格,成交金额,手续费,印花税,过户费\n"
-        "2026-01-02 09:35:00,600519,贵州茅台,买入,100,1700,170000,5,0,0.1\n"
-        "2026-01-08 10:00:00,600519,贵州茅台,卖出,100,1800,180000,5,180,0.1\n",
-        encoding="utf-8",
-    )
-    fmt, records = parse_file(csv)
-    assert fmt == "tonghuashun"
-    assert records[0].symbol == "600519.SH"  # qualified
-    assert records[0].side == "buy"
-    assert records[1].side == "sell"
-    # fee = 手续费 + 印花税 + 过户费
-    assert records[1].fee == pytest.approx(5 + 180 + 0.1)
-
-
-def test_parse_file_tonghuashun_dividend_and_bonus_rows(tmp_path: Path) -> None:
-    """A 红利入账 row used to kill the whole parse with "Unsupported trade side"."""
-    csv = tmp_path / "ths_dividend.csv"
-    csv.write_text(
-        "成交时间,证券代码,证券名称,操作,成交数量,成交价格,成交金额,手续费,印花税,过户费\n"
-        "2026-01-02 09:35:00,600519,贵州茅台,买入,100,1700,170000,5,0,0.1\n"
-        "2026-01-10 09:00:00,600519,贵州茅台,红利入账,,,500,0,0,0\n"
-        "2026-01-12 09:00:00,600519,贵州茅台,红股入账,10,,,0,0,0\n",
-        encoding="utf-8",
-    )
-    fmt, records = parse_file(csv)
-    assert fmt == "tonghuashun"
-    # The bonus-share row is dropped; the dividend row keeps its cash in amount.
-    assert [r.side for r in records] == ["buy", "dividend"]
-    dividend = records[1]
-    assert dividend.symbol == "600519.SH"
-    assert dividend.amount == 500.0
-    assert dividend.quantity == 0.0
-
-
 def test_parse_futu_dividend_row_carries_cash_amount() -> None:
     df = pd.DataFrame([
         {
@@ -311,8 +228,8 @@ def test_load_dataframe_accepts_utf16_bom_csv(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "header,value,error",
     [
-        ("datetime,symbol,quantity,price", "2026-01-02,AAPL,10,180", "requires a side"),
-        ("datetime,symbol,side,quantity,price", "2026-01-02,AAPL,hold,10,180", "Unsupported trade side"),
+        ("Date,Symbol,Quantity,Price", "2024-01-02,AAPL,10,100", "requires a side"),
+        ("Date,Symbol,Side,Quantity,Price", "2024-01-02,AAPL,hold,10,100", "side"),
     ],
 )
 def test_parse_file_rejects_missing_or_unknown_side(
@@ -677,63 +594,6 @@ def test_analyze_with_inverted_date_filter_returns_error_envelope(allow_tmp: Pat
     assert "inverted date filter" in result["error"]
 
 
-def test_qualify_a_share_rejects_empty() -> None:
-    with pytest.raises(ValueError, match="empty"):
-        _qualify_a_share("")
-    with pytest.raises(ValueError, match="empty"):
-        _qualify_a_share("   ")
-
-
-def test_parse_tonghuashun_skips_blank_code_rows() -> None:
-    df = pd.DataFrame([{
-        "成交时间": "2024-01-01 10:00:00", "证券代码": "", "证券名称": "",
-        "操作": "买入", "成交数量": 100, "成交价格": 10.0, "成交金额": 1000,
-        "手续费": 0, "印花税": 0, "过户费": 0,
-    }, {
-        "成交时间": "2024-01-01 10:01:00", "证券代码": "600519", "证券名称": "茅台",
-        "操作": "买入", "成交数量": 100, "成交价格": 10.0, "成交金额": 1000,
-        "手续费": 0, "印花税": 0, "过户费": 0,
-    }])
-    rec = parse_tonghuashun(df)
-    assert len(rec) == 1
-    assert rec[0].symbol == "600519.SH"
-
-
-def test_qualify_a_share_rejects_nan() -> None:
-    with pytest.raises(ValueError, match="empty"):
-        _qualify_a_share(float("nan"))
-
-
-def test_parse_tonghuashun_skips_nan_code_rows() -> None:
-    df = pd.DataFrame([{
-        "成交时间": "2024-01-01 10:00:00", "证券代码": float("nan"), "证券名称": "",
-        "操作": "买入", "成交数量": 100, "成交价格": 10.0, "成交金额": 1000,
-        "手续费": 0, "印花税": 0, "过户费": 0,
-    }, {
-        "成交时间": "2024-01-01 10:01:00", "证券代码": "600519", "证券名称": "茅台",
-        "操作": "买入", "成交数量": 100, "成交价格": 10.0, "成交金额": 1000,
-        "手续费": 0, "印花税": 0, "过户费": 0,
-    }])
-    rec = parse_tonghuashun(df)
-    assert len(rec) == 1
-    assert rec[0].symbol == "600519.SH"
-
-
-def test_parse_eastmoney_skips_nan_code_rows() -> None:
-    df = pd.DataFrame([{
-        "成交日期": "20240101", "成交时间": "10:00:00", "股票代码": float("nan"),
-        "股票名称": "", "买卖标志": "B", "成交数量": 100, "成交均价": 10.0,
-        "成交金额": 1000, "佣金": 0, "印花税": 0,
-    }, {
-        "成交日期": "20240101", "成交时间": "10:01:00", "股票代码": "000001",
-        "股票名称": "平安", "买卖标志": "B", "成交数量": 100, "成交均价": 10.0,
-        "成交金额": 1000, "佣金": 0, "印花税": 0,
-    }])
-    rec = parse_eastmoney(df)
-    assert len(rec) == 1
-    assert rec[0].symbol == "000001.SZ"
-
-
 def test_parse_futu_skips_nan_symbol_rows() -> None:
     """NaN Symbol cells must not become literal "NAN" US trades."""
     df = pd.DataFrame([{
@@ -763,35 +623,6 @@ def test_parse_generic_skips_nan_symbol_rows() -> None:
     rec = parse_generic(df)
     assert len(rec) == 1
     assert rec[0].symbol == "AAPL"
-
-
-@pytest.mark.parametrize(
-    "code,expected",
-    [
-        (600519.0, "600519.SH"),
-        ("600519.0", "600519.SH"),
-        ("6.00519E+5", "600519.SH"),
-        ("6.00519e5", "600519.SH"),
-        ("000001.0", "000001.SZ"),
-        ("600519.SH", "600519.SH"),  # still passthrough
-    ],
-)
-def test_qualify_a_share_normalizes_float_stringified_codes(
-    code: object, expected: str
-) -> None:
-    """Excel/CSV float forms must not be treated as exchange-qualified."""
-    assert _qualify_a_share(code) == expected  # type: ignore[arg-type]
-
-
-def test_parse_tonghuashun_float_code_cell() -> None:
-    df = pd.DataFrame([{
-        "成交时间": "2024-01-01 10:00:00", "证券代码": 600519.0, "证券名称": "茅台",
-        "操作": "买入", "成交数量": 100, "成交价格": 10.0, "成交金额": 1000,
-        "手续费": 0, "印花税": 0, "过户费": 0,
-    }])
-    rec = parse_tonghuashun(df)
-    assert len(rec) == 1
-    assert rec[0].symbol == "600519.SH"
 
 
 @pytest.mark.parametrize(
@@ -828,34 +659,6 @@ def test_parse_generic_currency_price_not_zero() -> None:
 
 # ── M3d: a dividend's cash may not live in the fill column ────────────────
 
-
-def test_dividend_cash_read_from_a_cash_movement_column(tmp_path: Path) -> None:
-    """A 红利入账 row books its payout even when 成交金额 is not where it sits.
-
-    A dividend row has no quantity and no price, so the usual
-    ``成交金额 or qty * price`` fallback collapses to 0.0. Brokers book the
-    payout under a cash-movement heading instead, and reading only the fill
-    column would record the dividend as 0 silently — the exact
-    "run succeeded, number is zero" shape #1207 item 15 is about.
-    """
-    for cash_column in ("发生金额", "资金发生额", "红利金额", "实发金额"):
-        csv = tmp_path / f"ths_{cash_column}.csv"
-        csv.write_text(
-            "成交时间,证券代码,证券名称,操作,成交数量,成交价格,成交金额,"
-            f"{cash_column},手续费,印花税,过户费\n"
-            "2026-01-02 09:35:00,600519,贵州茅台,买入,100,1700,170000,0,5,0,0.1\n"
-            "2026-01-08 10:00:00,600519,贵州茅台,卖出,100,1800,180000,0,5,180,0.1\n"
-            # the fill column is empty for a payout; the money is in the other one
-            "2026-01-10 09:00:00,600519,贵州茅台,红利入账,0,0,0,500,0,0,0\n",
-            encoding="utf-8",
-        )
-
-        _fmt, records = parse_file(csv)
-        payouts = [r for r in records if r.side == "dividend"]
-        assert len(payouts) == 1, cash_column
-        assert payouts[0].amount == pytest.approx(500.0), (
-            f"{cash_column}: dividend cash silently booked as {payouts[0].amount}"
-        )
 
 
 def test_unreadable_dividend_cash_is_surfaced_not_silently_zero() -> None:

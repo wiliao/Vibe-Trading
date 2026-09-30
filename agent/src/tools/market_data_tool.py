@@ -81,17 +81,14 @@ class MarketDataTool(BaseTool):
     name = "get_market_data"
     description = (
         "Fetch normalized OHLCV market data through the repository loader layer. "
-        "Use this for stock, ETF, index, or crypto price bars before writing raw "
-        "yfinance/OKX/Tushare scripts. Volume units are source- and market-dependent "
-        "(A-share sources report board lots of 100 shares, HK/US sources report single "
-        "shares); read the per-symbol _provenance.volume_unit field ('lots' / 'shares' / "
-        "null=undeclared) before interpreting or comparing volume values. Price caliber "
-        "is source-dependent too (some sources adjust for splits/dividends, others serve "
-        "raw quotes); read _provenance.adjustment ('raw' / 'split' / 'split_dividend' / "
-        "'split_dividend_additive' / 'na' / 'unknown') before comparing price levels "
-        "across symbols. 'split_dividend_additive' (the A-share qfq of Tencent, Eastmoney and AKShare) adjusts "
-        "dividends by shifting the price level rather than scaling it, so it is not on "
-        "the same scale as 'split_dividend'."
+        "Use this for US or Canadian stock, ETF and index price bars before writing "
+        "raw yfinance scripts. Volume units are source-dependent (surviving US/Canada "
+        "sources report single shares); read the per-symbol _provenance.volume_unit "
+        "field ('shares' / null=undeclared) before interpreting or comparing volume "
+        "values. Price caliber is source-dependent too (some sources adjust for "
+        "splits/dividends, others serve raw quotes); read _provenance.adjustment "
+        "('raw' / 'split_dividend' / 'unknown') before comparing price levels across "
+        "symbols."
     )
     parameters = {
         "type": "object",
@@ -100,8 +97,8 @@ class MarketDataTool(BaseTool):
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    'Symbols such as ["AAPL.US"], ["700.HK"], ["TD.TO"], '
-                    '["PNG.V"], or ["BTC-USDT"].'
+                    'Symbols such as ["AAPL.US"], ["TD.TO"], ["PNG.V"], or '
+                    '["^SPX"].'
                 ),
             },
             "start_date": {
@@ -117,21 +114,10 @@ class MarketDataTool(BaseTool):
                 "enum": _SOURCE_ENUM,
                 "description": (
                     "Data source. 'auto' detects from symbol format with fallback. "
-                    "Use 'longbridge' explicitly for US/HK OHLCV through the "
-                    "Longbridge OpenAPI (requires Longbridge credentials). "
-                    "Free, no key: yfinance/yahoo (US/HK/Canada equities; "
-                    "Canada uses .TO/.V), okx/ccxt/binance "
-                    "(crypto), baostock/tencent/eastmoney/sina/akshare/mootdx "
-                    "(China A-shares), futu (HK/A via local FutuOpenD), stooq "
-                    "(global EOD), pykrx (Korea KRX daily "
-                    "bars for <CODE>.KS / <CODE>.KQ; needs the optional pykrx "
-                    "package, else Korea falls back to yahoo/yfinance). Key-gated "
-                    "REST: tushare (China A-shares), finnhub/alphavantage/tiingo/fmp "
-                    "(US/global), qveris (premium marketplace). india_broker: "
-                    "read-only Shoonya/Dhan bars for .NS/.BO. mt5: forex/metals "
-                    "from a local MetaTrader 5 terminal (Windows; e.g. EUR/USD, "
-                    "XAUUSD.FX); tickerall: the same feed hosted, no terminal, "
-                    "any OS. local: your own CSV/Parquet/DuckDB files."
+                    "Free, no key: yfinance/yahoo (US and Canada equities and "
+                    "indices; Canada uses .TO/.V), eastmoney/sina/stooq (US EOD "
+                    "fallbacks), local: your own CSV/Parquet/DuckDB files. "
+                    "Key-gated REST: finnhub/alphavantage/tiingo/fmp (US/global)."
                 ),
                 "default": "auto",
             },

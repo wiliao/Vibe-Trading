@@ -19,24 +19,10 @@ from src.tools import symbol_search_tool as ss
 
 
 def _eastmoney_payload() -> dict:
-    """A suggest payload spanning A-share, HK, and US markets."""
+    """A suggest payload spanning the US listing venues."""
     return {
         "QuotationCodeTable": {
             "Data": [
-                {
-                    "QuoteID": "1.600519",
-                    "Code": "600519",
-                    "Name": "贵州茅台",
-                    "MktNum": "1",
-                    "SecurityTypeName": "沪A",
-                },
-                {
-                    "QuoteID": "116.00700",
-                    "Code": "00700",
-                    "Name": "腾讯控股",
-                    "MktNum": "116",
-                    "SecurityTypeName": "港股",
-                },
                 {
                     "QuoteID": "105.AAPL",
                     "Code": "AAPL",
@@ -64,18 +50,6 @@ def _yahoo_quotes() -> list:
             "shortname": "Apple Inc.",
             "exchange": "NMS",
             "quoteType": "EQUITY",
-        },
-        {
-            "symbol": "0700.HK",
-            "shortname": "TENCENT",
-            "exchange": "HKG",
-            "quoteType": "EQUITY",
-        },
-        {
-            "symbol": "BTC-USD",
-            "shortname": "Bitcoin USD",
-            "exchange": "CCC",
-            "quoteType": "CRYPTOCURRENCY",
         },
         {
             "symbol": "TD.TO",
@@ -122,39 +96,27 @@ class TestSymbolSearchSuccess:
         assert by_symbol["TD.TO"]["market"] == "ca"
         assert by_symbol["PNG.V"]["market"] == "ca"
 
-        # A-share secid -> 600519.SH, market cn.
-        assert by_symbol["600519.SH"]["market"] == "cn"
-        assert by_symbol["600519.SH"]["name"] == "贵州茅台"
-
-        # HK code zero-padded to 5 digits from both Eastmoney and Yahoo, merged.
-        assert "00700.HK" in by_symbol
-        assert by_symbol["00700.HK"]["market"] == "hk"
-        assert "yahoo" in by_symbol["00700.HK"].get("also_from", [])
-
         # US equity: Eastmoney + Yahoo merge, SEC CIK attached.
         aapl = by_symbol["AAPL.US"]
         assert aapl["market"] == "us"
         assert aapl["cik"] == "0000320193"
         assert "yahoo" in aapl.get("also_from", [])
 
-        # Crypto keeps its native Yahoo symbol and a global market label.
-        assert by_symbol["BTC-USD"]["market"] == "global"
-
         # Unmappable Eastmoney market dropped; empty Yahoo symbol dropped.
         assert "BK0001" not in by_symbol
         assert data["count"] == len(data["candidates"])
 
-    def test_argentina_candidate_keeps_market_identity(self):
+    def test_canada_candidate_keeps_market_identity(self):
         quote = {
-            "symbol": "GGAL.BA",
-            "shortname": "Grupo Financiero Galicia",
-            "exchange": "BUE",
+            "symbol": "TD.TO",
+            "shortname": "Toronto-Dominion Bank",
+            "exchange": "TOR",
             "quoteType": "EQUITY",
         }
         candidate = ss._yahoo_candidate(quote)
         assert candidate is not None
-        assert candidate["symbol"] == "GGAL.BA"
-        assert candidate["market"] == "ar"
+        assert candidate["symbol"] == "TD.TO"
+        assert candidate["market"] == "ca"
 
     def test_limit_clamped_and_applied(self):
         with patch.object(
@@ -482,34 +444,6 @@ class TestSymbolSearchErrors:
 
 class TestShanghaiAliasAndUnsupportedQueries:
     """The two resolver defects that made Shanghai and Chinese queries unusable."""
-
-    def test_yahoo_shanghai_suffix_folds_onto_the_project_convention(self):
-        """Yahoo's ``.SS`` and Eastmoney's ``.SH`` must merge into one candidate.
-
-        Emitted separately they became two rival candidates for one listing,
-        which no downstream tie-break could resolve, so every Shanghai query
-        dead-ended before any market tool could run.
-        """
-        with patch.object(
-            ss.eastmoney_client, "get_json", return_value=_eastmoney_payload()
-        ), patch.object(
-            ss.yahoo_client,
-            "search",
-            return_value=[
-                {
-                    "symbol": "600519.SS",
-                    "shortname": "Kweichow Moutai Co Ltd",
-                    "exchange": "SHH",
-                    "quoteType": "EQUITY",
-                }
-            ],
-        ):
-            data = json.loads(ss.SymbolSearchTool().execute(query="600519"))["data"]
-
-        by_symbol = {c["symbol"]: c for c in data["candidates"]}
-        assert "600519.SS" not in by_symbol
-        assert by_symbol["600519.SH"]["market"] == "cn"
-        assert "yahoo" in by_symbol["600519.SH"].get("also_from", [])
 
     def test_non_ascii_query_skips_yahoo_without_calling_it(self):
         """A source that cannot serve a query shape is skipped, not failed.

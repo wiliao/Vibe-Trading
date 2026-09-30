@@ -163,11 +163,10 @@ class RunShadowBacktestTool(BaseTool):
 
     name = "run_shadow_backtest"
     description = (
-        "Run a multi-market backtest (A股/港股/美股/crypto) on a Shadow Account "
+        "Run a multi-market backtest (US / Canada) on a Shadow Account "
         "profile and compute delta-PnL attribution vs the user's realized trades. "
-        "Markets are backtested per settlement currency (CNY / HKD / USD pools; "
-        "us + crypto share the USD pool); the headline PnL uses the profile's "
-        "source-market currency. "
+        "Canada settles in CAD and the US in USD; the headline PnL uses the "
+        "profile's source-market currency. "
         "Requires `extract_shadow_strategy` to have been run first."
     )
     parameters = {
@@ -184,8 +183,8 @@ class RunShadowBacktestTool(BaseTool):
             },
             "markets": {
                 "type": "array",
-                "items": {"type": "string", "enum": ["china_a", "hk", "us", "crypto"]},
-                "description": "Markets to include. Default: all four.",
+                "items": {"type": "string", "enum": ["us", "ca"]},
+                "description": "Markets to include. Default: both (US, Canada).",
             },
             "journal_path": {
                 "type": "string",
@@ -208,7 +207,7 @@ class RunShadowBacktestTool(BaseTool):
         today = date.today()
         window_end = kwargs.get("window_end") or today.isoformat()
         window_start = kwargs.get("window_start") or (today - timedelta(days=365)).isoformat()
-        markets = tuple(kwargs.get("markets") or ("china_a", "hk", "us", "crypto"))
+        markets = tuple(kwargs.get("markets") or ("us", "ca"))
 
         try:
             journal_path = _validate_optional_journal_path(kwargs.get("journal_path"))

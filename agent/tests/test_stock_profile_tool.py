@@ -146,12 +146,12 @@ class TestStockProfileSuccess:
             sp, "get_quote_summary", return_value=_sample_summary()
         ) as mock_get:
             out = sp.StockProfileTool().execute(
-                ticker="00700.HK", sections=["financials", "financials"]
+                ticker="TD.TO", sections=["financials", "financials"]
             )
 
         payload = json.loads(out)
         assert payload["ok"] is True
-        assert payload["market"] == "hk"
+        assert payload["market"] == "ca"
         # De-duplicated subset only.
         assert list(payload["data"]["sections"]) == ["financials"]
 
@@ -196,15 +196,14 @@ class TestStockProfileErrors:
         assert "429" in payload["error"]
 
 
-def test_uk_ticker_market_label() -> None:
-    """VOD.L is served by Yahoo but must not be labeled 'us' (#1206)."""
+def test_canada_ticker_market_label() -> None:
+    """TSX / TSX-V suffixes must not be labeled 'us'."""
     from src.tools.stock_profile_tool import _market_for
 
-    assert _market_for("VOD.L") == "uk"
-    assert _market_for("BARC.L") == "uk"
+    assert _market_for("TD.TO") == "ca"
+    assert _market_for("PNG.V") == "ca"
     assert _market_for("AAPL.US") == "us"
     assert _market_for("AAPL") == "us"
-    assert _market_for("00700.HK") == "hk"
 
 
 def test_listing_identity_independent_of_fundamentals() -> None:

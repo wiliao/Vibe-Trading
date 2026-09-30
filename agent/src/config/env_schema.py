@@ -198,13 +198,10 @@ class DataConfig(_EnvBase):
     """Market-data source credentials and tuning.
 
     Sources: ``backtest/loaders/*.py``, ``src/tools/web_search_tool.py``,
-    ``src/tools/iwencai_tool.py``, ``src/tools/fred_macro_tool.py``.
+    ``src/tools/fred_macro_tool.py``.
     """
 
     tushare_token: str = Field(alias="TUSHARE_TOKEN", default="")
-    ccxt_exchange: str = Field(alias="CCXT_EXCHANGE", default="binance")
-    ccxt_timeout_ms: int = Field(alias="CCXT_TIMEOUT_MS", default=15000)
-    ccxt_fetch_budget_s: float = Field(alias="CCXT_FETCH_BUDGET_S", default=60.0)
     futu_host: str = Field(alias="FUTU_HOST", default="127.0.0.1")
     futu_port: int = Field(alias="FUTU_PORT", default=11111)
     finnhub_api_key: str = Field(alias="FINNHUB_API_KEY", default="")
@@ -212,12 +209,7 @@ class DataConfig(_EnvBase):
     tiingo_api_key: str = Field(alias="TIINGO_API_KEY", default="")
     fmp_api_key: str = Field(alias="FMP_API_KEY", default="")
     gildata_token: str = Field(alias="GILDATA_TOKEN", default="")
-    gildata_base_url: str = Field(
-        alias="GILDATA_BASE_URL",
-        default="https://api.gildata.com/mcp-servers/aidata-assistant-srv-rawapi",
-    )
     fred_api_key: str = Field(alias="FRED_API_KEY", default="")
-    vibe_trading_iwencai_key: str = Field(alias="VIBE_TRADING_IWENCAI_KEY", default="")
     vibe_trading_sec_ua: str = Field(alias="VIBE_TRADING_SEC_UA", default="")
     # 13F scan bounds. No gt=0 constraint: a non-positive override must fall
     # back to the default like any other bad value, and a constraint would
@@ -231,15 +223,11 @@ class DataConfig(_EnvBase):
     vibe_trading_sec_ftd_url: str = Field(alias="VIBE_TRADING_SEC_FTD_URL", default="")
     vibe_trading_sec_ftd_files: int = Field(alias="VIBE_TRADING_SEC_FTD_FILES", default=1)
     vibe_trading_openalex_mailto: str = Field(alias="VIBE_TRADING_OPENALEX_MAILTO", default="")
-    vibe_tw_stock_db: str = Field(alias="VIBE_TW_STOCK_DB", default="")
     vibe_trading_data_cache: EnvBool = Field(alias="VIBE_TRADING_DATA_CACHE", default=False)
     vibe_trading_data_cache_root: str = Field(alias="VIBE_TRADING_DATA_CACHE_ROOT", default="")
     aliyun_iqs_api_key: str = Field(alias="ALIYUN_IQS_API_KEY", default="")
     qveris_api_key: str = Field(alias="QVERIS_API_KEY", default="")
     qveris_base_url: str = Field(alias="QVERIS_BASE_URL", default="")
-    tickerall_api_key: str = Field(alias="TICKERALL_API_KEY", default="")
-    tickerall_account_id: str = Field(alias="TICKERALL_ACCOUNT_ID", default="")
-    tickerall_base_url: str = Field(alias="TICKERALL_BASE_URL", default="")
     rsshub_base_url: str = Field(alias="RSSHUB_BASE_URL", default="")
     dashscope_api_key: str = Field(alias="DASHSCOPE_API_KEY", default="")
     longbridge_app_key: str = Field(alias="LONGBRIDGE_APP_KEY", default="")

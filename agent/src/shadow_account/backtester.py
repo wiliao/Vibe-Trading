@@ -38,13 +38,11 @@ from src.tools.trade_journal_tool import build_frame_adjust, pair_trades_fifo
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_MARKETS: tuple[str, ...] = ("china_a", "hk", "us", "crypto")
+SUPPORTED_MARKETS: tuple[str, ...] = ("us", "ca")
 
 _LIQUID_BASKETS: dict[str, list[str]] = {
-    "china_a": ["600519.SH", "000858.SZ", "300750.SZ", "600036.SH", "000001.SZ"],
-    "hk":      ["00700.HK", "09988.HK", "03690.HK", "00388.HK", "01810.HK"],
-    "us":      ["AAPL.US", "MSFT.US", "NVDA.US", "AMZN.US", "GOOGL.US"],
-    "crypto":  ["BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT"],
+    "us": ["AAPL.US", "MSFT.US", "NVDA.US", "AMZN.US", "GOOGL.US"],
+    "ca": ["TD.TO", "RY.TO", "SHOP.TO", "ENB.TO", "CNR.TO"],
 }
 
 
@@ -100,8 +98,8 @@ def _group_selection_by_currency(
 
     The composite backtest engine refuses a code set that spans currencies
     (its shared capital pool has no FX translation), so multi-market shadow
-    runs are split into one backtest per currency pool. Markets that settle
-    in the same currency (us + crypto → USD) share one pool.
+    runs are split into one backtest per currency pool: US equity settles in
+    USD and Canada in CAD, one pool each.
 
     Args:
         selection: Dict market → list of codes.
@@ -178,8 +176,8 @@ def run_shadow_backtest(
     Markets are backtested per settlement currency: the composite engine
     refuses a mixed-currency code set (its shared capital pool has no FX
     translation), so the selection is split into one run per currency pool —
-    e.g. the default four markets produce three runs: CNY (china_a),
-    HKD (hk) and USD (us + crypto sharing one pool). Each pool starts with
+    e.g. the default two markets produce two runs: USD (us) and CAD (ca).
+    Each pool starts with
     the full ``initial_capital``; there is no cross-currency aggregation.
 
     Args:

@@ -109,9 +109,6 @@ class TestEnvConfigDefaults:
     def test_data_defaults(self) -> None:
         c = EnvConfig()
         assert c.data.tushare_token == ""
-        assert c.data.ccxt_exchange == "binance"
-        assert c.data.ccxt_timeout_ms == 15000
-        assert c.data.ccxt_fetch_budget_s == 60.0
         assert c.data.futu_host == "127.0.0.1"
         assert c.data.futu_port == 11111
         assert c.data.finnhub_api_key == ""
@@ -119,9 +116,7 @@ class TestEnvConfigDefaults:
         assert c.data.tiingo_api_key == ""
         assert c.data.fmp_api_key == ""
         assert c.data.gildata_token == ""
-        assert c.data.gildata_base_url.endswith("aidata-assistant-srv-rawapi")
         assert c.data.fred_api_key == ""
-        assert c.data.vibe_trading_iwencai_key == ""
         assert c.data.vibe_trading_sec_ua == ""
         assert c.data.vibe_trading_data_cache is False
         assert c.data.vibe_trading_data_cache_root == ""
@@ -343,12 +338,12 @@ class TestEnvConfigOverride:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SWARM_MAX_WORKERS", "8")
-        monkeypatch.setenv("CCXT_EXCHANGE", "okx")
+        monkeypatch.setenv("MARKET_DATA_ORDER_US_EQUITY", "yahoo,stooq")
         monkeypatch.setenv("CORS_ORIGINS", "http://localhost:3000")
 
         c = EnvConfig()
         assert c.swarm.swarm_max_workers == 8
-        assert c.data.ccxt_exchange == "okx"
+        assert c.data.market_data_order_us_equity == "yahoo,stooq"
         assert c.api.cors_origins == "http://localhost:3000"
 
 
@@ -587,9 +582,9 @@ class TestSubModelDirectConstruction:
         assert cfg.timeout_seconds == 60
 
     def test_data_config_direct(self) -> None:
-        cfg = DataConfig(tushare_token="my_token", ccxt_exchange="okx")
+        cfg = DataConfig(tushare_token="my_token", fmp_api_key="fmp-key")
         assert cfg.tushare_token == "my_token"
-        assert cfg.ccxt_exchange == "okx"
+        assert cfg.fmp_api_key == "fmp-key"
 
     def test_swarm_config_direct(self) -> None:
         cfg = SwarmConfig(swarm_max_workers=16)

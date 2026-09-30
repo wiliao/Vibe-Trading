@@ -1,20 +1,8 @@
 """Read-only financial-statements tool: three statements + key indicators.
 
 Pulls a single stock's balance sheet, income statement, cash-flow statement, or
-key per-period indicators from a market-appropriate public source:
-
-* **A-share** (``.SH`` / ``.SZ`` / ``.BJ``) — Eastmoney's A-share F10 report
-  datasets (``RPT_F10_FINANCE_*``), filtered on the dotted ``SECUCODE`` (e.g.
-  ``600519.SH``). The legacy Sina ``quotes.sina.cn`` company-finance openapi
-  returned a graceful-empty masking an upstream failure, so the A-share path now
-  shares the Eastmoney transport with HK.
-* **US** (``.US``) — SEC EDGAR companyfacts XBRL, resolved by ticker->CIK.
-* **Hong Kong** (``.HK``) — Eastmoney's HK F10 financial-report datasets,
-  filtered on the bare ``SECURITY_CODE``; ``indicators`` reads the
-  main-indicator dataset.
-
-Eastmoney requests go through :func:`backtest.loaders.eastmoney_client.get_json`
-(``host_key="eastmoney"``); SEC requests go through the shared EDGAR client
+key per-period indicators from US SEC EDGAR companyfacts XBRL, resolved by
+ticker->CIK. SEC requests go through the shared EDGAR client
 (``host_key="sec"``).
 
 The tool is read-only and self-contained: ``execute`` returns a JSON-string
@@ -29,40 +17,11 @@ import logging
 from typing import Any
 
 from backtest.loaders import sec_frames
-from backtest.loaders import yahoo_client
-from backtest.loaders.eastmoney_client import datacenter_rejection, get_json, resolve_secid
 from backtest.loaders.sec_edgar_client import cik_for, get_company_facts
 from src.agent.tools import BaseTool
 from src.tools._result_paging import fit_records
 
 logger = logging.getLogger(__name__)
-
-# --- Eastmoney datacenter report API --------------------------------------
-
-# Eastmoney datacenter report API. The three statements and the main-indicator
-# dataset are addressed by report name, which differs by market (A / HK).
-_EM_REPORT_URL = "https://datacenter.eastmoney.com/securities/api/data/v1/get"
-
-# (market_prefix_group, statement) -> Eastmoney report name. ``a`` covers the
-# mainland exchanges (markets 0/1); ``hk`` covers 116.
-_EM_REPORT_NAME: dict[str, dict[str, str]] = {
-    "a": {
-        "balance": "RPT_F10_FINANCE_GBALANCE",
-        "income": "RPT_F10_FINANCE_GINCOME",
-        "cashflow": "RPT_F10_FINANCE_GCASHFLOW",
-        "indicators": "RPT_F10_FINANCE_MAINFINADATA",
-    },
-    "hk": {
-        "balance": "RPT_HKF10_FN_BALANCE",
-        "income": "RPT_HKF10_FN_INCOME",
-        "cashflow": "RPT_HKF10_FN_CASHFLOW",
-        "indicators": "RPT_HKF10_FN_GMAININDICATOR",
-    },
-}
-
-# Eastmoney mainland A-share markets (SZ/BJ = 0, SH = 1) and the HK market.
-_EM_A_MARKETS = ("0", "1")
-_EM_HK_MARKET = "116"
 
 _SEC_CONCEPTS: dict[str, tuple[str, ...]] = {
     "balance": (
@@ -154,234 +113,6 @@ def _cap_periods(periods: list[dict[str, Any]]) -> list[dict[str, Any]]:
         A new list of field-capped records, one per input period.
     """
     return [_truncate_period(record) for record in periods]
-
-
-def _eastmoney_market_group(secid: str) -> str | None:
-    """Classify an Eastmoney secid into the ``a`` or ``hk`` report group.
-
-    Args:
-        secid: Eastmoney secid (e.g. ``"1.600519"`` or ``"116.00700"``).
-
-    Returns:
-        ``"a"``, ``"hk"``, or ``None`` when the market prefix is unrecognized.
-    """
-    market = secid.split(".", 1)[0]
-    if market in _EM_A_MARKETS:
-        return "a"
-    if market == _EM_HK_MARKET:
-        return "hk"
-    return None
-
-
-def _parse_eastmoney_periods(payload: Any) -> list[dict[str, Any]]:
-    """Extract period records from an Eastmoney datacenter report payload.
-
-    Eastmoney nests report rows under ``result.data`` as a list of flat dicts.
-    Any other shape yields an empty list rather than raising.
-
-    Args:
-        payload: Decoded JSON from the datacenter report API.
-
-    Returns:
-        A list of flat period dicts (possibly empty).
-    """
-    if not isinstance(payload, dict):
-        return []
-    result = payload.get("result")
-    data = result.get("data") if isinstance(result, dict) else None
-    if not isinstance(data, list):
-        return []
-    return [row for row in data if isinstance(row, dict)]
-
-
-def _eastmoney_filter(group: str, code: str, secid: str) -> str:
-    """Build the datacenter ``filter`` clause for one market group.
-
-    The A-share F10 datasets key on the dotted ``SECUCODE`` (e.g.
-    ``600519.SH``), whereas the HK datasets key on the bare ``SECURITY_CODE``
-    carried in the secid (e.g. ``00700``). No ``REPORT_TYPE`` clause
-    is emitted: Eastmoney stores ``REPORT_TYPE`` as locale text (年报 / 一季报)
-    or a ``2026/Q1`` string that differs by market and report, so a numeric
-    filter matched zero rows. Period selection is done client-side instead
-    (see :func:`_filter_by_period`).
-
-    Args:
-        group: Market group from :func:`_eastmoney_market_group`.
-        code: Original Vibe-Trading symbol (e.g. ``"600519.SH"``).
-        secid: Resolved Eastmoney secid (e.g. ``"1.600519"``).
-
-    Returns:
-        The Eastmoney ``filter`` query-parameter string.
-    """
-    if group == "a":
-        return f'(SECUCODE="{code.upper()}")'
-    bare_code = secid.split(".", 1)[1]
-    return f'(SECURITY_CODE="{bare_code}")'
-
-
-def _filter_by_period(
-    periods: list[dict[str, Any]], period: str
-) -> list[dict[str, Any]]:
-    """Best-effort client-side period selection by report date.
-
-    Eastmoney returns a mixed newest-first series (annual + interim reports).
-    For ``annual`` we keep only fiscal-year-end rows (``REPORT_DATE`` ending
-    ``-12-31``); if none match — e.g. an issuer whose fiscal year does not end
-    in December — we fall back to the full series rather than drop all data.
-    ``quarter`` returns the full newest-first series unchanged.
-
-    Args:
-        periods: Period records (newest-first) from the report parser.
-        period: ``"annual"`` or ``"quarter"``.
-
-    Returns:
-        The filtered list; never empty when ``periods`` is non-empty.
-    """
-    if period != "annual":
-        return periods
-    annual = [
-        row
-        for row in periods
-        if str(row.get("REPORT_DATE", ""))[:10].endswith("-12-31")
-    ]
-    return annual or periods
-
-
-def _fetch_eastmoney_statement(
-    code: str, *, statement: str, period: str
-) -> dict[str, Any]:
-    """Fetch one A-share/HK statement from Eastmoney, shaped into a result dict.
-
-    Args:
-        code: Symbol (e.g. ``"600519.SH"`` or ``"00700.HK"``).
-        statement: One of :data:`_VALID_STATEMENTS`.
-        period: ``"annual"`` or ``"quarter"``.
-
-    Returns:
-        ``{"periods": [...]}`` on success or ``{"error": ...}`` on failure;
-        never raises.
-    """
-    secid = resolve_secid(code)
-    if secid is None:
-        return {"error": "unresolvable symbol"}
-
-    group = _eastmoney_market_group(secid)
-    if group is None:
-        return {"error": "symbol is not an A-share or Hong Kong instrument"}
-
-    params = {
-        "reportName": _EM_REPORT_NAME[group][statement],
-        "columns": "ALL",
-        "filter": _eastmoney_filter(group, code, secid),
-        "sortColumns": "REPORT_DATE",
-        "sortTypes": "-1",
-        "pageNumber": "1",
-        "pageSize": str(_MAX_PERIODS),
-        "source": "F10",
-        "client": "PC",
-    }
-    try:
-        payload = get_json(_EM_REPORT_URL, params=params)
-    except Exception as exc:  # noqa: BLE001 - one bad fetch must not kill the call
-        logger.warning("eastmoney statement fetch failed for %s: %s", code, exc)
-        return {"error": str(exc)}
-
-    rejection = datacenter_rejection(payload)
-    if rejection is not None:
-        # A stale report or column reads as a rejection, not as no filings (#1502).
-        return {"error": f"eastmoney rejected the request: {rejection}"}
-    periods = _filter_by_period(_parse_eastmoney_periods(payload), period)
-    return {"periods": _cap_periods(periods)}
-
-
-# Yahoo quoteSummary module + result-key per (statement, cadence). UK
-# (.L) names have no Eastmoney or SEC filing pipeline; Yahoo's
-# crumb-gated quoteSummary serves annual and quarterly histories for
-# LSE tickers (UK parity, #1206).
-_YAHOO_STATEMENT_MODULES: dict[tuple[str, str], tuple[str, str]] = {
-    ("balance", "annual"): ("balanceSheetHistory", "balanceSheetStatements"),
-    ("balance", "quarter"): ("balanceSheetHistoryQuarterly", "balanceSheetStatements"),
-    ("income", "annual"): ("incomeStatementHistory", "incomeStatementHistory"),
-    ("income", "quarter"): ("incomeStatementHistoryQuarterly", "incomeStatementHistory"),
-    ("cashflow", "annual"): ("cashflowStatementHistory", "cashflowStatements"),
-    ("cashflow", "quarter"): ("cashflowStatementHistoryQuarterly", "cashflowStatements"),
-}
-_YAHOO_INDICATOR_MODULES = ["financialData", "defaultKeyStatistics"]
-# {raw, fmt, longFmt} value shapes; keep the numeric raw only.
-_YAHOO_NUMERIC_KEYS = {"raw", "longFmt", "fmt"}
-
-
-def _yahoo_value(value: Any) -> Any:
-    """Flatten a Yahoo ``{raw, fmt, ...}`` value to plain numbers/integers.
-
-    Args:
-        value: A Yahoo quoteSummary value (``{raw, fmt, longFmt}``) or a
-            scalar (``str``/``int``/``float``/``bool``/``None``).
-
-    Returns:
-        The numeric ``raw`` when present (``None`` when raw is missing), or the
-        scalar itself. Text values like ``"2026-08-24"`` pass through.
-    """
-    if isinstance(value, dict):
-        if "raw" in value:
-            return value.get("raw")
-        return {k: _yahoo_value(v) for k, v in value.items() if k not in _YAHOO_NUMERIC_KEYS}
-    return value
-
-
-def _fetch_yahoo_statement(
-    code: str, *, statement: str, period: str
-) -> dict[str, Any]:
-    """Fetch one UK (.L) statement/indicators from Yahoo quoteSummary.
-
-    Args:
-        code: UK symbol (e.g. ``"VOD.L"``).
-        statement: One of :data:`_VALID_STATEMENTS`.
-        period: ``"annual"`` or ``"quarter"`` — selects the corresponding
-            history module; both exist for LSE tickers.
-
-    Returns:
-        ``{"periods": [...]}`` on success or ``{"error": ...}`` on failure;
-        never raises.
-    """
-    if statement == "indicators":
-        modules = _YAHOO_INDICATOR_MODULES
-    else:
-        module, key = _YAHOO_STATEMENT_MODULES[(statement, period)]
-        modules = [module]
-    try:
-        result = yahoo_client.get_quote_summary(code, modules)
-    except Exception as exc:  # noqa: BLE001 - one bad fetch must not kill the call
-        logger.warning("yahoo statement fetch failed for %s: %s", code, exc)
-        return {"error": str(exc)}
-
-    if statement == "indicators":
-        record: dict[str, Any] = {}
-        for module in modules:
-            block = result.get(module) or {}
-            for field, value in block.items():
-                if field == "maxAge":
-                    continue
-                record[field] = _yahoo_value(value)
-        return {"periods": [record]} if record else {"error": "no indicator data"}
-
-    block = result.get(module) or {}
-    rows = block.get(key) or []
-    periods = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        flat: dict[str, Any] = {}
-        for field, value in row.items():
-            if field in ("maxAge",):
-                continue
-            flat[field] = _yahoo_value(value)
-        if flat:
-            periods.append(flat)
-    if not periods:
-        return {"error": f"Yahoo returned no {statement} history for {code}"}
-    periods.sort(key=lambda row: str(row.get("endDate") or ""), reverse=True)
-    return {"periods": _cap_periods(periods)}
 
 
 def _to_number(value: Any) -> float | None:
@@ -663,24 +394,17 @@ def _fetch_sec_statement(code: str, *, statement: str, period: str) -> dict[str,
 
 
 def _classify_market(code: str) -> str | None:
-    """Classify a symbol's suffix into ``a_share``, ``us``, ``hk``, ``uk``, or ``None``.
+    """Classify a symbol's suffix into ``us`` or ``None``.
 
     Args:
-        code: Symbol with a market suffix (e.g. ``"600519.SH"``, ``"AAPL.US"``).
+        code: Symbol with a market suffix (e.g. ``"AAPL.US"``).
 
     Returns:
-        The market label, or ``None`` when the suffix is unrecognized.
+        ``"us"``, or ``None`` when the suffix is unrecognized.
     """
     suffix = code.rpartition(".")[2].strip().upper()
-    if suffix in ("SH", "SZ", "BJ", "SS"):
-        return "a_share"
     if suffix == "US":
         return "us"
-    if suffix == "HK":
-        return "hk"
-    if suffix == "L":
-        # London Stock Exchange (#1206).
-        return "uk"
     return None
 
 
@@ -691,22 +415,17 @@ class FinancialStatementsTool(BaseTool):
     description = (
         "Fetch a single stock's financial statements: balance sheet, income "
         "statement, cash-flow statement, or key per-period indicators (margins, "
-        "ROE, EPS, etc.). Markets: A-share (.SH/.SZ/.BJ), US (.US), "
-        "Hong Kong (.HK) and UK LSE (.L). US uses SEC EDGAR companyfacts; "
-        "A-share and HK use Eastmoney; UK uses Yahoo quoteSummary (annual "
-        "history). Reports come back newest-first as flat per-period rows. Use "
+        "ROE, EPS, etc.). US equities only (.US), sourced from SEC EDGAR "
+        "companyfacts. Reports come back newest-first as flat per-period rows. Use "
         'this to read fundamentals before building a valuation or screen. Example: '
-        '{"code": "600519.SH", "statement": "income", "period": "annual"}.'
+        '{"code": "AAPL.US", "statement": "income", "period": "annual"}.'
     )
     parameters = {
         "type": "object",
         "properties": {
             "code": {
                 "type": "string",
-                "description": (
-                    "Single symbol with a market suffix, e.g. '600519.SH', "
-                    "'000001.SZ', 'AAPL.US', '00700.HK', or 'VOD.L'."
-                ),
+                "description": "Single US symbol with a market suffix, e.g. 'AAPL.US'.",
             },
             "statement": {
                 "type": "string",
@@ -741,20 +460,20 @@ class FinancialStatementsTool(BaseTool):
     }
 
     def execute(self, **kwargs: Any) -> str:
-        """Validate inputs, dispatch by market, and return a JSON envelope.
+        """Validate inputs, fetch the statement, and return a JSON envelope.
 
         Args:
             **kwargs: ``code`` (str, required), ``statement`` (one of balance|
                 income|cashflow|indicators, default 'indicators'), ``period``
-                (annual|quarter, default 'annual').
+                (annual|quarter, default 'annual'), ``offset`` (int, default 0).
 
         Returns:
             A JSON string ``{"ok": true, "market": str, "source": str,
             "statement": str, "period": str, "data": {...}}`` when the fetch
             yields data, ``{"ok": false, "error": ...}`` when validation fails,
             or the same envelope with ``ok: false`` plus a top-level ``error``
-            when the per-market fetch failed for every requested code (so a
-            nested fetch error is never masked by a top-level ``ok: true``).
+            when the fetch failed (so a nested fetch error is never masked by a
+            top-level ``ok: true``).
         """
         code = kwargs.get("code")
         if not isinstance(code, str) or not code.strip():
@@ -771,25 +490,21 @@ class FinancialStatementsTool(BaseTool):
 
         market = _classify_market(code)
         if market is None:
-            return _error(
-                "code must carry a supported suffix: .SH/.SZ/.BJ, .US, .HK, or .L"
-            )
+            return _error("code must carry a supported suffix: .US")
 
-        if market == "us":
-            result = _fetch_sec_statement(code, statement=statement, period=period)
-            source = "sec_edgar"
-        elif market == "uk":
-            result = _fetch_yahoo_statement(code, statement=statement, period=period)
-            source = "yahoo"
-        else:
-            result = _fetch_eastmoney_statement(
-                code, statement=statement, period=period
-            )
-            source = "eastmoney"
+        # Validated before the fetch: a malformed offset must not burn a live
+        # SEC request, and must not be masked by a fetch error.
+        try:
+            offset = max(int(kwargs.get("offset") or 0), 0)
+        except (TypeError, ValueError):
+            return _error("offset must be an integer")
 
-        # The fetch failed for every requested code (here, the single ``code``)
-        # iff its result carries an ``error``. Surface that as a top-level
-        # ``ok: false`` so a nested failure is never masked by ``ok: true``.
+        result = _fetch_sec_statement(code, statement=statement, period=period)
+        source = "sec_edgar"
+
+        # The fetch failed iff its result carries an ``error``. Surface that as a
+        # top-level ``ok: false`` so a nested failure is never masked by
+        # ``ok: true``.
         if "error" in result:
             return json.dumps(
                 {
@@ -803,11 +518,6 @@ class FinancialStatementsTool(BaseTool):
                 },
                 ensure_ascii=False,
             )
-
-        try:
-            offset = max(int(kwargs.get("offset") or 0), 0)
-        except (TypeError, ValueError):
-            return _error("offset must be an integer")
 
         # Page whole periods. A raw character cut lands mid-record, and the
         # model reads the periods that survived as the issuer's full history.

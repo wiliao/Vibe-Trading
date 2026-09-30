@@ -5,16 +5,14 @@ run-detail handler expects (``RUNS_DIR/<run_id>/artifacts/positions.csv``).
 
 After the US/CA refactor the endpoint only classifies each symbol's asset
 class (``us_equity`` / ``ca_equity`` / ``index``); the A-share industry lookup
-via Eastmoney is gone, so ``industry`` is always ``None`` and no network call
-is ever made.
+via Eastmoney is gone with ``sector_tool``, so ``industry`` is always ``None``
+and no network call is ever made.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
-
 from fastapi.testclient import TestClient
 
 import api_server
@@ -49,10 +47,7 @@ def test_positions_sectors_classifies_us_ca_index(tmp_path: Path, monkeypatch) -
     )
     client = _client(tmp_path, monkeypatch)
 
-    with patch("src.tools.sector_tool.resolve_secid") as resolve, patch(
-        "src.tools.sector_tool.get_json"
-    ) as get:
-        response = client.get(f"/runs/{RUN_ID}/positions/sectors")
+    response = client.get(f"/runs/{RUN_ID}/positions/sectors")
 
     assert response.status_code == 200
     payload = response.json()
@@ -75,10 +70,6 @@ def test_positions_sectors_classifies_us_ca_index(tmp_path: Path, monkeypatch) -
     assert payload["total_symbols"] == 3
     assert payload["symbol_limit"] == 200
 
-    # No surviving market resolves an industry, so Eastmoney is never touched.
-    resolve.assert_not_called()
-    get.assert_not_called()
-
     cache_path = tmp_path / "runs" / RUN_ID / "artifacts" / "sector_map.json"
     cache = json.loads(cache_path.read_text(encoding="utf-8"))
     assert cache["symbols"]["AAPL.US"]["asset_class"] == "us_equity"
@@ -97,18 +88,13 @@ def test_positions_sectors_cache_hit_makes_zero_network_calls(tmp_path: Path, mo
     assert first.status_code == 200
     assert first.json()["cached"] is False
 
-    with patch("src.tools.sector_tool.resolve_secid") as resolve, patch(
-        "src.tools.sector_tool.get_json"
-    ) as get:
-        second = client.get(f"/runs/{RUN_ID}/positions/sectors")
+    second = client.get(f"/runs/{RUN_ID}/positions/sectors")
 
     assert second.status_code == 200
     payload = second.json()
     assert payload["cached"] is True
     assert payload["resolved_at"] == first.json()["resolved_at"]
     assert payload["symbols"]["AAPL.US"]["asset_class"] == "us_equity"
-    resolve.assert_not_called()
-    get.assert_not_called()
 
 
 def test_positions_sectors_refresh_bypasses_cache(tmp_path: Path, monkeypatch) -> None:

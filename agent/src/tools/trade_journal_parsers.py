@@ -1,7 +1,7 @@
 """Trade journal format adapters.
 
 Each parser normalizes one broker export format into a list of TradeRecord.
-Supported: Tonghuashun (同花顺), Eastmoney (东方财富), Futu (富途), generic CSV.
+Supported: Futu (富途) and generic CSV.
 
 Encoding fallback order for CSV: utf-8 → utf-8-sig → gbk → gb2312.
 Excel (.xlsx/.xls) always opens as utf-8 internally via openpyxl/xlrd.
@@ -24,14 +24,8 @@ _CURRENCY_TOKEN_RE = re.compile(
     r"(?i)(?<![A-Za-z])(?:USDT|USDC|USD|EUR|GBP|JPY|CNY|HKD)(?![A-Za-z])|[$€£¥￥]"
 )
 
-FormatName = str  # "tonghuashun" | "eastmoney" | "futu" | "generic" | "unknown"
+FormatName = str  # "futu" | "generic" | "unknown"
 
-_A_SHARE_EXCHANGE_MAP = {
-    # prefix → suffix; Shanghai Main + STAR, Shenzhen Main + SME + ChiNext, BSE
-    ("6",): ".SH",
-    ("0", "3"): ".SZ",
-    ("4", "8"): ".BJ",
-}
 
 _BUY_TOKENS = {
     "buy",
@@ -108,7 +102,7 @@ class TradeRecord:
         price: Filled price.
         amount: Gross amount (quantity * price, pre-fee).
         fee: Total fees (commission + stamp + transfer).
-        market: "china_a" / "us" / "hk" / "crypto" / "other".
+        market: "us" / "ca" / "other".
     """
 
     datetime: str
@@ -171,10 +165,6 @@ def detect_format(df: pd.DataFrame) -> FormatName:
     """
     cols = set(df.columns.astype(str))
 
-    if {"成交时间", "证券代码", "操作"}.issubset(cols):
-        return "tonghuashun"
-    if {"买卖标志", "股票代码"}.issubset(cols) or {"买卖标志", "成交均价"}.issubset(cols):
-        return "eastmoney"
     if {"Date", "Symbol", "Side"}.issubset(cols) or {"Date", "Symbol", "Direction"}.issubset(cols):
         return "futu"
 
@@ -275,28 +265,6 @@ def _is_empty_code(raw: Any) -> bool:
     return not str(raw).strip()
 
 
-def _qualify_a_share(code: str) -> str:
-    """Append .SH/.SZ/.BJ suffix to a bare A-share ticker."""
-    if _is_empty_code(code):
-        raise ValueError("empty securities code")
-    code = str(code).strip()
-    # Excel/CSV numeric cells stringify as "600519.0"/sci — not exchange suffixes.
-    try:
-        as_float = float(code)
-        if as_float.is_integer() and abs(as_float) < 10_000_000:
-            code = str(int(as_float))
-    except (ValueError, OverflowError):
-        pass
-    code = code.zfill(6)
-    if "." in code:
-        return code.upper()
-    first = code[0]
-    for prefixes, suffix in _A_SHARE_EXCHANGE_MAP.items():
-        if first in prefixes:
-            return code + suffix
-    return code
-
-
 def _to_float(val: Any, default: float = 0.0) -> float:
     """Safely cast to float; return default on failure."""
     if val is None:
@@ -312,131 +280,14 @@ def _to_float(val: Any, default: float = 0.0) -> float:
         return default
 
 
-def parse_tonghuashun(df: pd.DataFrame) -> list[TradeRecord]:
-    """Parse 同花顺 exports.
-
-    Expected columns: 成交时间, 证券代码, 证券名称, 操作, 成交数量, 成交价格,
-    成交金额, 手续费, 印花税, 过户费.
-    """
-    records: list[TradeRecord] = []
-    for _, row in df.iterrows():
-        raw_code = row.get("证券代码", "")
-        if _is_empty_code(raw_code):
-            continue
-        if _is_skippable_side(row.get("操作")):
-            continue
-        qty = _to_float(row.get("成交数量"))
-        price = _to_float(row.get("成交价格"))
-        amount = _to_float(row.get("成交金额")) or qty * price
-        side = _normalize_side(row.get("操作"))
-        if side == "dividend":
-            amount = _dividend_amount(row, amount)
-        fee = _to_float(row.get("手续费")) + _to_float(row.get("印花税")) + _to_float(row.get("过户费"))
-        records.append(TradeRecord(
-            datetime=_ths_datetime(row.get("成交时间", "")),
-            symbol=_qualify_a_share(raw_code),
-            name=str(row.get("证券名称", "")).strip(),
-            side=side,
-            quantity=qty,
-            price=price,
-            amount=amount,
-            fee=fee,
-            market="china_a",
-        ))
-    return records
-
-
-def _ths_datetime(val: Any) -> str:
-    """Normalize 成交时间; Excel serial floats become ISO datetime."""
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return ""
-    # iterrows yields numpy integer/float scalars; bare pd.to_datetime(int) is ns-epoch.
-    if pd.api.types.is_number(val) and not isinstance(val, (bool,)):
-        ts = pd.to_datetime(float(val), unit="D", origin="1899-12-30", errors="coerce")
-        if pd.notna(ts):
-            return ts.strftime("%Y-%m-%d %H:%M:%S")
-    # load_dataframe uses dtype=str; Excel serials arrive as "44927" / "44927.5".
-    text = str(val).strip()
-    if text and not any(ch in text for ch in "/-:"):
-        try:
-            serial = float(text)
-        except ValueError:
-            serial = None
-        else:
-            # Civil day serials; YYYYMMDD ints are >= 19_000_001.
-            if 1.0 <= serial < 100_000.0:
-                ts = pd.to_datetime(serial, unit="D", origin="1899-12-30", errors="coerce")
-                if pd.notna(ts):
-                    return ts.strftime("%Y-%m-%d %H:%M:%S")
-    ts = pd.to_datetime(val, errors="coerce")
-    if pd.notna(ts):
-        return ts.strftime("%Y-%m-%d %H:%M:%S")
-    return text
-
-
-def parse_eastmoney(df: pd.DataFrame) -> list[TradeRecord]:
-    """Parse 东方财富 exports.
-
-    Expected columns: 成交日期 (YYYYMMDD), 成交时间 (HH:MM:SS), 股票代码,
-    股票名称, 买卖标志 (B/S), 成交数量, 成交均价, 成交金额, 佣金, 印花税.
-    """
-    records: list[TradeRecord] = []
-    for _, row in df.iterrows():
-        raw_code = row.get("股票代码", "")
-        if _is_empty_code(raw_code):
-            continue
-        if _is_skippable_side(row.get("买卖标志")):
-            continue
-        raw_date = str(row.get("成交日期", "")).strip()
-        # Excel numeric YYYYMMDD cells stringify as "20260115.0".
-        # Day-count serials (dtype=str load) arrive as "44941" / "44941.0".
-        try:
-            as_float = float(raw_date)
-            if as_float.is_integer() and 19_000_001 <= int(as_float) <= 21_001_231:
-                raw_date = f"{int(as_float):08d}"
-            elif 1.0 <= as_float < 100_000.0:
-                ts = pd.to_datetime(as_float, unit="D", origin="1899-12-30", errors="coerce")
-                if pd.notna(ts):
-                    raw_date = ts.strftime("%Y-%m-%d")
-        except (ValueError, OverflowError):
-            pass
-        raw_time = str(row.get("成交时间", "")).strip()
-        if len(raw_date) == 8 and raw_date.isdigit():
-            iso_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
-        else:
-            iso_date = raw_date
-        dt = f"{iso_date} {raw_time}".strip()
-        qty = _to_float(row.get("成交数量"))
-        price = _to_float(row.get("成交均价"))
-        amount = _to_float(row.get("成交金额")) or qty * price
-        side = _normalize_side(row.get("买卖标志"))
-        if side == "dividend":
-            amount = _dividend_amount(row, amount)
-        fee = _to_float(row.get("佣金")) + _to_float(row.get("印花税"))
-        records.append(TradeRecord(
-            datetime=dt,
-            symbol=_qualify_a_share(raw_code),
-            name=str(row.get("股票名称", "")).strip(),
-            side=side,
-            quantity=qty,
-            price=price,
-            amount=amount,
-            fee=fee,
-            market="china_a",
-        ))
-    return records
-
-
 def _futu_market(symbol: str, market_hint: str) -> str:
-    """Infer market from symbol/market column."""
+    """Infer market from symbol/market column (US / Canada only)."""
     hint = market_hint.strip().lower()
-    if hint in {"hk", "us", "cn"}:
-        return {"hk": "hk", "us": "us", "cn": "china_a"}[hint]
-    if symbol.endswith(".HK"):
-        return "hk"
-    if symbol.isalpha() or "." not in symbol:
+    if hint == "us":
         return "us"
-    return "other"
+    if hint in {"ca", "toronto", "tsx"}:
+        return "ca"
+    return _infer_market_from_symbol(symbol)
 
 
 def _futu_datetime(date_val: Any, time_val: Any) -> str:
@@ -636,33 +487,16 @@ def _generic_datetime_cell(val: Any) -> str:
 
 
 def _infer_market_from_symbol(symbol: str) -> str:
-    """Best-effort market inference from a symbol string."""
+    """Best-effort market inference from a symbol string (US / Canada)."""
     s = symbol.upper()
-    if s.endswith(".HK"):
-        return "hk"
-    if s.endswith(".L"):
-        # LSE names (#1206); without this they landed in "other"
-        # and shadow analysis silently degraded to NaN.
-        return "uk"
-    if s.endswith(".SH") or s.endswith(".SZ") or s.endswith(".BJ"):
-        return "china_a"
-    if ("-" in s or "/" in s) and any(quote in s for quote in ("USDT", "USDC", "BTC", "USD")):
-        return "crypto"
-    # Binance-style concatenated pairs (BTCUSDT) are purely alphabetic, so the
-    # isalpha() US-equity branch below would mis-label them without this check.
-    for quote in ("USDT", "USDC", "BUSD"):
-        if len(s) > len(quote) and s.endswith(quote):
-            base = s[: -len(quote)]
-            if base.isalpha() and len(base) >= 2:
-                return "crypto"
-    if s.isalpha():
+    if s.endswith(".TO") or s.endswith(".V"):
+        return "ca"
+    if s.endswith(".US") or s.isalpha():
         return "us"
     return "other"
 
 
 _PARSERS = {
-    "tonghuashun": parse_tonghuashun,
-    "eastmoney": parse_eastmoney,
     "futu": parse_futu,
     "generic": parse_generic,
 }

@@ -80,7 +80,7 @@ class GetFundamentalsTool(BaseTool):
                 "description": (
                     "US tickers, with or without a .US suffix, e.g. "
                     '["AAPL", "MSFT.US", "BRK-B"]. This tool is US-only: it '
-                    "reads SEC XBRL, so A-share and HK symbols are rejected."
+                    "reads SEC XBRL, so non-US symbols are rejected."
                 ),
             },
             "fields": {

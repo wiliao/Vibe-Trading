@@ -2,22 +2,21 @@
 """Vibe-Trading MCP Server — expose finance research tools to any MCP client.
 
 Works with OpenClaw, Claude Desktop, Cursor, and any MCP-compatible client.
-Zero API key required for HK/US/crypto research markets (yfinance, OKX,
-AKShare are free). Trading connector tools are profile-scoped and require the
-selected connector's own local app or OAuth setup.
+Zero API key required for US/Canada research markets (yfinance and the
+Eastmoney / Sina / Stooq fallbacks are free). Trading connector tools are
+profile-scoped and require the selected connector's own local app or OAuth
+setup.
 
-Surfaces 74 tools: skills, research goals, strategy discovery,
+Surfaces the US/Canada tool set: skills, research goals, strategy discovery,
 backtest/factor/options/pattern
 analysis, market data, fundamentals & capital-flow & news & discovery
-(get_fund_flow / get_dragon_tiger / get_northbound_flow / get_margin_trading /
-get_block_trades / get_shareholder_count / get_lockup_expiry / get_sector_info /
-get_research_reports / get_stock_news / get_sec_filings /
+(get_fund_flow / get_stock_news / get_sec_filings /
 get_financial_statements / get_options_chain / get_stock_profile /
-screen_market / search_symbol / get_macro_series / iwencai_search /
+screen_market / search_symbol / get_macro_series /
 qveris_search / qveris_inspect / qveris_execute),
 institutional-research and alternative data (get_institutional_holdings /
 etf_holdings / prediction_market / research_papers), read-only finance math and
-market analytics (quantlib_call / cashflow_performance / orderbook_depth /
+market analytics (quantlib_call / cashflow_performance /
 sentiment / technical_indicators / get_fundamentals), read-only
 trading-connector reads, swarm orchestration, trade-journal and shadow-account
 analysis. Every exposed tool is read-only or research-only except
@@ -1856,7 +1855,7 @@ def get_market_data(
 # Each wrapper delegates to the auto-discovered local registry, exactly like
 # factor_analysis / pattern_recognition above. The registry returns a clean
 # JSON error envelope when a key-gated tool (get_macro_series needs
-# FRED_API_KEY, iwencai_search needs VIBE_TRADING_IWENCAI_KEY, the qveris_*
+# FRED_API_KEY, the qveris_*
 # tools need QVeris paid routing: QVERIS_API_KEY + paid mode) is absent — see
 # ``_execute_key_gated`` below, which honours that contract even though the
 # tool is excluded from the registry by ``check_available()``. Every tool below
@@ -1871,8 +1870,8 @@ def get_market_data(
 # answer with a generic "Tool not found". That contradicts the documented
 # contract above (a clean, env-var-named error). For these tools we therefore
 # fall through to the tool's own ``execute()`` — whose missing-key envelope
-# names the exact env var (``FRED_API_KEY`` / ``VIBE_TRADING_IWENCAI_KEY``),
-# or the missing QVeris paid-routing setup (``QVERIS_API_KEY`` + paid mode).
+# names the exact env var (``FRED_API_KEY``), or the missing QVeris
+# paid-routing setup (``QVERIS_API_KEY`` + paid mode).
 def _key_gated_tool_classes() -> dict[str, Any]:
     """Return the {tool_name: tool_class} map for key-gated MCP tools.
 
@@ -1883,7 +1882,6 @@ def _key_gated_tool_classes() -> dict[str, Any]:
         Mapping of MCP tool name to its ``BaseTool`` subclass.
     """
     from src.tools.fred_macro_tool import FredMacroTool
-    from src.tools.iwencai_tool import IWenCaiSearchTool
     from src.tools.qveris_tool import (
         QVerisExecuteTool,
         QVerisInspectTool,
@@ -1892,7 +1890,6 @@ def _key_gated_tool_classes() -> dict[str, Any]:
 
     return {
         "get_macro_series": FredMacroTool,
-        "iwencai_search": IWenCaiSearchTool,
         "qveris_search": QVerisSearchTool,
         "qveris_inspect": QVerisInspectTool,
         "qveris_execute": QVerisExecuteTool,
@@ -1910,8 +1907,8 @@ def _execute_key_gated(name: str, params: dict[str, Any]) -> str:
     found".
 
     Args:
-        name: MCP tool name (``get_macro_series``, ``iwencai_search``,
-            ``qveris_search``, ``qveris_inspect`` or ``qveris_execute``).
+        name: MCP tool name (``get_macro_series``, ``qveris_search``,
+            ``qveris_inspect`` or ``qveris_execute``).
         params: Keyword arguments forwarded to the tool.
 
     Returns:
@@ -1942,166 +1939,6 @@ def get_fund_flow(codes: _lenient_str_list, period: str = "daily", days: int = 3
     """
     registry = _get_registry()
     return registry.execute("get_fund_flow", {"codes": codes, "period": period, "days": days})
-
-
-@mcp.tool
-def get_dragon_tiger(date: str, code: str | None = None) -> str:
-    """Fetch the A-share dragon-tiger board (龙虎榜) for a trade date (Eastmoney).
-
-    Markets: China A-share (SH/SZ). Omit ``code`` for the full-market list of
-    every security on the board that day; supply ``code`` to also get that
-    security's ranked top buy/sell brokerage seats. Read-only, no auth.
-
-    Args:
-        date: Trade date in YYYY-MM-DD format (e.g. 2024-01-02).
-        code: Optional A-share symbol or bare code (e.g. "600519.SH" or "600519").
-    """
-    params: dict[str, Any] = {"date": date}
-    if code:
-        params["code"] = code
-    registry = _get_registry()
-    return registry.execute("get_dragon_tiger", params)
-
-
-@mcp.tool
-def get_northbound_flow(lookback_days: int = 30) -> str:
-    """Fetch Northbound (Stock-Connect) net capital flow for China A-shares.
-
-    Returns the latest realtime net inflow plus recent daily history, split into
-    Shanghai-Connect (沪股通) and Shenzhen-Connect (深股通) channels (units: 10k
-    CNY) from Eastmoney. Read-only; China A-share market only.
-
-    Args:
-        lookback_days: Trailing trading days of daily net-inflow history to return.
-    """
-    registry = _get_registry()
-    return registry.execute("get_northbound_flow", {"lookback_days": lookback_days})
-
-
-@mcp.tool
-def get_margin_trading(code: str, days: int = 30) -> str:
-    """Fetch an A-share stock's daily margin-trading (融资融券) balances (Eastmoney).
-
-    Returns outstanding financing balance, financing buy amount,
-    securities-lending balance, and combined RZRQ balance, one row per trading
-    day (most recent first). Read-only, no credentials, A-shares only (SH/SZ).
-
-    Args:
-        code: A-share code: bare ("600519"), suffixed ("600519.SH"), or
-            exchange-prefixed ("sh600519").
-        days: Number of most-recent trading days to return.
-    """
-    registry = _get_registry()
-    return registry.execute("get_margin_trading", {"code": code, "days": days})
-
-
-@mcp.tool
-def get_block_trades(code: str, days: int = 30) -> str:
-    """Fetch recent A-share block trades (大宗交易) for one symbol (Eastmoney).
-
-    Returns per-deal price, volume, amount, the premium/discount versus that
-    day's close, and the buyer/seller broker seats (营业部). Markets: China
-    A-share only (.SH/.SZ/.BJ). Read-only.
-
-    Args:
-        code: A-share symbol with exchange suffix, e.g. "600519.SH", "830799.BJ".
-        days: Lookback window in calendar days ending today.
-    """
-    registry = _get_registry()
-    return registry.execute("get_block_trades", {"code": code, "days": days})
-
-
-@mcp.tool
-def get_shareholder_count(code: str, max_periods: int = 24) -> str:
-    """Fetch mainland A-share shareholder count history (股东户数) (Eastmoney).
-
-    Returns holder count per disclosed period, the change against the previous
-    disclosed period (absolute and percent; each row states its own
-    prev_period_end since intervals vary), and average holding (shares and
-    market value) per account on the newest row. Markets: China A-shares only
-    (.SH/.SZ/.BJ).
-
-    Args:
-        code: A-share symbol in <code>.<exchange> form (SH/SZ/BJ).
-        max_periods: Maximum number of most-recent report periods to return.
-    """
-    registry = _get_registry()
-    return registry.execute("get_shareholder_count", {"code": code, "max_periods": max_periods})
-
-
-@mcp.tool
-def get_lockup_expiry(code: str | None = None, horizon_days: int = 90) -> str:
-    """Fetch Chinese A-share lockup-expiry (restricted-share unlock, 限售解禁) data.
-
-    Pass an A-share ``code`` to get that stock's full historical unlock
-    schedule, or omit it for a market-wide calendar of upcoming unlocks within
-    the next ``horizon_days`` (Eastmoney). A large near-term unlock adds
-    tradable supply and often pressures the stock. Read-only.
-
-    Args:
-        code: A-share symbol (e.g. "600519", "600519.SH"). Omit for a
-            market-wide upcoming-unlock calendar.
-        horizon_days: Upcoming-unlock window in days for the market-wide
-            calendar; ignored when ``code`` is given (full history is returned).
-    """
-    params: dict[str, Any] = {"horizon_days": horizon_days}
-    if code:
-        params["code"] = code
-    registry = _get_registry()
-    return registry.execute("get_lockup_expiry", params)
-
-
-@mcp.tool
-def get_sector_info(code: str | None = None, mode: str = "membership", limit: int = 30) -> str:
-    """Look up Chinese A-share sector / concept board info (Eastmoney, no auth).
-
-    Two modes: (1) membership — given a stock ``code``, list the industry and
-    concept boards it belongs to; (2) ranking — set ``mode="ranking"`` to rank
-    industry boards by today's percent change (with up/down constituent counts
-    and the leading stock). Market: A-share stocks.
-
-    Args:
-        code: A-share stock symbol with market suffix. Required when
-            mode="membership"; ignored when mode="ranking".
-        mode: "membership" (default) or "ranking".
-        limit: For mode="ranking", number of top boards to return.
-    """
-    params: dict[str, Any] = {"mode": mode, "limit": limit}
-    if code:
-        params["code"] = code
-    registry = _get_registry()
-    return registry.execute("get_sector_info", params)
-
-
-@mcp.tool
-def get_research_reports(
-    code: str,
-    limit: int = 20,
-    beginTime: str | None = None,
-    endTime: str | None = None,
-) -> str:
-    """Fetch mainland A-share sell-side research coverage and consensus forecasts.
-
-    Returns recent broker research reports (title, brokerage, analyst, publish
-    date, rating) with each broker's per-year EPS and PE forecasts from
-    Eastmoney, plus the market consensus (mean) EPS forecast per forward fiscal
-    year from THS (同花顺). Markets: China A-shares only (.SH/.SZ/.BJ).
-
-    Args:
-        code: A-share symbol in <code>.<exchange> form (SH/SZ/BJ).
-        limit: Maximum number of most-recent research reports to return.
-        beginTime: Earliest report publish date (inclusive), 'YYYYMMDD'.
-            Optional; defaults to the start of a trailing two-year window.
-        endTime: Latest report publish date (inclusive), 'YYYYMMDD'.
-            Optional; defaults to today.
-    """
-    params: dict[str, Any] = {"code": code, "limit": limit}
-    if beginTime:
-        params["beginTime"] = beginTime
-    if endTime:
-        params["endTime"] = endTime
-    registry = _get_registry()
-    return registry.execute("get_research_reports", params)
 
 
 @mcp.tool
@@ -2294,24 +2131,6 @@ def get_macro_series(
 
 
 @mcp.tool
-def iwencai_search(query: str, limit: int = 20) -> str:
-    """Run a natural-language A-share research query against iWenCai (问财).
-
-    iWenCai is a Chinese-market semantic stock screener. Phrase the question in
-    plain language (Chinese works best) and get back the matching China A-share
-    (SH/SZ) securities with the metric columns iWenCai parsed from the question.
-    Read-only; requires the VIBE_TRADING_IWENCAI_KEY access key (without it the
-    tool returns a not-available error).
-
-    Args:
-        query: Natural-language research question (Chinese phrasing yields the
-            best parse, e.g. "市盈率低于15的银行股").
-        limit: Maximum securities to return.
-    """
-    return _execute_key_gated("iwencai_search", {"query": query, "limit": limit})
-
-
-@mcp.tool
 def qveris_search(query: str, limit: int = 20, session_id: str | None = None) -> str:
     """Search the QVeris premium data/tool marketplace for capabilities.
 
@@ -2451,7 +2270,6 @@ _MIRRORED_TOOL_SOURCES = (
     # would create the second definition this block exists to avoid.
     ("src.tools.quantlib_tool", "QuantlibCallTool"),
     ("src.tools.cashflow_analytics_tool", "CashFlowPerformanceTool"),
-    ("src.tools.orderbook_depth_tool", "OrderBookDepthTool"),
     ("src.tools.sentiment_tool", "SentimentTool"),
     ("src.tools.technical_indicator_tool", "TechnicalIndicatorTool"),
     ("src.tools.get_fundamentals_tool", "GetFundamentalsTool"),

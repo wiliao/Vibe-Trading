@@ -588,7 +588,7 @@ class TradingHistoryDealsTool(BaseTool):
             "code": {
                 "type": "string",
                 "default": "",
-                "description": "Optional Futu instrument code (e.g. HK.00700). Empty = all symbols.",
+                "description": "Optional Futu instrument code (e.g. US.AAPL). Empty = all symbols.",
             },
         },
         "required": ["start", "end"],
@@ -698,12 +698,12 @@ class TradingEarningsCalendarTool(BaseTool):
     """
 
     name = "trading_earnings_calendar"
-    description = "Read upcoming earnings calendar (code, name, EPS/revenue forecast, IV, IV rank) for US / HK. begin/end YYYY-MM-DD. Read-only."
+    description = "Read upcoming earnings calendar (code, name, EPS/revenue forecast, IV, IV rank) for US listings. begin/end YYYY-MM-DD. Read-only."
     parameters = {
         "type": "object",
         "properties": {
             **TradingQuoteTool.parameters["properties"],
-            "market": {"type": "string", "default": "US", "description": "US or HK."},
+            "market": {"type": "string", "default": "US", "description": "US."},
             "begin_date": {"type": "string", "default": "", "description": "Begin YYYY-MM-DD."},
             "end_date": {"type": "string", "default": "", "description": "End YYYY-MM-DD."},
         },
@@ -747,7 +747,7 @@ class TradingPlaceOrderTool(BaseTool):
         "type": "object",
         "properties": {
             **TRADING_COMMON_PARAMETERS,
-            "symbol": {"type": "string", "description": "Symbol, e.g. AAPL, BTC-USDT, 700.HK, HK.00700."},
+            "symbol": {"type": "string", "description": "Symbol, e.g. AAPL or TD.TO."},
             "side": {"type": "string", "enum": ["buy", "sell"]},
             "quantity": {
                 "type": "number",

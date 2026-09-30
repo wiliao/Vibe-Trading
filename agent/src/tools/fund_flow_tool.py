@@ -9,8 +9,8 @@ are delegated to :mod:`backtest.loaders.eastmoney_client` (every request routes
 through the shared per-host throttle — Eastmoney rate-limits by IP and bans
 bursting clients).
 
-Markets: A-share (``.SH`` / ``.SZ`` / ``.BJ``), Hong Kong (``.HK``) and US
-(``.US``). One unresolvable or failing symbol never aborts the batch.
+Markets: US (``.US``). One unresolvable or failing symbol never aborts the
+batch.
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ from typing import Any
 
 from backtest.loaders.eastmoney_client import get_json, resolve_secid
 from src.agent.tools import BaseTool
-from src.tools import tushare_fallbacks
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +88,7 @@ def _fetch_symbol_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]
     """Fetch one symbol's capital-flow series and shape it into a result dict.
 
     Args:
-        symbol: Vibe-Trading symbol (e.g. ``"600519.SH"``, ``"AAPL.US"``).
+        symbol: Vibe-Trading symbol (e.g. ``"AAPL.US"``).
         period: ``"daily"`` or ``"min"``.
         days: Number of most-recent daily bars to keep (ignored for ``"min"``).
 
@@ -99,17 +98,6 @@ def _fetch_symbol_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]
     """
     secid = resolve_secid(symbol)
     if secid is None:
-        if period == "daily":
-            try:
-                fallback = tushare_fallbacks.fetch_fund_flow(symbol, days=days)
-                fallback["warning"] = "eastmoney symbol resolution failed; used tushare fallback"
-                return fallback
-            except Exception as exc:  # noqa: BLE001 - fallback details belong in the symbol result
-                return {
-                    "symbol": symbol,
-                    "error": "unresolvable symbol",
-                    "fallback_error": str(exc),
-                }
         return {"symbol": symbol, "error": "unresolvable symbol"}
 
     is_daily = period == "daily"
@@ -125,17 +113,6 @@ def _fetch_symbol_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]
         payload = get_json(url, params=params)
     except Exception as exc:  # noqa: BLE001 - one bad symbol must not kill the batch
         logger.warning("fund flow fetch failed for %s: %s", symbol, exc)
-        if period == "daily":
-            try:
-                fallback = tushare_fallbacks.fetch_fund_flow(symbol, days=days)
-                fallback["warning"] = f"eastmoney failed ({exc}); used tushare fallback"
-                return fallback
-            except Exception as fallback_exc:  # noqa: BLE001 - keep per-symbol isolation
-                return {
-                    "symbol": symbol,
-                    "error": str(exc),
-                    "fallback_error": str(fallback_exc),
-                }
         return {"symbol": symbol, "error": str(exc)}
 
     data = payload.get("data") if isinstance(payload, dict) else None
@@ -171,9 +148,8 @@ class FundFlowTool(BaseTool):
         "(in CNY), as daily history or the current session's per-minute line. Use "
         "this for one or more named stocks to gauge whether large/main-force money "
         "is flowing into or out of that specific symbol. NOT market-wide aggregate "
-        "flow (for Stock-Connect 北向 use get_northbound_flow). Markets: A-share "
-        "(.SH/.SZ/.BJ), Hong Kong (.HK) and US (.US). Example: "
-        '{"codes": ["600519.SH", "00700.HK"], "period": "daily", "days": 30}.'
+        "flow. Markets: US (.US). Example: "
+        '{"codes": ["AAPL.US"], "period": "daily", "days": 30}.'
     )
     parameters = {
         "type": "object",
@@ -182,9 +158,9 @@ class FundFlowTool(BaseTool):
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    'Symbols with market suffix, e.g. ["600519.SH", "000001.SZ", '
-                    '"00700.HK", "AAPL.US"]. One unresolvable symbol is reported '
-                    "per-symbol and does not abort the batch."
+                    'Symbols with market suffix, e.g. ["AAPL.US"]. One '
+                    "unresolvable symbol is reported per-symbol and does not "
+                    "abort the batch."
                 ),
             },
             "period": {

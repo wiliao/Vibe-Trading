@@ -22,7 +22,7 @@ def _malicious_profile() -> ShadowProfile:
         shadow_id='shadow_abc"""\nINJECTED_SHADOW_ID = "boom"\n"""',
         created_at="2026-05-05T00:00:00Z",
         journal_hash="deadbeef",
-        source_market="china_a",
+        source_market="us",
         profitable_roundtrips=7,
         total_roundtrips=11,
         date_range=(
@@ -42,7 +42,7 @@ def _malicious_profile() -> ShadowProfile:
                 holding_days_range=(2, 4),
                 support_count=3,
                 coverage_rate=0.42,
-                sample_trades=("600519.SH@2026-01-05",),
+                sample_trades=("AAPL.US@2026-01-05",),
                 weight=0.75,
             ),
         ),
@@ -100,7 +100,7 @@ def _conditional_entry_profile() -> ShadowProfile:
                 rule_id="R1",
                 human_text="buy low RSI after a pullback, hold 3 days",
                 entry_condition={
-                    "market": "china_a",
+                    "market": "us",
                     "entry_hour": {"min": 9, "max": 15},
                     "entry_rsi14": {"min": 20.0, "max": 45.0},
                     "prior_5d_return": {"min": -0.08, "max": 0.02},
@@ -109,11 +109,11 @@ def _conditional_entry_profile() -> ShadowProfile:
                 holding_days_range=(3, 3),
                 support_count=4,
                 coverage_rate=0.5,
-                sample_trades=("600519.SH@2026-02-03",),
+                sample_trades=("AAPL.US@2026-02-03",),
                 weight=1.0,
             ),
         ),
-        preferred_markets=("china_a",),
+        preferred_markets=("us",),
         typical_holding_days=(3.0, 3.0),
     )
 
@@ -155,9 +155,9 @@ def test_rendered_signal_engine_passes_runner_validation(tmp_path) -> None:
         index=idx,
     )
 
-    signals = engine.generate({"600519.SH": df})
+    signals = engine.generate({"AAPL.US": df})
 
-    assert set(signals) == {"600519.SH"}
-    series = signals["600519.SH"]
+    assert set(signals) == {"AAPL.US"}
+    series = signals["AAPL.US"]
     assert len(series) == len(idx)
     assert (series > 0).any(), "conditional entry should fire on the pullback"

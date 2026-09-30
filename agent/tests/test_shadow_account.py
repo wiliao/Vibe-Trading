@@ -63,32 +63,31 @@ def _offline_prices(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _write_journal(path: Path, rows: list[dict]) -> Path:
-    """Write a plain-utf8 Tonghuashun-style CSV the parser can ingest."""
+    """Write a plain-utf8 generic-CSV journal the parser can ingest."""
     df = pd.DataFrame(rows)
     df.to_csv(path, index=False, encoding="utf-8")
     return path
 
 
-def _make_tonghuashun_rows(trades: list[tuple[str, str, str, float, float]]) -> list[dict]:
-    """Build Tonghuashun-format rows from (datetime, symbol, side, qty, price).
+def _make_generic_rows(trades: list[tuple[str, str, str, float, float]]) -> list[dict]:
+    """Build generic-CSV rows from (datetime, symbol, side, qty, price).
 
-    Tonghuashun requires columns: 成交时间 / 证券代码 / 操作 (see
-    `trade_journal_parsers.parse_tonghuashun`).
+    The generic parser keys off ``datetime`` + ``symbol`` + ``side`` (see
+    `trade_journal_parsers.parse_generic`); quantity/price/amount/fee keep the
+    fixtures faithful to a broker export.
     """
     out: list[dict] = []
     for dt_str, symbol, side, qty, price in trades:
         amount = qty * price
         out.append({
-            "成交时间": dt_str,
-            "证券代码": symbol,
-            "证券名称": f"标的{symbol}",
-            "操作": "买入" if side == "buy" else "卖出",
-            "成交数量": qty,
-            "成交价格": price,
-            "成交金额": round(amount, 2),
-            "手续费": round(amount * 0.00025, 2),
-            "印花税": round(amount * 0.001, 2) if side == "sell" else 0.0,
-            "过户费": 0.0,
+            "datetime": dt_str,
+            "symbol": symbol,
+            "name": symbol,
+            "side": side,
+            "quantity": qty,
+            "price": price,
+            "amount": round(amount, 2),
+            "fee": round(amount * 0.00025, 2),
         })
     return out
 
@@ -97,9 +96,9 @@ def _make_tonghuashun_rows(trades: list[tuple[str, str, str, float, float]]) -> 
 
 @pytest.fixture
 def profitable_journal(tmp_path: Path) -> Path:
-    """15 roundtrips across 5 symbols, all profitable (2% gain each)."""
+    """15 roundtrips across 5 US symbols, all profitable (2% gain each)."""
     trades: list[tuple[str, str, str, float, float]] = []
-    symbols = ["600519", "000001", "300750", "600036", "000858"]
+    symbols = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]
     start_day = 1
     for sym in symbols:
         for i in range(3):
@@ -107,29 +106,29 @@ def profitable_journal(tmp_path: Path) -> Path:
             sell_day = buy_day + 2
             trades.append((f"2026-01-{buy_day:02d} 10:30:00", sym, "buy", 100.0, 10.0))
             trades.append((f"2026-01-{sell_day:02d} 14:15:00", sym, "sell", 100.0, 10.2))
-    return _write_journal(tmp_path / "journal_profitable.csv", _make_tonghuashun_rows(trades))
+    return _write_journal(tmp_path / "journal_profitable.csv", _make_generic_rows(trades))
 
 
 @pytest.fixture
 def insufficient_journal(tmp_path: Path) -> Path:
     """Only 2 profitable roundtrips — below MIN_PROFITABLE_ROUNDTRIPS."""
     trades = [
-        ("2026-01-02 10:30:00", "600519", "buy", 100.0, 10.0),
-        ("2026-01-04 14:15:00", "600519", "sell", 100.0, 10.5),
-        ("2026-01-06 10:30:00", "000001", "buy", 100.0, 20.0),
-        ("2026-01-08 14:15:00", "000001", "sell", 100.0, 20.5),
+        ("2026-01-02 10:30:00", "AAPL", "buy", 100.0, 10.0),
+        ("2026-01-04 14:15:00", "AAPL", "sell", 100.0, 10.5),
+        ("2026-01-06 10:30:00", "MSFT", "buy", 100.0, 20.0),
+        ("2026-01-08 14:15:00", "MSFT", "sell", 100.0, 20.5),
     ]
-    return _write_journal(tmp_path / "journal_few.csv", _make_tonghuashun_rows(trades))
+    return _write_journal(tmp_path / "journal_few.csv", _make_generic_rows(trades))
 
 
 @pytest.fixture
 def no_roundtrips_journal(tmp_path: Path) -> Path:
     """Only buys, no sells — zero roundtrips."""
     trades = [
-        ("2026-01-02 10:30:00", "600519", "buy", 100.0, 10.0),
-        ("2026-01-04 10:30:00", "000001", "buy", 50.0, 20.0),
+        ("2026-01-02 10:30:00", "AAPL", "buy", 100.0, 10.0),
+        ("2026-01-04 10:30:00", "MSFT", "buy", 50.0, 20.0),
     ]
-    return _write_journal(tmp_path / "journal_nort.csv", _make_tonghuashun_rows(trades))
+    return _write_journal(tmp_path / "journal_nort.csv", _make_generic_rows(trades))
 
 
 # ---------------- extract_shadow_profile ----------------
@@ -140,7 +139,7 @@ def test_extract_profile_happy_path(profitable_journal: Path) -> None:
     assert isinstance(profile, ShadowProfile)
     assert profile.profitable_roundtrips >= MIN_PROFITABLE_ROUNDTRIPS
     assert profile.total_roundtrips == profile.profitable_roundtrips  # all profitable
-    assert profile.source_market == "china_a"
+    assert profile.source_market == "us"
     assert profile.shadow_id.startswith("shadow_")
     assert profile.journal_hash and len(profile.journal_hash) == 40
     assert profile.typical_holding_days[0] > 0
@@ -282,7 +281,7 @@ def test_generated_engine_runs_on_mock_data_map(profitable_journal: Path) -> Non
 
         idx = pd.date_range("2026-01-02", periods=30, freq="B")
         data_map = {
-            "600519.SH": pd.DataFrame({"close": range(30)}, index=idx),
+            "AAPL.US": pd.DataFrame({"close": range(30)}, index=idx),
             "AAPL": pd.DataFrame({"close": range(30)}, index=idx),
         }
         signals = engine.generate(data_map)
@@ -298,13 +297,13 @@ def test_render_config_shape(profitable_journal: Path) -> None:
     profile = extract_shadow_profile(profitable_journal)
     cfg = render_config(
         profile,
-        codes=["600519.SH", "AAPL"],
+        codes=["AAPL.US", "TD.TO"],
         start_date="2026-01-01",
         end_date="2026-06-30",
     )
     assert cfg["source"] == "auto"
     assert cfg["engine"] == "daily"
-    assert cfg["codes"] == ["600519.SH", "AAPL"]
+    assert cfg["codes"] == ["AAPL.US", "TD.TO"]
     assert cfg["shadow_id"] == profile.shadow_id
 
 
@@ -316,7 +315,7 @@ def test_write_run_dir_materializes_files(
     run_dir = write_run_dir(
         profile,
         tmp_path / "run",
-        codes=["600519.SH"],
+        codes=["AAPL.US"],
         start_date="2026-01-01",
         end_date="2026-06-30",
     )
@@ -332,7 +331,7 @@ def test_write_run_dir_materializes_files(
 def test_select_multi_market_codes_covers_all_markets(profitable_journal: Path) -> None:
     profile = extract_shadow_profile(profitable_journal)
     selection = select_multi_market_codes(profile, per_market_count=3)
-    assert set(selection.keys()) == {"china_a", "hk", "us", "crypto"}
+    assert set(selection.keys()) == {"us", "ca"}
     for market, codes in selection.items():
         assert 1 <= len(codes) <= 3
         assert all(codes)
@@ -384,7 +383,7 @@ def test_run_shadow_backtest_with_mocked_runner(
     )
     assert isinstance(result, ShadowBacktestResult)
     assert result.shadow_id == profile.shadow_id
-    assert set(result.per_market.keys()) == {"china_a", "hk", "us", "crypto"}
+    assert set(result.per_market.keys()) == {"us", "ca"}
     assert result.combined["final_value"] == 1_012_345.0
     assert result.combined["sharpe"] == 1.5
     assert result.shadow_total_pnl == pytest.approx(12_345.0)
@@ -498,8 +497,9 @@ def test_run_shadow_backtest_derives_pnl_from_final_value(
 
 from backtest.engines._market_hooks import code_currency  # noqa: E402
 from src.shadow_account.backtester import (  # noqa: E402
-    _group_selection_by_currency,
     _LIQUID_BASKETS,
+    _group_selection_by_currency,
+    SUPPORTED_MARKETS,
 )
 from src.shadow_account.storage import runs_dir  # noqa: E402
 
@@ -547,53 +547,27 @@ def _recording_stub(
 
 
 @pytest.mark.unit
+def test_supported_markets_and_baskets_are_us_canada_only() -> None:
+    """The backtester's market vocabulary and liquid fallbacks are US/CA only.
+
+    Guards the market-contract boundary the currency-pool split depends on:
+    one basket per surviving market, each settling in its own currency.
+    """
+    assert SUPPORTED_MARKETS == ("us", "ca")
+    assert set(_LIQUID_BASKETS) == {"us", "ca"}
+    assert all(codes for codes in _LIQUID_BASKETS.values())
+
+
+@pytest.mark.unit
 def test_group_selection_by_currency_default_markets(
     profitable_journal: Path,
 ) -> None:
     profile = extract_shadow_profile(profitable_journal)
     selection = select_multi_market_codes(profile, per_market_count=3)
     groups = _group_selection_by_currency(selection)
-    assert set(groups.keys()) == {"CNY", "HKD", "USD"}
-    assert set(groups["CNY"].keys()) == {"china_a"}
-    assert set(groups["HKD"].keys()) == {"hk"}
-    assert set(groups["USD"].keys()) == {"us", "crypto"}
-
-
-@pytest.mark.unit
-def test_group_selection_by_currency_us_crypto_single_group() -> None:
-    groups = _group_selection_by_currency({
-        "us": _LIQUID_BASKETS["us"][:2],
-        "crypto": _LIQUID_BASKETS["crypto"][:2],
-    })
-    assert set(groups.keys()) == {"USD"}
-    assert set(groups["USD"].keys()) == {"us", "crypto"}
-
-
-@pytest.mark.unit
-def test_group_selection_by_currency_names_vnd() -> None:
-    """A HOSE pool groups under VND, not an ``UNKNOWN:`` marker.
-
-    The group key is not merely a label: it names the pool's run directory
-    (``base_dir / currency``) and is rendered into the headline
-    ``_currency_note``. A market missing from the currency table would put a
-    colon into a path — illegal on Windows — and print the marker to the user.
-    """
-    groups = _group_selection_by_currency({"vietnam": ["VIC.VN", "FPT.VN"]})
-
-    assert set(groups.keys()) == {"VND"}
-    assert groups["VND"]["vietnam"] == ["VIC.VN", "FPT.VN"]
-    assert all(":" not in currency for currency in groups)
-
-
-@pytest.mark.unit
-def test_a_hose_pool_is_separated_from_other_currencies() -> None:
-    groups = _group_selection_by_currency({
-        "vietnam": ["VIC.VN"],
-        "us": _LIQUID_BASKETS["us"][:1],
-    })
-
-    assert set(groups.keys()) == {"VND", "USD"}
-    assert groups["VND"] == {"vietnam": ["VIC.VN"]}
+    assert set(groups.keys()) == {"USD", "CAD"}
+    assert set(groups["USD"].keys()) == {"us"}
+    assert set(groups["CAD"].keys()) == {"ca"}
 
 
 @pytest.mark.unit
@@ -606,9 +580,8 @@ def test_run_shadow_backtest_runs_once_per_currency(
 
     calls: list[dict[str, object]] = []
     metrics = {
-        "CNY": {"total_return_abs": 100.0, "sharpe": 1.0},
-        "HKD": {"total_return_abs": 200.0, "sharpe": 2.0},
-        "USD": {"total_return_abs": 300.0, "sharpe": 3.0},
+        "USD": {"total_return_abs": 100.0, "sharpe": 1.0},
+        "CAD": {"total_return_abs": 200.0, "sharpe": 2.0},
     }
     result = run_shadow_backtest(
         profile,
@@ -616,15 +589,15 @@ def test_run_shadow_backtest_runs_once_per_currency(
         window_end="2026-06-30",
         run_backtest_fn=_recording_stub(metrics, calls),
     )
-    assert len(calls) == 3
-    assert {c["pool"] for c in calls} == {"CNY", "HKD", "USD"}
+    assert len(calls) == 2
+    assert {c["pool"] for c in calls} == {"USD", "CAD"}
     for call in calls:
         currencies = {code_currency(c) for c in call["codes"]}  # type: ignore[union-attr]
         assert len(currencies) == 1
     from src.shadow_account.backtester import _cache_key
     digest = _cache_key(profile, "2026-01-01", "2026-06-30")
     assert (runs_dir(profile.shadow_id) / f"shadow_result_{digest}.json").exists()
-    assert set(result.per_market.keys()) == {"china_a", "hk", "us", "crypto"}
+    assert set(result.per_market.keys()) == {"us", "ca"}
 
 
 @pytest.mark.unit
@@ -637,9 +610,8 @@ def test_per_market_rows_come_from_own_currency_group(
 
     calls: list[dict[str, object]] = []
     metrics = {
-        "CNY": {"total_return_abs": 100.0, "sharpe": 1.0},
-        "HKD": {"total_return_abs": 200.0, "sharpe": 2.0},
-        "USD": {"total_return_abs": 300.0, "sharpe": 3.0},
+        "USD": {"total_return_abs": 100.0, "sharpe": 1.0},
+        "CAD": {"total_return_abs": 200.0, "sharpe": 2.0},
     }
     result = run_shadow_backtest(
         profile,
@@ -647,10 +619,8 @@ def test_per_market_rows_come_from_own_currency_group(
         window_end="2026-06-30",
         run_backtest_fn=_recording_stub(metrics, calls),
     )
-    assert result.per_market["china_a"]["sharpe"] == 1.0
-    assert result.per_market["hk"]["sharpe"] == 2.0
-    assert result.per_market["us"]["sharpe"] == 3.0
-    assert result.per_market["crypto"]["sharpe"] == 3.0
+    assert result.per_market["us"]["sharpe"] == 1.0
+    assert result.per_market["ca"]["sharpe"] == 2.0
 
 
 @pytest.mark.unit
@@ -660,13 +630,12 @@ def test_headline_pnl_uses_source_market_currency(
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     profile = extract_shadow_profile(profitable_journal)
-    assert profile.source_market == "china_a"
+    assert profile.source_market == "us"
 
     calls: list[dict[str, object]] = []
     metrics = {
-        "CNY": {"total_return_abs": 100.0, "sharpe": 1.0},
-        "HKD": {"total_return_abs": 200.0, "sharpe": 2.0},
-        "USD": {"total_return_abs": 300.0, "sharpe": 3.0},
+        "USD": {"total_return_abs": 100.0, "sharpe": 1.0},
+        "CAD": {"total_return_abs": 200.0, "sharpe": 2.0},
     }
     result = run_shadow_backtest(
         profile,
@@ -693,7 +662,7 @@ def test_single_currency_group_keeps_single_run(
         profile,
         window_start="2026-01-01",
         window_end="2026-06-30",
-        markets=("us", "crypto"),
+        markets=("us",),
         run_backtest_fn=_recording_stub(metrics, calls, with_equity=True),
     )
     assert len(calls) == 1
@@ -714,21 +683,19 @@ def test_currency_group_failure_is_isolated(
 
     calls: list[dict[str, object]] = []
     metrics = {
-        "HKD": {"total_return_abs": 200.0, "sharpe": 2.0},
-        "USD": {"total_return_abs": 300.0, "sharpe": 3.0},
+        "CAD": {"total_return_abs": 200.0, "sharpe": 2.0},
     }
     result = run_shadow_backtest(
         profile,
         window_start="2026-01-01",
         window_end="2026-06-30",
         run_backtest_fn=_recording_stub(
-            metrics, calls, fail_pools=frozenset({"CNY"}),
+            metrics, calls, fail_pools=frozenset({"USD"}),
         ),
     )
-    assert len(calls) == 3
-    assert result.per_market["china_a"] == {}
-    assert result.per_market["hk"]["sharpe"] == 2.0
-    assert result.per_market["us"]["sharpe"] == 3.0
+    assert len(calls) == 2
+    assert result.per_market["us"] == {}
+    assert result.per_market["ca"]["sharpe"] == 2.0
     assert "error" not in result.combined
     assert result.combined["total_return_abs"] == 200.0
     assert result.shadow_total_pnl == 200.0
@@ -748,10 +715,10 @@ def test_all_currency_groups_failure(
         window_start="2026-01-01",
         window_end="2026-06-30",
         run_backtest_fn=_recording_stub(
-            {}, calls, fail_pools=frozenset({"CNY", "HKD", "USD"}),
+            {}, calls, fail_pools=frozenset({"USD", "CAD"}),
         ),
     )
-    assert len(calls) == 3
+    assert len(calls) == 2
     assert result.combined.get("error")
     assert result.shadow_total_pnl is None
     assert result.delta_pnl is None
@@ -762,23 +729,21 @@ def test_all_currency_groups_failure(
 # ---------------- M3c: cash dividends in the journal ----------------
 
 def _journal_with_dividend(path: Path, *, include_dividend: bool = True) -> Path:
-    """One 600519 roundtrip plus (optionally) a 500-yuan 红利入账 cash row."""
-    rows = _make_tonghuashun_rows([
-        ("2026-01-02 10:30:00", "600519", "buy", 100.0, 10.0),
-        ("2026-01-05 14:15:00", "600519", "sell", 100.0, 10.2),
+    """One AAPL roundtrip plus (optionally) a $500 cash-dividend row."""
+    rows = _make_generic_rows([
+        ("2026-01-02 10:30:00", "AAPL", "buy", 100.0, 10.0),
+        ("2026-01-05 14:15:00", "AAPL", "sell", 100.0, 10.2),
     ])
     if include_dividend:
         rows.append({
-            "成交时间": "2026-01-10 09:00:00",
-            "证券代码": "600519",
-            "证券名称": "标的600519",
-            "操作": "红利入账",
-            "成交数量": 0.0,
-            "成交价格": 0.0,
-            "成交金额": 500.0,
-            "手续费": 0.0,
-            "印花税": 0.0,
-            "过户费": 0.0,
+            "datetime": "2026-01-10 09:00:00",
+            "symbol": "AAPL",
+            "name": "AAPL",
+            "side": "dividend",
+            "quantity": 0.0,
+            "price": 0.0,
+            "amount": 500.0,
+            "fee": 0.0,
         })
     return _write_journal(path, rows)
 
@@ -788,14 +753,13 @@ def _dividend_scenario_run(
 ) -> ShadowBacktestResult:
     """Run the shadow backtest over a dividend journal with a stub runner.
 
-    With ``with_frame`` the CNY pool also emits an ohlcv artifact for
-    600519.SH (constant closes, so the caliber factor is 1.0 and roundtrip
-    PnL is unchanged), which marks the symbol as frame-covered.
+    With ``with_frame`` the USD pool also emits an ohlcv artifact for AAPL
+    (constant closes, so the caliber factor is 1.0 and roundtrip PnL is
+    unchanged), which marks the symbol as frame-covered.
     """
     metrics = {
-        "CNY": {"total_return_abs": 1000.0, "sharpe": 1.0},
-        "HKD": {"total_return_abs": 200.0, "sharpe": 2.0},
-        "USD": {"total_return_abs": 300.0, "sharpe": 3.0},
+        "USD": {"total_return_abs": 1000.0, "sharpe": 1.0},
+        "CAD": {"total_return_abs": 200.0, "sharpe": 2.0},
     }
 
     def stub(run_dir_str: str) -> str:
@@ -806,8 +770,8 @@ def _dividend_scenario_run(
         metrics_path.write_text(
             json.dumps(metrics[run_path.name]), encoding="utf-8",
         )
-        if with_frame and run_path.name == "CNY":
-            (artifacts_dir / "ohlcv_600519.SH.csv").write_text(
+        if with_frame and run_path.name == "USD":
+            (artifacts_dir / "ohlcv_AAPL.csv").write_text(
                 "date,close\n"
                 "2026-01-01,10.0\n2026-01-02,10.0\n"
                 "2026-01-05,10.0\n2026-01-10,10.0\n",
@@ -875,8 +839,8 @@ def _stub_backtest_result(profile: ShadowProfile) -> ShadowBacktestResult:
     return ShadowBacktestResult(
         shadow_id=profile.shadow_id,
         per_market={
-            "china_a": {"sharpe": 1.2, "annual_return": 0.15, "max_drawdown": -0.08},
-            "us": {"sharpe": 0.9, "annual_return": 0.11, "max_drawdown": -0.10},
+            "us": {"sharpe": 1.2, "annual_return": 0.15, "max_drawdown": -0.08},
+            "ca": {"sharpe": 0.9, "annual_return": 0.11, "max_drawdown": -0.10},
         },
         combined={"sharpe": 1.05, "annual_return": 0.13, "max_drawdown": -0.09},
         equity_curves={"combined": [("2026-01-02", 1_000_000.0), ("2026-06-30", 1_130_000.0)]},
@@ -888,7 +852,7 @@ def _stub_backtest_result(profile: ShadowProfile) -> ShadowBacktestResult:
             overtrading_pnl=10.0,
             counterfactual_trades=(
                 {
-                    "symbol": "600519.SH", "buy_dt": "2026-02-01", "sell_dt": "2026-02-02",
+                    "symbol": "AAPL.US", "buy_dt": "2026-02-01", "sell_dt": "2026-02-02",
                     "hold_days": 1.0, "pnl": 100.0, "impact": 50.0, "reason": "early_exit",
                 },
             ),
@@ -922,7 +886,7 @@ def test_render_shadow_report_includes_today_signals(
     profile = extract_shadow_profile(profitable_journal)
     result = _stub_backtest_result(profile)
     signals = [
-        {"symbol": "NVDA", "market": "us", "rule_id": "R1", "reason": "匹配影子规则"},
+        {"symbol": "NVDA.US", "market": "us", "rule_id": "R1", "reason": "shadow rule matched"},
     ]
     out = render_shadow_report(profile, result, today_signals=signals, output_dir=tmp_path)
     content = Path(out["html_path"]).read_text(encoding="utf-8")
@@ -1371,8 +1335,8 @@ def test_promoted_features_threshold() -> None:
     promoted = _promoted_numeric_features(df, min_support=3)
     assert "prior_5d_return" in promoted  # 4 >= 3
     assert "entry_rsi14" not in promoted  # 2 < 3
-    assert set(_MARKET_KEY_MAP) == {"china_a", "us", "hk", "uk", "crypto"}
-    assert _MARKET_KEY_MAP["uk"] == "uk_equity"
+    assert set(_MARKET_KEY_MAP) == {"us", "ca"}
+    assert _MARKET_KEY_MAP["ca"] == "ca_equity"
 
 
 @pytest.mark.unit
@@ -1486,7 +1450,7 @@ def test_fetch_price_history_symbol_absent_from_map(monkeypatch: pytest.MonkeyPa
         "backtest.loaders.registry.resolve_loader", lambda market: _EmptyMapLoader(),
     )
     out = _fetch_price_history(
-        "600519", "china_a",
+        "AAPL", "us",
         start=pd.Timestamp("2026-01-01"), end=pd.Timestamp("2026-02-01"),
     )
     assert out is None
@@ -1505,7 +1469,7 @@ def test_fetch_price_history_empty_frame(monkeypatch: pytest.MonkeyPatch) -> Non
         "backtest.loaders.registry.resolve_loader", lambda market: _EmptyFrameLoader(),
     )
     out = _fetch_price_history(
-        "600519", "china_a",
+        "AAPL", "us",
         start=pd.Timestamp("2026-01-01"), end=pd.Timestamp("2026-02-01"),
     )
     assert out is None
@@ -1523,7 +1487,7 @@ def test_fetch_price_history_loader_raises(monkeypatch: pytest.MonkeyPatch) -> N
         "backtest.loaders.registry.resolve_loader", lambda market: _BoomLoader(),
     )
     out = _fetch_price_history(
-        "600519", "china_a",
+        "AAPL", "us",
         start=pd.Timestamp("2026-01-01"), end=pd.Timestamp("2026-02-01"),
     )
     assert out is None
@@ -1549,8 +1513,8 @@ def test_attach_price_features_batches_one_fetch_per_symbol(
         "backtest.loaders.registry.resolve_loader", lambda market: _CountingLoader(),
     )
     rows = [
-        {"symbol": "600519", "market": "china_a", "buy_dt": pd.Timestamp("2026-02-10")},
-        {"symbol": "600519", "market": "china_a", "buy_dt": pd.Timestamp("2026-02-20")},
+        {"symbol": "AAPL", "market": "us", "buy_dt": pd.Timestamp("2026-02-10")},
+        {"symbol": "AAPL", "market": "us", "buy_dt": pd.Timestamp("2026-02-20")},
     ]
     _attach_price_features(rows)
     assert len(calls) == 1  # one symbol → one fetch despite two roundtrips
@@ -1644,7 +1608,7 @@ def test_price_condition_bounds_are_p10_p90() -> None:
 
     cluster_df = pd.DataFrame({
         "symbol": ["A"] * 4,
-        "market": ["china_a"] * 4,
+        "market": ["us"] * 4,
         "holding_days": [3.0, 4.0, 3.0, 4.0],
         "pnl_pct": [0.1, 0.2, 0.1, 0.2],
         "entry_hour": [10, 10, 10, 10],
@@ -1677,7 +1641,7 @@ def test_price_condition_nan_rows_excluded_from_bounds() -> None:
 
     cluster_df = pd.DataFrame({
         "symbol": ["A"] * 4,
-        "market": ["china_a"] * 4,
+        "market": ["us"] * 4,
         "holding_days": [3.0, 4.0, 3.0, 4.0],
         "pnl_pct": [0.1, 0.2, 0.1, 0.2],
         "entry_hour": [10, 10, 10, 10],
@@ -1711,7 +1675,7 @@ def test_rule_to_context_with_price_conditions() -> None:
         rule_id="R1",
         human_text="Enter when RSI 25-45",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 9, "max": 11},
             "entry_rsi14": {"min": 25.0, "max": 45.0},
             "prior_5d_return": {"min": -0.05, "max": 0.02},
@@ -1720,7 +1684,7 @@ def test_rule_to_context_with_price_conditions() -> None:
         holding_days_range=(2, 5),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     ctx = _rule_to_context(rule)
     assert ctx["entry_rsi14_min"] == 25.0
@@ -1735,14 +1699,14 @@ def test_rule_to_context_without_price_conditions() -> None:
         rule_id="R1",
         human_text="Enter at 9-11am",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 9, "max": 11},
         },
         exit_condition={"holding_days": {"min": 2, "max": 5}},
         holding_days_range=(2, 5),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     ctx = _rule_to_context(rule)
     assert "entry_rsi14_min" not in ctx
@@ -1757,7 +1721,7 @@ def test_render_signal_engine_with_price_conditions() -> None:
         rule_id="R1",
         human_text="Enter when RSI 25-45",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 9, "max": 11},
             "entry_rsi14": {"min": 25.0, "max": 45.0},
         },
@@ -1765,19 +1729,19 @@ def test_render_signal_engine_with_price_conditions() -> None:
         holding_days_range=(2, 5),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     profile = ShadowProfile(
         shadow_id="shadow_test123",
         created_at="2026-01-01T00:00:00",
         journal_hash="abc",
-        source_market="china_a",
+        source_market="us",
         profitable_roundtrips=10,
         total_roundtrips=20,
         date_range=("2025-01-01", "2026-01-01"),
         profile_text="test",
         rules=(rule,),
-        preferred_markets=("china_a",),
+        preferred_markets=("us",),
         typical_holding_days=(3.0, 5.0),
     )
     source = render_signal_engine(profile)
@@ -1798,26 +1762,26 @@ def test_render_signal_engine_without_price_conditions_still_valid() -> None:
         rule_id="R1",
         human_text="Enter at 9-11am",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 9, "max": 11},
         },
         exit_condition={"holding_days": {"min": 2, "max": 5}},
         holding_days_range=(2, 5),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     profile = ShadowProfile(
         shadow_id="shadow_test456",
         created_at="2026-01-01T00:00:00",
         journal_hash="def",
-        source_market="china_a",
+        source_market="us",
         profitable_roundtrips=10,
         total_roundtrips=20,
         date_range=("2025-01-01", "2026-01-01"),
         profile_text="test",
         rules=(rule,),
-        preferred_markets=("china_a",),
+        preferred_markets=("us",),
         typical_holding_days=(3.0, 5.0),
     )
     source = render_signal_engine(profile)
@@ -1870,7 +1834,7 @@ def _rule_with_rsi(
         rule_id="R1",
         human_text="RSI rule",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": hour_min, "max": hour_max},
             "entry_rsi14": {"min": rsi_min, "max": rsi_max},
         },
@@ -1878,7 +1842,7 @@ def _rule_with_rsi(
         holding_days_range=(3, 3),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
 
 
@@ -1887,14 +1851,14 @@ def _rule_without_price() -> ShadowRule:
         rule_id="R1",
         human_text="Time-only rule",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 0, "max": 23},
         },
         exit_condition={"holding_days": {"min": 2, "max": 5}},
         holding_days_range=(3, 3),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
 
 
@@ -1903,13 +1867,13 @@ def _profile(rule: ShadowRule) -> ShadowProfile:
         shadow_id="shadow_test",
         created_at="2026-01-01T00:00:00",
         journal_hash="test",
-        source_market="china_a",
+        source_market="us",
         profitable_roundtrips=10,
         total_roundtrips=20,
         date_range=("2025-01-01", "2026-01-01"),
         profile_text="test",
         rules=(rule,),
-        preferred_markets=("china_a",),
+        preferred_markets=("us",),
         typical_holding_days=(3.0, 5.0),
     )
 
@@ -1956,15 +1920,14 @@ def test_generated_engine_keeps_unmatched_markets_flat() -> None:
     signals = _generate_signals(
         profile,
         {
-            "AAPL": frame,
-            "600519.SH": frame,
-            "0700.HK": frame,
-            "BTC-USDT": frame,
+            "AAPL.US": frame,
+            "TD.TO": frame,
+            "PNG.V": frame,
         },
     )
 
-    assert signals["AAPL"].ne(0).any()
-    for code in ("600519.SH", "0700.HK", "BTC-USDT"):
+    assert signals["AAPL.US"].ne(0).any()
+    for code in ("TD.TO", "PNG.V"):
         assert signals[code].eq(0).all(), code
 
 
@@ -2046,8 +2009,8 @@ def test_conditional_entry_emits_signal_when_rsi_in_range() -> None:
     )
     s2 = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": sideways}, index=idx)},
-    )["600519.SH"]
+        {"AAPL.US": pd.DataFrame({"close": sideways}, index=idx)},
+    )["AAPL.US"]
     assert (s2 >= 0).all()
     # With a 3-day hold, at least some 4-hour entry windows should fire.
     assert (s2 > 0).any(), "signal should fire when RSI is in range"
@@ -2064,9 +2027,9 @@ def test_conditional_entry_skips_when_rsi_out_of_range() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     # RSI should be far above the 5-15 range → zero entries.
     assert (series == 0.0).all()
 
@@ -2081,9 +2044,9 @@ def test_conditional_entry_respects_hour_window() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     for i, ts in enumerate(idx):
         h = pd.Timestamp(ts).hour
         if h < 9 or h > 11:
@@ -2100,9 +2063,9 @@ def test_conditional_entry_holds_for_full_duration() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
 
     # Find first entry bar.
     entry_idx = None
@@ -2128,9 +2091,9 @@ def test_conditional_entry_no_reentry_while_holding() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
 
     # Find the first entry bar.
     entry_bar = None
@@ -2154,9 +2117,9 @@ def test_conditional_entry_falls_back_to_time_only_when_no_price_keys() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     assert isinstance(series, pd.Series)
     assert len(series) == len(idx)
     # With hour_min=0, hour_max=23 and no price gates, at least first bar enters.
@@ -2170,7 +2133,7 @@ def test_conditional_entry_prior_return_gates_entry() -> None:
         rule_id="R1",
         human_text="Return rule",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 0, "max": 23},
             "prior_5d_return": {"min": -0.03, "max": 0.03},
         },
@@ -2178,7 +2141,7 @@ def test_conditional_entry_prior_return_gates_entry() -> None:
         holding_days_range=(3, 3),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     idx = _daily_index(periods=40)
     # Very large returns (+50% over 5 bars) → well outside [-0.03, 0.03]
@@ -2187,9 +2150,9 @@ def test_conditional_entry_prior_return_gates_entry() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     # Strong trend → prior_5d_return far outside narrow [-3%, 3%] → all zero.
     assert (series == 0.0).all()
 
@@ -2201,7 +2164,7 @@ def test_conditional_entry_both_rsi_and_return_must_pass() -> None:
         rule_id="R1",
         human_text="Both rule",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 0, "max": 23},
             "entry_rsi14": {"min": 0.0, "max": 100.0},  # always passes
             "prior_5d_return": {"min": -0.02, "max": 0.02},  # very narrow
@@ -2210,7 +2173,7 @@ def test_conditional_entry_both_rsi_and_return_must_pass() -> None:
         holding_days_range=(3, 3),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     idx = _daily_index(periods=40)
     # Strong uptrend → prior_5d_return >> 2%.
@@ -2219,9 +2182,9 @@ def test_conditional_entry_both_rsi_and_return_must_pass() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     # RSI passes, but prior_5d_return fails (too positive) → no entry.
     assert (series == 0.0).all()
 
@@ -2233,7 +2196,7 @@ def test_conditional_entry_only_prior_return_condition() -> None:
         rule_id="R1",
         human_text="Return-only rule",
         entry_condition={
-            "market": "china_a",
+            "market": "us",
             "entry_hour": {"min": 0, "max": 23},
             "prior_5d_return": {"min": -0.02, "max": 0.02},
         },
@@ -2241,7 +2204,7 @@ def test_conditional_entry_only_prior_return_condition() -> None:
         holding_days_range=(3, 3),
         support_count=10,
         coverage_rate=0.5,
-        sample_trades=("600519@2026-01-10",),
+        sample_trades=("AAPL@2026-01-10",),
     )
     idx = _daily_index(periods=40)
     # Sideways prices → prior_5d_return ~0, within [-0.02, 0.02].
@@ -2250,9 +2213,9 @@ def test_conditional_entry_only_prior_return_condition() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     assert (series >= 0).all()
     assert (series > 0).any(), "entry should fire when return in range"
 
@@ -2264,7 +2227,7 @@ def test_cluster_to_rule_skips_all_nan_price_feature() -> None:
 
     cluster_df = pd.DataFrame({
         "symbol": ["A"] * 4,
-        "market": ["china_a"] * 4,
+        "market": ["us"] * 4,
         "holding_days": [3.0, 4.0, 3.0, 4.0],
         "pnl_pct": [0.1, 0.2, 0.1, 0.2],
         "entry_hour": [10, 10, 10, 10],
@@ -2296,9 +2259,9 @@ def test_conditional_entry_rsi_nan_bars_are_skipped() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     # First 14 bars have NaN RSI → must be zero.
     for i in range(14):
         assert series.iloc[i] == 0.0, f"bar {i} should be zero (RSI warmup)"
@@ -2325,9 +2288,9 @@ def test_daily_bars_ignore_mined_hour_window() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     assert (series > 0).any(), "daily replay must not be flat for market-hours rules"
 
 
@@ -2341,9 +2304,9 @@ def test_intraday_bars_still_enforce_hour_window() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     entry_hours = {pd.Timestamp(ts).hour for ts in series[series > 0].index}
     assert entry_hours, "expected entries within the window"
     assert entry_hours <= {9, 10, 11}
@@ -2359,7 +2322,7 @@ def test_daily_bars_date_only_journal_window_still_enters() -> None:
     )
     signals = _generate_signals(
         _profile(rule),
-        {"600519.SH": pd.DataFrame({"close": close}, index=idx)},
+        {"AAPL.US": pd.DataFrame({"close": close}, index=idx)},
     )
-    series = signals["600519.SH"]
+    series = signals["AAPL.US"]
     assert (series > 0).any(), "date-only journal window must still enter"

@@ -18,7 +18,7 @@ prompt forwarder:
    Verified against ``src/tools/*`` (``get_financial_statements``,
    ``get_stock_profile``, ``get_market_data``, ``get_sec_filings``,
    ``get_macro_series``, ``screen_market``, ``get_stock_news``,
-   ``get_research_reports``, ``portfolio_risk_xray``).
+   ``get_sec_filings``, ``portfolio_risk_xray``).
 4. ``gap_policy`` — what to do when a number cannot be fetched. The shared
    default forbids filling gaps from model memory.
 
@@ -367,7 +367,7 @@ _ATTRIB = Playbook(
         "  quarter: the headline beat is mostly one sector tilt, which is one",
         "  decision, not a repeatable process. Report it that way.",
     ),
-    tools=("get_market_data", "portfolio_risk_xray", "get_sector_info", "get_stock_profile"),
+    tools=("get_market_data", "portfolio_risk_xray", "get_stock_profile"),
     aliases=("attribution",),
 )
 
@@ -386,7 +386,7 @@ _MEMO = Playbook(
     steps=(
         Step(
             title="Thesis and variant view",
-            inputs="get_research_reports and get_stock_news for what consensus currently believes.",
+            inputs="get_stock_news and get_sec_filings for what consensus currently believes.",
             compute="State consensus in one sentence, your view in one sentence, and the specific fact or mechanism that separates them.",
             output="If you cannot name what you believe that consensus does not, there is no memo — say so and stop.",
         ),
@@ -452,7 +452,6 @@ _MEMO = Playbook(
         "get_financial_statements",
         "get_sec_filings",
         "get_stock_profile",
-        "get_research_reports",
         "get_stock_news",
     ),
 )
@@ -472,7 +471,7 @@ _EARNINGS = Playbook(
     steps=(
         Step(
             title="Pull the print",
-            inputs="get_financial_statements for the latest quarter; get_sec_filings for the 8-K / 10-Q; get_stock_news or get_research_reports for the consensus figure.",
+            inputs="get_financial_statements for the latest quarter; get_sec_filings for the 8-K / 10-Q; get_stock_news for the consensus figure.",
             compute="Line up actual versus consensus for revenue, gross margin, opex, tax rate, share count, EPS.",
             output="A two-column table. The consensus column is tagged SOURCED or ASSUMPTION — a remembered consensus number is an ASSUMPTION and must be labelled one.",
         ),
@@ -537,7 +536,6 @@ _EARNINGS = Playbook(
         "get_financial_statements",
         "get_sec_filings",
         "get_stock_news",
-        "get_research_reports",
         "get_market_data",
     ),
 )
@@ -634,7 +632,7 @@ _SCREEN = Playbook(
         "  research queue and require an out-of-sample or fundamental confirmation",
         "  before any of it becomes a position.",
     ),
-    tools=("screen_market", "get_financial_statements", "get_stock_profile", "iwencai_search"),
+    tools=("screen_market", "get_financial_statements", "get_stock_profile"),
     aliases=("screener",),
 )
 

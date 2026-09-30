@@ -48,18 +48,18 @@ class TestSuccessEnvelope:
             "src.tools.market_screener_tool.get_json", return_value=_CLIST_PAYLOAD
         ):
             text = MarketScreenerTool().execute(
-                market="a", sort_by="change_pct", top_n=20
+                market="us", sort_by="change_pct", top_n=20
             )
 
         payload = json.loads(text)
         assert payload["ok"] is True
-        assert payload["market"] == "a"
+        assert payload["market"] == "us"
         assert payload["source"] == "eastmoney"
         # The row list nests under data:{...} like every other tool's envelope,
         # never a bare list directly under "data".
         data = payload["data"]
         assert isinstance(data, dict)
-        assert data["market"] == "a"
+        assert data["market"] == "us"
         assert data["sort_by"] == "change_pct"
 
         rows = data["rows"]
@@ -94,7 +94,7 @@ class TestSuccessEnvelope:
         with patch(
             "src.tools.market_screener_tool.get_json", return_value=dict_diff
         ):
-            text = MarketScreenerTool().execute(market="hk")
+            text = MarketScreenerTool().execute(market="us")
 
         rows = json.loads(text)["data"]["rows"]
         assert len(rows) == 1
@@ -104,7 +104,7 @@ class TestSuccessEnvelope:
         with patch(
             "src.tools.market_screener_tool.get_json", return_value=_CLIST_PAYLOAD
         ):
-            text = MarketScreenerTool().execute(market="a", top_n=1)
+            text = MarketScreenerTool().execute(market="us", top_n=1)
 
         assert len(json.loads(text)["data"]["rows"]) == 1
 
@@ -112,7 +112,7 @@ class TestSuccessEnvelope:
         with patch(
             "src.tools.market_screener_tool.get_json", return_value={"data": None}
         ):
-            text = MarketScreenerTool().execute(market="a")
+            text = MarketScreenerTool().execute(market="us")
 
         payload = json.loads(text)
         assert payload["ok"] is True
@@ -125,30 +125,33 @@ class TestSuccessEnvelope:
 class TestErrorEnvelope:
     """Validation and request failures return the ok=false envelope."""
 
-    def test_missing_market_rejected(self):
-        payload = json.loads(MarketScreenerTool().execute())
-        assert payload["ok"] is False
-        assert "market" in payload["error"]
+    def test_missing_market_defaults_to_the_us_screen(self):
+        with patch(
+            "src.tools.market_screener_tool.get_json", return_value=_CLIST_PAYLOAD
+        ):
+            payload = json.loads(MarketScreenerTool().execute())
+        assert payload["ok"] is True
+        assert payload["market"] == "us"
 
-    def test_invalid_market_rejected(self):
+    def test_retired_market_rejected(self):
         payload = json.loads(MarketScreenerTool().execute(market="jp"))
         assert payload["ok"] is False
         assert "market" in payload["error"]
 
     def test_invalid_sort_by_rejected(self):
         payload = json.loads(
-            MarketScreenerTool().execute(market="a", sort_by="price")
+            MarketScreenerTool().execute(market="us", sort_by="price")
         )
         assert payload["ok"] is False
         assert "sort_by" in payload["error"]
 
     def test_non_positive_top_n_rejected(self):
-        payload = json.loads(MarketScreenerTool().execute(market="a", top_n=0))
+        payload = json.loads(MarketScreenerTool().execute(market="us", top_n=0))
         assert payload["ok"] is False
         assert "top_n" in payload["error"]
 
     def test_bool_top_n_rejected(self):
-        payload = json.loads(MarketScreenerTool().execute(market="a", top_n=True))
+        payload = json.loads(MarketScreenerTool().execute(market="us", top_n=True))
         assert payload["ok"] is False
         assert "top_n" in payload["error"]
 
@@ -157,7 +160,7 @@ class TestErrorEnvelope:
             "src.tools.market_screener_tool.get_json",
             side_effect=RuntimeError("HTTP 429"),
         ):
-            text = MarketScreenerTool().execute(market="a")
+            text = MarketScreenerTool().execute(market="us")
 
         payload = json.loads(text)
         assert payload["ok"] is False

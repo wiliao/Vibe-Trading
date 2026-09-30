@@ -23,7 +23,7 @@ class ShadowRule:
 
     Attributes:
         rule_id: Stable ID like "R1", "R2".
-        human_text: Chinese natural-language description (<=30 chars).
+        human_text: Natural-language description (<=80 chars).
         entry_condition: Structured condition dict for codegen. Keys are
             feature names (e.g. "prior_5d_return", "market"); values are
             either scalars or (op, value) tuples (e.g. ("<=", -0.08)).
@@ -54,11 +54,11 @@ class ShadowProfile:
         shadow_id: "shadow_<8-hex>" unique ID.
         created_at: ISO8601 UTC timestamp.
         journal_hash: SHA1 of the source journal content for idempotency.
-        source_market: Primary market from the journal ("china_a" etc.).
+        source_market: Primary market from the journal ("us" / "ca").
         profitable_roundtrips: Number of roundtrips used for extraction.
         total_roundtrips: Total roundtrips in journal.
         date_range: (start_iso, end_iso) of the journal.
-        profile_text: One-paragraph Chinese portrait for Section 1.
+        profile_text: One-paragraph portrait for Section 1.
         rules: Tuple of 3-5 ShadowRule.
         preferred_markets: Markets the user actually traded, frequency-sorted.
         typical_holding_days: (median, p75) in days.

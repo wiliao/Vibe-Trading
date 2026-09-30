@@ -239,8 +239,8 @@ class TechnicalIndicatorTool(BaseTool):
             "symbol": {
                 "type": "string",
                 "description": (
-                    "Trading symbol, e.g. AAPL for US stocks, "
-                    "600519.SH for A-shares, BTC-USDT for crypto."
+                    "Trading symbol, e.g. AAPL or AAPL.US for US stocks, "
+                    "TD.TO or PNG.V for Canada."
                 ),
             },
             "interval": {
@@ -301,8 +301,8 @@ class TechnicalIndicatorTool(BaseTool):
                 # Indicators require consecutive bars. ``max_rows=lookback``
                 # would make the shared helper even-stride sample long windows.
                 max_rows=0,
-                # For volume_unit: lots on the A-share sources, shares on the
-                # Yahoo family (#1062) -- 100x apart, and nothing to infer from.
+                # For volume_unit: the surviving sources all report single
+                # shares, but the field is still stamped for the reader (#1062).
                 include_provenance=True,
             )
         except Exception as exc:

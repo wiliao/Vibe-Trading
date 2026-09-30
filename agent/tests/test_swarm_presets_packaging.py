@@ -213,8 +213,7 @@ def test_explicit_user_preset_accepted_by_swarm_tool(user_presets_dir) -> None:
 _INVESTMENT_COMMITTEE_FUNDAMENTAL_TOOLS = (
     "get_financial_statements",
     "get_fund_flow",
-    "get_margin_trading",
-    "get_research_reports",
+    "get_stock_profile",
     "get_stock_news",
 )
 

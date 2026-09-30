@@ -59,18 +59,18 @@ def _rt(symbol: str, pnl: float, hold_days: float) -> dict:
 def test_mixed_journal_excludes_other_currencies_from_real_pnl() -> None:
     roundtrips = [
         _rt("AAPL.US", 100.0, 3.0),
-        _rt("0700.HK", 50.0, 3.0),
-        _rt("9988.HK", -20.0, 3.0),
+        _rt("TD.TO", 50.0, 3.0),
+        _rt("RY.TO", -20.0, 3.0),
     ]
     breakdown, _, real_pnl = _compute_attribution(
         profile=_profile(), roundtrips=roundtrips, shadow_pnl=200.0, pool_currency="USD",
     )
     assert real_pnl == 100.0
-    assert breakdown.excluded_currencies == {"HKD": 2}
+    assert breakdown.excluded_currencies == {"CAD": 2}
 
 
 def test_no_pool_currency_keeps_legacy_sum() -> None:
-    roundtrips = [_rt("AAPL.US", 100.0, 3.0), _rt("0700.HK", 50.0, 3.0)]
+    roundtrips = [_rt("AAPL.US", 100.0, 3.0), _rt("TD.TO", 50.0, 3.0)]
     _, _, real_pnl = _compute_attribution(
         profile=_profile(), roundtrips=roundtrips, shadow_pnl=200.0,
     )

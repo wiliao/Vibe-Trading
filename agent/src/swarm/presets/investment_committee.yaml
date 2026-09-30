@@ -45,7 +45,7 @@ agents:
 
       Use factor_analysis for quant support; use load_skill for frameworks.
     tools: [bash, read_file, write_file, load_skill, get_market_data, factor_analysis,
-            get_financial_statements, get_fund_flow, get_margin_trading, get_research_reports,
+            get_financial_statements, get_fund_flow, get_stock_profile, get_stock_news,
             get_stock_news]
     skills: [technical-basic, fundamental-filter, yfinance, earnings-revision, sentiment-analysis]
     max_iterations: 50
@@ -116,7 +116,7 @@ agents:
 
       Use factor_analysis for risk-factor views; use load_skill for risk frameworks.
     tools: [bash, read_file, write_file, load_skill, get_market_data, factor_analysis, get_options_chain,
-            get_financial_statements, get_fund_flow, get_margin_trading, get_research_reports,
+            get_financial_statements, get_fund_flow, get_stock_profile, get_stock_news,
             get_stock_news]
     skills: [technical-basic, fundamental-filter, yfinance, risk-analysis, volatility]
     max_iterations: 50
@@ -188,7 +188,7 @@ agents:
 
       Stay independent; do not cheerlead either side; optimize portfolio-level risk.
     tools: [bash, read_file, write_file, load_skill, get_market_data, get_options_chain, options_pricing, options_payoff,
-            get_financial_statements, get_fund_flow, get_margin_trading, get_research_reports,
+            get_financial_statements, get_fund_flow, get_stock_profile, get_stock_news,
             get_stock_news]
     skills: [risk-analysis, volatility, correlation-analysis]
     max_iterations: 50

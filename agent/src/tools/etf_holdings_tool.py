@@ -1,12 +1,10 @@
-"""Read-only ETF look-through: fund search + constituent holdings, US and A-share.
+"""Read-only ETF look-through: fund search + constituent holdings (SEC N-PORT).
 
 An ETF price series says nothing about what the fund actually owns. This tool
-answers that second question on both sides of the Pacific from free, no-auth
-sources, and — because every ETF holdings disclosure is *stale by construction*
-— stamps every answer with the report period it belongs to.
+answers that second question from free, no-auth SEC filings, and — because every
+ETF holdings disclosure is *stale by construction* — stamps every answer with the
+report period it belongs to.
 
-United States — SEC N-PORT
---------------------------
 Registered funds file Form NPORT-P, whose ``primary_doc.xml`` carries the
 **entire** portfolio (``invstOrSecs/invstOrSec``) plus total/net assets. Three
 verified facts drive the US path:
@@ -29,58 +27,9 @@ verified facts drive the US path:
   therefore ranked by their indexed period, not by filing date.
 * Disclosure lags: IVV's period ending 2026-03-31 was filed 2026-05-28.
 
-China A-share — Eastmoney fund archives
----------------------------------------
-``fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc`` returns the
-stock-holding detail as a JS ``var apidata={content:"<html>",...}`` envelope.
-Traps, all confirmed against the live endpoint:
-
-* the request 404s without a ``Referer`` on ``fundf10.eastmoney.com``;
-* an out-of-range ``year`` is **silently ignored** and the current year is
-  returned instead, so the report period is always read back out of the payload
-  and never echoed from the request;
-* ``topline`` does nothing on its own. The parameter that unlocks the whole book
-  is ``month``: the page's own "显示全部持仓明细" control calls
-  ``LoadMore(this, <month>, LoadStockPos)``, which appends that month to
-  ``params.month``. ``month=6,12`` expands the June and December periods,
-  ``month=3,6,9,12`` expands all four.
-
-Chinese funds disclose the **complete** portfolio in the interim (半年度/中期,
-period end 06-30) and annual (年度, period end 12-31) reports, and only the top
-holdings in the quarterly ones. Measured on the expanded June/December periods:
-510300 → 342 holdings summing 98.66% of net assets, 510500 → 541 / 95.35%,
-159915 → 118 / 99.96%. That is the full book, not a top-N slice.
-
-Two things make the "is this the whole book?" question harder than reading the
-month off the period end, and both are handled rather than assumed:
-
-* **Row provenance.** Eastmoney merges a second source into the table and says
-  so in its own footnote: "注：加*号代表进入上市公司的十大流通股东却没有进入单只
-  基金前十大重仓股的个股" — a starred ``序号`` means the row came from the
-  *issuer's* top-10 float-holder disclosure, not from the fund's report. On an
-  expanded quarterly period 510050 returns 10 fund-reported rows plus 33 starred
-  ones. Those rows are real disclosure, but they are a different filing with
-  different coverage, so every holding carries ``disclosure_source`` and the
-  disclosed-percentage total counts fund-reported rows only.
-* **Publication lag.** A period ending 06-30 is served long before its interim
-  report exists — until then Eastmoney answers it with the quarterly data. On
-  2026-08-04 the expanded 2026-06-30 period for 510300 is 15 rows / 23.26%
-  (top-10 index investment + top-5 active), because the interim report is not
-  due until 08-31. ``api.fund.eastmoney.com/f10/JJGG?type=3`` lists the fund's
-  periodic reports by title ("…2025年年度报告", "…2025年中期报告"), which
-  settles authoritatively whether the full portfolio has been published and when.
-  That endpoint also needs a ``Referer``; without one it answers ``ErrCode -999``
-  with ``Data`` as an empty **string** rather than a list.
-
-Coverage is therefore decided from evidence, never from the calendar alone, and
-is deliberately conservative — see :func:`_annotate_cn_period`. Two candidate
-signals were tested and rejected: the ``t2`` table class tracks the requested
-year rather than detail availability, and a disclosed-percentage threshold
-cannot work because a concentrated fund's top-10 alone reaches 91.5% (513050).
-
-Everything routes through :mod:`backtest.loaders._http` so the SEC and Eastmoney
-per-host throttles, sessions and User-Agent policy are the project's existing
-ones, not a second stack. No optional package is required.
+Everything routes through :mod:`backtest.loaders._http` so the SEC per-host
+throttle, session and User-Agent policy are the project's existing ones, not a
+second stack. No optional package is required.
 """
 
 from __future__ import annotations
@@ -89,16 +38,14 @@ import csv
 import io
 import json
 import logging
-import re
 import threading
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any
 
 from defusedxml import ElementTree as DefusedET
 
 from backtest.loaders import sec_edgar_client
-from backtest.loaders._http import resolve_min_interval, throttled_get
-from backtest.loaders.eastmoney_client import get_json, resolve_secid
+from backtest.loaders._http import throttled_get
 from src.agent.tools import BaseTool
 from src.tools._result_paging import fit_records
 
@@ -124,51 +71,11 @@ _SEC_FTS_URL = "https://efts.sec.gov/LATEST/search-index"
 
 _NPORT_HOST_KEY = "sec"
 
-# ── Eastmoney endpoints ──────────────────────────────────────────────────────
-
-_EM_HOLDINGS_URL = "https://fundf10.eastmoney.com/FundArchivesDatas.aspx"
-# Periodic-report announcement shelf (``type``/``NEWCATEGORY`` 3 = 定期报告).
-# The one authority on whether a period's full portfolio has been published.
-_EM_ANNOUNCEMENT_URL = "https://api.fund.eastmoney.com/f10/JJGG"
-_EM_PERIODIC_REPORT_TYPE = "3"
-# A fund files four periodic reports a year; 80 covers two decades.
-_EM_ANNOUNCEMENT_PAGE_SIZE = 80
-# Quote hosts in preference order. ``push2delay`` is tried first because the
-# other edges intermittently drop a Python HTTP client before responding
-# (measured 0/4 on ``push2`` and ``push2his`` against 4/4 on ``push2delay``,
-# while curl reached all three) — the delayed edge is also the one AKShare
-# itself uses for the fund list, and delayed quotes are irrelevant here since
-# only the fund's name and size are read.
-_EM_QUOTE_HOSTS = ("push2delay.eastmoney.com", "push2.eastmoney.com")
-_EM_QUOTE_PATH = "/api/qt/stock/get"
-_EM_LIST_PATH = "/api/qt/clist/get"
-_EM_HOST_KEY = "eastmoney"
-_EM_MIN_INTERVAL_ENV = "VIBE_TRADING_EASTMONEY_MIN_INTERVAL"
-_EM_DEFAULT_MIN_INTERVAL = 1.0
-
-# Eastmoney board filters for exchange-traded funds, and the per-page cap the
-# server enforces (``pz`` above 100 is silently clamped to 100).
-_EM_ETF_BOARDS = "b:MK0021,b:MK0022,b:MK0023,b:MK0024,b:MK0827"
-_EM_PAGE_SIZE = 100
-_EM_MAX_PAGES = 30
-
-# Exchange-listed fund code prefixes, mirroring
-# ``backtest.loaders._symbol_utils._ETF_PREFIXES`` but resolved to the exchange
-# so a bare six-digit code can be addressed without a suffix.
-_CN_PREFIX_EXCHANGE = {
-    "15": "SZ", "16": "SZ",
-    "50": "SH", "51": "SH", "52": "SH", "56": "SH", "58": "SH",
-}
-
 # ── Result shaping ───────────────────────────────────────────────────────────
 
-# The ceiling has to clear a real full portfolio, or ``disclosure='full'`` hands
-# back a truncated book while still calling itself complete. Measured on the
-# 2025 annual reports: 510500 → 541, 512100 → 1041, 159845 → 1044, and the
-# CSI-2000 tracker 159531 → 2031. A broad-market fund is therefore well past a
-# thousand names, so the cap is set high enough that no measured A-share
-# portfolio reaches it; ``fit_records`` still pages the answer down to one
-# result's worth, so a large cap costs nothing per response.
+# A broad-market U.S. fund can run past a thousand names, so the cap is set high
+# enough to clear a real full portfolio; ``fit_records`` still pages the answer
+# down to one result's worth, so a large cap costs nothing per response.
 _MAX_TOP_N = 6000
 _DEFAULT_TOP_N = 25
 _MAX_LOOKUP = 40
@@ -177,38 +84,9 @@ _DEFAULT_LOOKUP = 10
 _SEC_FILING_COUNT = 10
 
 _MODES = ("lookup", "holdings")
-_MARKETS = ("auto", "US", "CN")
-_DISCLOSURES = ("latest", "full", "cross_reference")
 
-# ``month`` presets for the A-share archive. The default expands only the two
-# periods whose reports carry the complete portfolio; the wide one additionally
-# expands the quarterlies, which is where the issuer cross-referenced rows live.
-_EM_FULL_DISCLOSURE_MONTHS = "6,12"
-_EM_ALL_QUARTER_MONTHS = "3,6,9,12"
-
-# Period ends whose report — when published — discloses the complete portfolio.
-_FULL_DISCLOSURE_PERIOD_ENDS = ("-06-30", "-12-31")
-
-# A quarterly report discloses the top ten holdings, plus for an index fund the
-# top five active-investment holdings. More fund-reported rows than that on a
-# June/December period can only have come from the interim or annual report.
-_QUARTERLY_DISCLOSURE_CAP = 15
-
-# How many extra years to fetch when hunting backwards for a full portfolio.
-_MAX_FULL_LOOKBACK_FETCHES = 3
-
-# Row provenance, per Eastmoney's own footnote on the starred 序号.
-_SOURCE_FUND_REPORT = "fund_report"
-_SOURCE_ISSUER_CROSS_REF = "issuer_top10_float_holders"
-
-_COVERAGE_FULL = "full_portfolio"
-_COVERAGE_TOP_N = "top_n_disclosed"
-
-# CJK unified ideographs — a lookup query containing one is a Chinese fund name.
-_HAN_RE = re.compile(r"[一-鿿]")
-
-# Neither source publishes an expense ratio, so it is declared missing rather
-# than estimated. Fund size is only available on the paths noted below.
+# The SEC N-PORT filing publishes no expense ratio, so it is declared missing
+# rather than estimated.
 _NOTE_LAG = (
     "ETF holdings are disclosed with a lag. 'as_of' is the report period the "
     "holdings belong to, NOT today's portfolio."
@@ -225,73 +103,6 @@ def _error(message: str) -> str:
         A ``{"ok": false, "error": ...}`` JSON string.
     """
     return json.dumps({"ok": False, "error": message}, ensure_ascii=False)
-
-
-# ── Symbol / market classification ───────────────────────────────────────────
-
-
-def _classify_market(symbol: str) -> str:
-    """Route a symbol to the A-share or the US path.
-
-    The repository's shared classifier
-    (``backtest.engines._market_hooks._detect_market``) is deliberately not used
-    here: it defaults an unrecognized symbol to ``a_share``, which would send a
-    bare ``IVV`` down the Eastmoney path. This tool needs the opposite default.
-
-    Args:
-        symbol: An ETF symbol such as ``"510050.SH"``, ``"510050"`` or ``"IVV"``.
-
-    Returns:
-        ``"CN"`` for a ``.SH`` / ``.SZ`` suffix or a bare six-digit code,
-        ``"US"`` otherwise.
-    """
-    upper = symbol.strip().upper()
-    if upper.endswith((".SH", ".SZ")):
-        return "CN"
-    if len(upper) == 6 and upper.isdigit():
-        return "CN"
-    return "US"
-
-
-def _classify_query_market(query: str) -> str:
-    """Route a free-text lookup query to the A-share or the US path.
-
-    Adds one rule to :func:`_classify_market`: a query containing Han
-    characters is an A-share fund search, since the SEC index holds no Chinese
-    fund names and would silently answer "no matches".
-
-    Args:
-        query: A ticker, fund name, or theme keyword.
-
-    Returns:
-        ``"CN"`` or ``"US"``.
-    """
-    if _HAN_RE.search(query):
-        return "CN"
-    return _classify_market(query)
-
-
-def _cn_code_and_secid(symbol: str) -> tuple[str, str | None]:
-    """Split an A-share fund symbol into its bare code and Eastmoney secid.
-
-    A bare six-digit code carries no exchange, so the exchange is derived from
-    the listed-fund prefix table before delegating to the shared Eastmoney
-    resolver.
-
-    Args:
-        symbol: ``"510050.SH"``, ``"510050"`` or ``"159915.sz"``.
-
-    Returns:
-        ``(bare_code, secid)``; ``secid`` is ``None`` when the exchange cannot
-        be determined.
-    """
-    upper = symbol.strip().upper()
-    if upper.endswith((".SH", ".SZ")):
-        return upper.split(".")[0], resolve_secid(upper)
-    exchange = _CN_PREFIX_EXCHANGE.get(upper[:2])
-    if exchange is None:
-        return upper, None
-    return upper, resolve_secid(f"{upper}.{exchange}")
 
 
 # ── HTTP transport (reuses the shared per-host throttles) ────────────────────
@@ -324,32 +135,6 @@ def _sec_get_text(url: str, params: dict[str, Any] | None = None) -> str:
         timeout=60.0,
     )
     response.raise_for_status()
-    return response.text
-
-
-def _em_get_text(url: str, *, params: dict[str, Any], referer: str) -> str:
-    """GET an Eastmoney URL as text through the shared ``"eastmoney"`` throttle.
-
-    Args:
-        url: Fully-qualified Eastmoney URL.
-        params: Query parameters.
-        referer: Referer header — ``fundf10`` returns 404 without one.
-
-    Returns:
-        The decoded response body.
-
-    Raises:
-        requests.RequestException: Network failure or non-2xx status.
-    """
-    response = throttled_get(
-        url,
-        host_key=_EM_HOST_KEY,
-        min_interval=resolve_min_interval(_EM_MIN_INTERVAL_ENV, _EM_DEFAULT_MIN_INTERVAL),
-        params=params,
-        headers={"Referer": referer},
-    )
-    response.raise_for_status()
-    response.encoding = "utf-8"
     return response.text
 
 
@@ -664,24 +449,6 @@ def _child(parent: Any, name: str) -> Any:
     return None
 
 
-def _iso_date(value: Any) -> str | None:
-    """Normalize an Eastmoney ``YYYYMMDD`` field to ``YYYY-MM-DD``.
-
-    Args:
-        value: The raw field, e.g. ``20260804`` or ``"20260804"``.
-
-    Returns:
-        The ISO date, the original string when it is not eight digits, or
-        ``None`` when empty.
-    """
-    text = str(value).strip() if value not in (None, "") else ""
-    if not text:
-        return None
-    if len(text) == 8 and text.isdigit():
-        return f"{text[:4]}-{text[4:6]}-{text[6:]}"
-    return text
-
-
 def _to_float(value: Any) -> float | None:
     """Coerce a reported value to ``float``, or ``None`` when non-numeric."""
     if value is None or value == "":
@@ -796,463 +563,6 @@ def _lag_days(as_of: str | None, filing_date: str | None) -> int | None:
         return None
 
 
-# ── A-share: Eastmoney fund archives ─────────────────────────────────────────
-
-# ``var apidata={ content:"<html>",arryear:[2026,...],curyear:2026};``
-_APIDATA_RE = re.compile(r'content:"(?P<content>.*?)",\s*arryear:\[(?P<years>[^\]]*)\]', re.S)
-_TAG_RE = re.compile(r"<[^>]+>")
-_ROW_RE = re.compile(r"<tr>(?P<row>.*?)</tr>", re.S)
-# A cell ends at its closing tag, at the next cell's opening tag, or at the end
-# of the row. The last two alternatives are not defensiveness for its own sake:
-# Eastmoney emits rows whose 相关资讯 cell is never closed — 510500's 2025 annual
-# report carries ``<td class='xglj'>…<td class='tor'>0.00%</td>`` for the NEEQ
-# line 400174 中天3 — and requiring ``</td>`` merges that cell with the next one,
-# shifting every later column left by one. That silently reported the holding's
-# share count (1,877.51) as its weight in percent.
-_CELL_RE = re.compile(r"<t[dh][^>]*>(?P<cell>.*?)(?=</t[dh]>|<t[dh][^>]*>|\Z)", re.S)
-# Quote links carry the Eastmoney market prefix: 1 = Shanghai, 0 = Shenzhen.
-_QUOTE_LINK_RE = re.compile(r"quote\.eastmoney\.com/unify/r/(?P<market>\d)\.(?P<code>\d{6})")
-_ASOF_RE = re.compile(r"截止至：\s*<font[^>]*>(?P<date>[\d-]+)</font>")
-_FUND_NAME_RE = re.compile(r"title='(?P<name>[^']*)'")
-_PERIOD_RE = re.compile(r"(?P<label>\d{4}年\d季度[^<]*)</label>")
-_EM_MARKET_SUFFIX = {"1": "SH", "0": "SZ"}
-# Present while a period is still collapsed to its top rows; its absence means
-# this payload already carries everything Eastmoney holds for that period.
-_EXPAND_LINK = "显示全部持仓明细"
-
-# Periodic-report titles, e.g. "华泰柏瑞沪深300交易型开放式指数证券投资基金2025年
-# 年度报告". The 摘要 (abstract) editions are excluded: they are a companion to
-# the full report, and only the full report carries the portfolio schedule.
-_ANNUAL_REPORT_RE = re.compile(r"(?P<year>\d{4})年年度报告(?!摘要)")
-_INTERIM_REPORT_RE = re.compile(r"(?P<year>\d{4})年(?:中期|半年度)报告(?!摘要)")
-
-
-def _strip_html(fragment: str) -> str:
-    """Flatten an HTML fragment to its visible text."""
-    return _TAG_RE.sub("", fragment).replace("&nbsp;", " ").replace("&amp;", "&").strip()
-
-
-def _cn_column_map(header_row: str) -> dict[str, tuple[int, float]]:
-    """Map logical holding columns to ``(index, unit_scale)`` from the table head.
-
-    Eastmoney reports 持股数 in 万股 and 持仓市值 in 万元 (both ten-thousands),
-    but the exact header wording varies between funds, so the scale is read from
-    the header text rather than assumed.
-
-    Args:
-        header_row: The raw ``<tr>`` inner HTML of the table head.
-
-    Returns:
-        Mapping of ``"code"`` / ``"name"`` / ``"pct"`` / ``"shares"`` /
-        ``"value"`` to ``(column_index, scale)``. Absent columns are omitted.
-    """
-    columns: dict[str, tuple[int, float]] = {}
-    for index, match in enumerate(_CELL_RE.finditer(header_row)):
-        text = _strip_html(match.group("cell"))
-        scale = 10_000.0 if "万" in text else 1.0
-        if "序号" in text:
-            # Carries the provenance marker: a trailing '*' means the row came
-            # from the issuer's float-holder disclosure, not the fund's report.
-            columns["seq"] = (index, 1.0)
-        elif "股票代码" in text:
-            columns["code"] = (index, 1.0)
-        elif "股票名称" in text:
-            columns["name"] = (index, 1.0)
-        elif "占净值" in text:
-            columns["pct"] = (index, 1.0)
-        elif "持股数" in text:
-            columns["shares"] = (index, scale)
-        elif "持仓市值" in text:
-            columns["value"] = (index, scale)
-    return columns
-
-
-def _parse_cn_period(block: str) -> dict[str, Any] | None:
-    """Parse one report period's holdings block from the Eastmoney fund archive.
-
-    Every holding is stamped with the disclosure it came from, because the table
-    merges two of them: unstarred rows are the fund's own periodic report, and a
-    starred ``序号`` is Eastmoney cross-referencing the *issuer's* top-10 float
-    holders. Mixing the two would inflate the apparent coverage of the fund's
-    filing, so the totals are kept apart rather than summed.
-
-    Args:
-        block: One ``boxitem`` fragment, header table included.
-
-    Returns:
-        ``{as_of, report_label, fund_name, holdings, unparseable_rows,
-        expandable, source_labelled, fund_report_holdings,
-        cross_referenced_holdings, pct_of_net_assets_disclosed,
-        pct_of_net_assets_cross_referenced}``, or ``None`` when the block
-        carries no parseable table.
-    """
-    rows = _ROW_RE.findall(block)
-    if len(rows) < 2:
-        return None
-    columns = _cn_column_map(rows[0])
-    if "code" not in columns or "pct" not in columns:
-        return None
-
-    width = len(_CELL_RE.findall(rows[0]))
-    holdings: list[dict[str, Any]] = []
-    malformed = 0
-    for row in rows[1:]:
-        cells = [m.group("cell") for m in _CELL_RE.finditer(row)]
-        # Column indices come from the header, so a row of a different width has
-        # them pointing at the wrong values. Dropping it loses one holding;
-        # keeping it reports one column's number under another column's name.
-        # The count is returned so the loss is never silent.
-        if len(cells) != width:
-            malformed += 1
-            continue
-
-        def cell(key: str) -> tuple[str, float] | None:
-            spec = columns.get(key)
-            if spec is None or spec[0] >= len(cells):
-                return None
-            return _strip_html(cells[spec[0]]), spec[1]
-
-        code_cell = cell("code")
-        if code_cell is None or not code_cell[0]:
-            continue
-        link = _QUOTE_LINK_RE.search(row)
-        suffix = _EM_MARKET_SUFFIX.get(link.group("market")) if link else None
-        code = code_cell[0]
-
-        seq_cell = cell("seq")
-        cross_referenced = bool(seq_cell and "*" in seq_cell[0])
-        holding: dict[str, Any] = {
-            "symbol": f"{code}.{suffix}" if suffix else code,
-            "disclosure_source": (
-                _SOURCE_ISSUER_CROSS_REF if cross_referenced else _SOURCE_FUND_REPORT
-            ),
-        }
-        name_cell = cell("name")
-        if name_cell and name_cell[0]:
-            holding["name"] = name_cell[0]
-        pct_cell = cell("pct")
-        if pct_cell:
-            holding["pct_of_net_assets"] = _to_float(pct_cell[0].rstrip("%"))
-        shares_cell = cell("shares")
-        shares = _to_float(shares_cell[0]) if shares_cell else None
-        if shares is not None:
-            # Rounded because the ten-thousands rescale otherwise leaks binary
-            # float noise into a share count (6816530699.999999 CNY).
-            holding["shares"] = round(shares * shares_cell[1], 2)
-        value_cell = cell("value")
-        value = _to_float(value_cell[0]) if value_cell else None
-        if value is not None:
-            holding["market_value_cny"] = round(value * value_cell[1], 2)
-        holdings.append({k: v for k, v in holding.items() if v is not None})
-
-    if not holdings:
-        return None
-    as_of = _ASOF_RE.search(block)
-    label = _PERIOD_RE.search(block)
-    name = _FUND_NAME_RE.search(block)
-    fund_rows = [h for h in holdings if h["disclosure_source"] == _SOURCE_FUND_REPORT]
-    return {
-        "as_of": as_of.group("date") if as_of else None,
-        "report_label": label.group("label").strip() if label else None,
-        "fund_name": name.group("name") if name else None,
-        "holdings": holdings,
-        "unparseable_rows": malformed,
-        # Still collapsed: Eastmoney holds more rows for this period than this
-        # payload carries, so nothing here may be called a complete portfolio.
-        "expandable": _EXPAND_LINK in block,
-        # Without the 序号 column there is no way to tell the two disclosures
-        # apart, so the period is barred from claiming full coverage.
-        "source_labelled": "seq" in columns,
-        "fund_report_holdings": len(fund_rows),
-        "cross_referenced_holdings": len(holdings) - len(fund_rows),
-        "pct_of_net_assets_disclosed": round(
-            sum(h.get("pct_of_net_assets") or 0.0 for h in fund_rows), 4
-        ),
-        "pct_of_net_assets_cross_referenced": round(
-            sum(
-                h.get("pct_of_net_assets") or 0.0
-                for h in holdings
-                if h["disclosure_source"] == _SOURCE_ISSUER_CROSS_REF
-            ),
-            4,
-        ),
-    }
-
-
-def _cn_holdings_periods(code: str, year: int | None, months: str) -> list[dict[str, Any]]:
-    """Fetch a fund's disclosed stock holdings by period, newest period first.
-
-    The endpoint silently ignores an out-of-range ``year`` and answers with the
-    current one instead, so the caller must read ``as_of`` off each returned
-    period rather than assuming the year it asked for.
-
-    Args:
-        code: Bare six-digit fund code, e.g. ``"510050"``.
-        year: Calendar year to request, or ``None`` for the endpoint default.
-        months: Report months to expand past their top rows, as the page's own
-            control sends them — ``"6,12"`` for the interim/annual periods,
-            ``"3,6,9,12"`` for every quarter. An unexpanded period comes back
-            collapsed to its top ten rows.
-
-    Returns:
-        Parsed period blocks in the order Eastmoney returns them (newest first).
-
-    Raises:
-        requests.RequestException: Network failure or non-2xx status.
-    """
-    body = _em_get_text(
-        _EM_HOLDINGS_URL,
-        params={
-            "type": "jjcc",
-            "code": code,
-            "topline": str(_MAX_TOP_N),
-            "year": str(year) if year else "",
-            "month": months,
-        },
-        referer=f"https://fundf10.eastmoney.com/ccmx_{code}.html",
-    )
-    match = _APIDATA_RE.search(body)
-    if match is None:
-        return []
-    content = match.group("content")
-    blocks = content.split("<div class='boxitem")[1:]
-    periods = [p for p in (_parse_cn_period(b) for b in blocks) if p is not None]
-    return periods
-
-
-def _cn_periodic_reports(code: str) -> dict[str, dict[str, str]]:
-    """Map period end to the interim/annual report that discloses it in full.
-
-    This is the only authority on whether a June or December period's complete
-    portfolio is actually public yet: the archive serves such a period from the
-    quarterly data until the interim/annual report lands, and looks no different
-    when it does. Best-effort by design — a failure returns an empty map, and
-    the caller then declines to claim full coverage rather than guessing.
-
-    Args:
-        code: Bare six-digit fund code.
-
-    Returns:
-        ``{"YYYY-06-30": {"report": title, "published": "YYYY-MM-DD"}}``. When a
-        report was published more than once, the earliest date wins, since that
-        is when the holdings became public.
-    """
-    try:
-        body = _em_get_text(
-            _EM_ANNOUNCEMENT_URL,
-            params={
-                "fundcode": code,
-                "pageIndex": "1",
-                "pageSize": str(_EM_ANNOUNCEMENT_PAGE_SIZE),
-                "type": _EM_PERIODIC_REPORT_TYPE,
-            },
-            referer=f"https://fundf10.eastmoney.com/jjgg_{code}_3.html",
-        )
-        payload = json.loads(body)
-    except Exception as exc:  # noqa: BLE001 - corroboration only, never fatal
-        logger.warning("Eastmoney periodic-report index failed for %s: %s", code, exc)
-        return {}
-
-    # Without a Referer the endpoint answers 200 with ErrCode -999 and Data as
-    # an empty *string*, so the shape is checked rather than assumed.
-    records = payload.get("Data") if isinstance(payload, dict) else None
-    if payload.get("ErrCode") != 0 or not isinstance(records, list):
-        logger.warning("Eastmoney periodic-report index rejected the request for %s", code)
-        return {}
-
-    reports: dict[str, dict[str, str]] = {}
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        title = str(record.get("TITLE") or "")
-        published = str(record.get("PUBLISHDATEDesc") or "").strip()
-        if annual := _ANNUAL_REPORT_RE.search(title):
-            period_end = f"{annual.group('year')}-12-31"
-        elif interim := _INTERIM_REPORT_RE.search(title):
-            period_end = f"{interim.group('year')}-06-30"
-        else:
-            continue
-        known = reports.get(period_end)
-        if known is None or (published and published < known["published"]):
-            reports[period_end] = {"report": title, "published": published}
-    return reports
-
-
-def _annotate_cn_period(period: dict[str, Any], reports: dict[str, dict[str, str]]) -> None:
-    """Decide in place what a parsed period's rows actually cover.
-
-    ``full_portfolio`` is claimed only when every one of these holds, so the
-    label errs towards understating coverage rather than overstating it:
-
-    * the period end is a June or December one, the only reports that carry the
-      complete portfolio;
-    * the block was expanded, so no rows are being withheld;
-    * row provenance was readable, so fund-reported rows are separable from the
-      issuer cross-referenced ones;
-    * more fund-reported rows came back than a quarterly report may disclose
-      (:data:`_QUARTERLY_DISCLOSURE_CAP`), which is what distinguishes a
-      published interim/annual report from the quarterly data still standing in
-      for it — on 2026-08-04 the expanded 2026-06-30 period is 15 rows;
-    * the announcement index does not contradict it. A fund whose complete book
-      genuinely runs to fifteen names or fewer is therefore reported as
-      ``top_n_disclosed``; the disclosed percentage is published alongside so
-      that understatement is visible rather than misleading.
-
-    Args:
-        period: A parsed period block, mutated with its coverage verdict.
-        reports: Output of :func:`_cn_periodic_reports`, possibly empty.
-    """
-    as_of = period["as_of"] or ""
-    report = reports.get(as_of)
-    # None = the announcement index was unreachable, so it neither confirms nor
-    # denies; False = it was read and holds no such report for this period.
-    confirmed = None if not reports else report is not None
-
-    period["report"] = report["report"] if report else None
-    period["report_published"] = report["published"] if report else None
-    period["report_confirmed"] = confirmed
-    period["disclosure_lag_days"] = _lag_days(
-        as_of, report["published"] if report else None
-    )
-    period["coverage"] = (
-        _COVERAGE_FULL
-        if (
-            as_of.endswith(_FULL_DISCLOSURE_PERIOD_ENDS)
-            and not period["expandable"]
-            and period["source_labelled"]
-            and period["fund_report_holdings"] > _QUARTERLY_DISCLOSURE_CAP
-            and confirmed is not False
-        )
-        else _COVERAGE_TOP_N
-    )
-
-
-def _em_push_json(path: str, params: dict[str, Any]) -> Any:
-    """Call an Eastmoney quote endpoint, trying each edge host in turn.
-
-    Args:
-        path: Endpoint path such as ``"/api/qt/stock/get"``.
-        params: Query parameters.
-
-    Returns:
-        The decoded JSON payload from the first host that answers.
-
-    Raises:
-        requests.RequestException: When every host fails; the last failure is
-            re-raised so the caller reports a real cause.
-    """
-    last: Exception | None = None
-    for host in _EM_QUOTE_HOSTS:
-        try:
-            return get_json(f"https://{host}{path}", params=params)
-        except Exception as exc:  # noqa: BLE001 - fall through to the next edge
-            logger.warning("eastmoney %s failed on %s: %s", path, host, exc)
-            last = exc
-    raise last if last is not None else RuntimeError("no Eastmoney quote host configured")
-
-
-def _cn_quote(secid: str) -> dict[str, Any]:
-    """Fetch one A-share fund's name and market size from the Eastmoney quote API.
-
-    Args:
-        secid: Eastmoney secid such as ``"1.510050"``.
-
-    Returns:
-        The ``data`` mapping (``f57`` code, ``f58`` name, ``f43`` last price,
-        ``f116`` total market value, ``f117`` free-float market value), or an
-        empty dict when the payload carries none.
-
-    Raises:
-        requests.RequestException: Network failure or non-2xx status.
-    """
-    payload = _em_push_json(
-        _EM_QUOTE_PATH,
-        {"secid": secid, "fltt": "2", "invt": "2", "fields": "f43,f57,f58,f86,f116,f117"},
-    )
-    data = payload.get("data") if isinstance(payload, dict) else None
-    return data if isinstance(data, dict) else {}
-
-
-_CN_LIST_CACHE: list[dict[str, Any]] | None = None
-_CN_LIST_LOCK = threading.Lock()
-
-
-def _cn_etf_list() -> tuple[list[dict[str, Any]], bool]:
-    """Return every exchange-traded fund Eastmoney lists, memoized when complete.
-
-    The quote server caps a page at 100 rows regardless of the requested ``pz``,
-    so the ~1,500-row universe takes about sixteen throttled requests. A run
-    that dies part-way is returned as-is with ``complete=False`` and is *not*
-    cached, so a truncated universe can neither be mistaken for the whole one
-    nor poison later calls.
-
-    Returns:
-        ``(rows, complete)`` where each row is ``{symbol, code, name,
-        total_market_cap_cny, quote_date}``.
-
-    Raises:
-        requests.RequestException: Network failure on the very first page.
-    """
-    global _CN_LIST_CACHE
-    if _CN_LIST_CACHE is not None:
-        return _CN_LIST_CACHE, True
-    with _CN_LIST_LOCK:
-        if _CN_LIST_CACHE is not None:
-            return _CN_LIST_CACHE, True
-        rows: list[dict[str, Any]] = []
-        expected: int | None = None
-        for page in range(1, _EM_MAX_PAGES + 1):
-            try:
-                payload = _em_push_json(
-                    _EM_LIST_PATH,
-                    {
-                        "pn": str(page),
-                        "pz": str(_EM_PAGE_SIZE),
-                        "po": "1",
-                        "np": "1",
-                        "fltt": "2",
-                        "invt": "2",
-                        "fid": "f12",
-                        "fs": _EM_ETF_BOARDS,
-                        "fields": "f12,f13,f14,f20,f21,f297",
-                    },
-                )
-            except Exception:
-                if page == 1:
-                    raise
-                logger.warning("eastmoney ETF universe truncated at page %d", page)
-                return rows, False
-            data = payload.get("data") if isinstance(payload, dict) else None
-            page_rows = data.get("diff") if isinstance(data, dict) else None
-            if not isinstance(page_rows, list) or not page_rows:
-                break
-            total = data.get("total") if isinstance(data, dict) else None
-            if isinstance(total, int) and total > 0:
-                expected = total
-            for row in page_rows:
-                if not isinstance(row, dict):
-                    continue
-                code = str(row.get("f12") or "").strip()
-                if not code:
-                    continue
-                suffix = _EM_MARKET_SUFFIX.get(str(row.get("f13")))
-                rows.append(
-                    {
-                        "symbol": f"{code}.{suffix}" if suffix else code,
-                        "code": code,
-                        "name": row.get("f14"),
-                        "total_market_cap_cny": _to_float(row.get("f20")),
-                        "quote_date": _iso_date(row.get("f297")),
-                    }
-                )
-            if expected is not None and len(rows) >= expected:
-                break
-        complete = expected is None or len(rows) >= expected
-        if complete:
-            _CN_LIST_CACHE = rows
-        return rows, complete
-
-
 # ── Mode handlers ────────────────────────────────────────────────────────────
 
 
@@ -1279,75 +589,6 @@ def _lookup_us(query: str, limit: int, offset: int) -> str:
             ),
             "paging": paging,
             "data": {"query": query, "matches": page},
-        }
-
-    return fit_records(matches, offset, build)
-
-
-def _lookup_cn(query: str, limit: int, offset: int) -> str:
-    """Search A-share ETFs by code or name and render the envelope."""
-    needle = query.strip()
-    matches: list[dict[str, Any]] = []
-    quote_as_of: Any = None
-    universe_complete = True
-
-    if _classify_market(needle) == "CN":
-        code, secid = _cn_code_and_secid(needle)
-        if secid is None:
-            return _error(f"'{needle}' is not a recognizable A-share fund code")
-        try:
-            quote = _cn_quote(secid)
-        except Exception as exc:  # noqa: BLE001 - surface as envelope
-            return _error(f"Eastmoney quote request failed: {exc}")
-        if quote:
-            record = {
-                "symbol": f"{code}.{_CN_PREFIX_EXCHANGE.get(code[:2], '')}".rstrip("."),
-                "code": quote.get("f57") or code,
-                "name": quote.get("f58"),
-                "last_price": _to_float(quote.get("f43")),
-                # Shares outstanding x last price, i.e. an exchange-side size
-                # proxy — not the fund's officially struck NAV-based AUM.
-                "fund_size_cny": _to_float(quote.get("f116")),
-            }
-            matches = [{k: v for k, v in record.items() if v is not None}]
-            # f86 is the quote's epoch second; an ISO instant is what downstream
-            # reasoning can actually compare against a report period.
-            epoch = _to_float(quote.get("f86"))
-            if epoch is not None:
-                quote_as_of = datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
-    else:
-        try:
-            universe, universe_complete = _cn_etf_list()
-        except Exception as exc:  # noqa: BLE001 - surface as envelope
-            return _error(f"Eastmoney ETF universe request failed: {exc}")
-        lowered = needle.lower()
-        matches = [row for row in universe if lowered in str(row.get("name") or "").lower()][:limit]
-        quote_as_of = next((m.get("quote_date") for m in matches), None)
-
-    notes = (
-        "fund_size_cny / total_market_cap_cny is shares outstanding x last "
-        "traded price, an exchange-side size proxy rather than the fund's "
-        "struck NAV. Eastmoney publishes no expense ratio on this endpoint."
-    )
-    if not universe_complete:
-        notes += (
-            " WARNING: the ETF universe fetch was cut short by an upstream "
-            "failure, so these matches are drawn from a PARTIAL list and a "
-            "matching fund may be missing. Retry before concluding none exists."
-        )
-
-    def build(page: list[Any], paging: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "ok": True,
-            "mode": "lookup",
-            "market": "CN",
-            "source": "eastmoney_quote",
-            "as_of": quote_as_of,
-            "universe_complete": universe_complete,
-            "missing_fields": ["expense_ratio"],
-            "notes": notes,
-            "paging": paging,
-            "data": {"query": needle, "matches": page},
         }
 
     return fit_records(matches, offset, build)
@@ -1448,239 +689,21 @@ def _holdings_us(symbol: str, top_n: int, offset: int) -> str:
     return fit_records(holdings, offset, build)
 
 
-def _cn_fetch_year(
-    code: str, year: int | None, months: str, reports: dict[str, dict[str, str]]
-) -> list[dict[str, Any]]:
-    """Fetch one calendar year of report periods, each annotated with coverage."""
-    periods = _cn_holdings_periods(code, year, months)
-    for period in periods:
-        _annotate_cn_period(period, reports)
-    return periods
-
-
-def _newest_full_period(reports: dict[str, dict[str, str]]) -> dict[str, str] | None:
-    """Return the newest period the announcement index says is fully disclosed."""
-    if not reports:
-        return None
-    as_of = max(reports)
-    return {"as_of": as_of, **reports[as_of]}
-
-
-def _holdings_cn(
-    symbol: str, top_n: int, offset: int, year: int | None, disclosure: str
-) -> str:
-    """Fetch and render one A-share ETF's disclosed holdings for a report period."""
-    code, _ = _cn_code_and_secid(symbol)
-    if not (len(code) == 6 and code.isdigit()):
-        return _error(f"'{symbol}' is not a six-digit A-share fund code")
-
-    months = (
-        _EM_ALL_QUARTER_MONTHS
-        if disclosure == "cross_reference"
-        else _EM_FULL_DISCLOSURE_MONTHS
-    )
-    reports = _cn_periodic_reports(code)
-    try:
-        periods = _cn_fetch_year(code, year, months, reports)
-        # A June/December period is served from the quarterly data until its
-        # report lands, so the newest full portfolio is routinely in an earlier
-        # year. The announcement index says which year to ask for, so the walk
-        # back is a targeted refetch rather than a blind sweep.
-        if disclosure == "full" and year is None:
-            fetched = {int(p["as_of"][:4]) for p in periods if p["as_of"]}
-            # One request serves a whole year, and a year contributes both its
-            # June and December report, so the years are de-duplicated — the
-            # fetch budget must not be spent asking for the same one twice.
-            candidates: list[int] = []
-            for as_of in sorted(reports, reverse=True):
-                year_of = int(as_of[:4])
-                if year_of not in fetched and year_of not in candidates:
-                    candidates.append(year_of)
-            for candidate in candidates[:_MAX_FULL_LOOKBACK_FETCHES]:
-                if any(p["coverage"] == _COVERAGE_FULL for p in periods):
-                    break
-                periods = _cn_fetch_year(code, candidate, months, reports)
-    except Exception as exc:  # noqa: BLE001 - surface as envelope
-        return _error(f"Eastmoney fund-holdings request failed: {exc}")
-    if not periods:
-        return _error(
-            f"Eastmoney published no stock-holding detail for fund {code}. This "
-            "endpoint covers equity holdings only, so a commodity fund (gold, "
-            "e.g. 518880.SH) or a pure bond fund legitimately has none."
-        )
-
-    # Eastmoney returns the periods newest-first, but the report period is what
-    # the answer is stamped with, so it is picked by date rather than by
-    # trusting the server's ordering.
-    full_periods = [p for p in periods if p["coverage"] == _COVERAGE_FULL]
-    if disclosure == "full":
-        if not full_periods:
-            known = _newest_full_period(reports)
-            scope = f" in {year}" if year is not None else ""
-            if not known:
-                hint = (
-                    " The announcement index lists no interim or annual report "
-                    "for this fund yet."
-                )
-            elif year is not None and not known["as_of"].startswith(str(year)):
-                hint = (
-                    f" The fund's newest one is '{known['report']}' (period "
-                    f"{known['as_of']}), which the requested year excludes — drop "
-                    "'year' to reach it."
-                )
-            else:
-                hint = (
-                    f" The fund's newest such report is '{known['report']}' "
-                    f"(published {known['published']}, period {known['as_of']}), "
-                    "but the archive is not yet serving its holdings detail."
-                )
-            return _error(
-                f"no fully-disclosed portfolio is available for fund {code}{scope}. "
-                "Only the interim (June) and annual (December) reports carry the "
-                "complete portfolio." + hint + " Call again with "
-                "disclosure='latest' for the most recent partial disclosure."
-            )
-        chosen = max(full_periods, key=lambda p: p["as_of"] or "")
-    else:
-        chosen = max(periods, key=lambda p: p["as_of"] or "")
-
-    holdings = chosen["holdings"][:top_n]
-    # ``top_n`` cuts the period's rows before paging, so paging reports the cut
-    # length as its total and a caller who pages to the end sees no sign that
-    # anything was withheld. That is exactly how a complete portfolio turns into
-    # a silently partial one, so the cut is reported rather than assumed benign.
-    truncated = len(chosen["holdings"]) - len(holdings)
-    complete = chosen["coverage"] == _COVERAGE_FULL
-
-    if complete:
-        notes = (
-            _NOTE_LAG
-            + " These are ALL the fund's disclosed stock holdings for this "
-            "period: Chinese funds publish the complete portfolio in the interim "
-            "and annual reports, and pct_of_net_assets_disclosed shows how much "
-            "of net assets they add up to."
-        )
-    else:
-        notes = (
-            _NOTE_LAG
-            + " This period is a quarterly disclosure, which carries only the "
-            "fund's largest holdings — pct_of_net_assets_disclosed shows how "
-            "much of the portfolio that covers. The complete portfolio exists "
-            "only for interim (June) and annual (December) periods, once their "
-            "report is published; call again with disclosure='full' for the "
-            "newest one."
-        )
-    if chosen["cross_referenced_holdings"]:
-        notes += (
-            f" {chosen['cross_referenced_holdings']} of these rows are marked "
-            f"disclosure_source='{_SOURCE_ISSUER_CROSS_REF}': the fund's report "
-            "does not list them, they are positions large enough to put the fund "
-            "in the ISSUER's top-10 float holders. Real disclosure, different "
-            "filing, and not counted in pct_of_net_assets_disclosed."
-        )
-    if chosen["unparseable_rows"]:
-        notes += (
-            f" WARNING: {chosen['unparseable_rows']} row(s) in this period had a "
-            "cell count the table header does not explain and were dropped "
-            "rather than read against mismatched columns, so this period is "
-            "missing that many holdings."
-        )
-    if chosen["report_confirmed"] is None:
-        notes += (
-            " The periodic-report announcement index was unreachable, so the "
-            "report behind this period could not be confirmed and its "
-            "publication date is unknown."
-        )
-    if truncated:
-        notes += (
-            f" NOTE: top_n={top_n} cut {truncated} of this period's "
-            f"{len(chosen['holdings'])} disclosed rows before paging, so paging "
-            "to the end yields the largest top_n holdings rather than the whole "
-            f"period. Raise top_n (max {_MAX_TOP_N}) to page through all of it."
-        )
-
-    missing = ["expense_ratio", "net_assets"]
-    if not complete or truncated:
-        missing.insert(1, "full_portfolio")
-    newest_full = _newest_full_period(reports)
-
-    def build(page: list[Any], paging: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "ok": True,
-            "mode": "holdings",
-            "market": "CN",
-            "source": "eastmoney_fund_archives",
-            "as_of": chosen["as_of"],
-            "coverage": chosen["coverage"],
-            "notes": notes,
-            "missing_fields": missing,
-            "paging": paging,
-            "data": {
-                "symbol": symbol.strip().upper(),
-                "fund": {"code": code, "name": chosen["fund_name"]},
-                "report_label": chosen["report_label"],
-                "disclosure": {
-                    "requested": disclosure,
-                    "report": chosen["report"],
-                    "report_published": chosen["report_published"],
-                    "report_confirmed": chosen["report_confirmed"],
-                    "disclosure_lag_days": chosen["disclosure_lag_days"],
-                },
-                "holdings_in_period": chosen["fund_report_holdings"],
-                "cross_referenced_in_period": chosen["cross_referenced_holdings"],
-                "unparseable_rows": chosen["unparseable_rows"],
-                # Rows this period holds that top_n cut before paging ever saw
-                # them; 0 means paging really can reach the whole period.
-                "holdings_withheld_by_top_n": truncated,
-                "pct_of_net_assets_disclosed": chosen["pct_of_net_assets_disclosed"],
-                "pct_of_net_assets_cross_referenced": (
-                    chosen["pct_of_net_assets_cross_referenced"]
-                ),
-                # What the caller could have instead, so a partial answer never
-                # hides the existence of the complete one.
-                "full_portfolio_available": None if complete else newest_full,
-                "available_periods": [
-                    {
-                        "as_of": p["as_of"],
-                        "report_label": p["report_label"],
-                        "coverage": p["coverage"],
-                        "holdings_in_period": p["fund_report_holdings"],
-                        "pct_of_net_assets_disclosed": p["pct_of_net_assets_disclosed"],
-                    }
-                    for p in periods
-                ],
-                "holdings": page,
-            },
-        }
-
-    return fit_records(holdings, offset, build)
-
-
 class EtfHoldingsTool(BaseTool):
     """Look through an ETF to its constituents, or search the ETF universe."""
 
     name = "etf_holdings"
     description = (
-        "ETF look-through across two markets. mode='holdings' returns an ETF's "
-        "constituent holdings (security, weight, market value) — for U.S. funds "
-        "the FULL portfolio from the SEC N-PORT filing, for A-share funds the "
-        "holdings disclosed in the fund's own periodic report. "
-        "mode='lookup' searches funds by ticker, name or theme and returns their "
-        "identity and size. Market is auto-detected: '.SH'/'.SZ' or a bare "
-        "six-digit code goes to the A-share path, anything else to the U.S. path. "
-        "For A-share funds, disclosure='full' returns the COMPLETE portfolio from "
-        "the newest interim or annual report (hundreds of names, ~95-100% of net "
-        "assets) while the default disclosure='latest' returns the most recent "
-        "period, which between reports is a quarterly top-N — read 'coverage' and "
-        "'pct_of_net_assets_disclosed' to tell which you got. "
+        "ETF look-through for U.S.-listed funds. mode='holdings' returns an ETF's "
+        "constituent holdings (security, weight, market value) — the FULL "
+        "portfolio from the fund's SEC N-PORT filing. mode='lookup' searches "
+        "funds by ticker, name or theme and returns their identity and size. "
         "Every answer carries 'as_of', the report period the holdings belong to — "
-        "ETF holdings are disclosed with a lag and are never live, and the full "
-        "A-share portfolio is the more complete but older of the two. Fields the "
+        "ETF holdings are disclosed with a lag and are never live. Fields the "
         "source does not publish (expense ratio in particular) are listed under "
         "'missing_fields' and never estimated. "
         'Examples: {"mode": "holdings", "symbol": "IVV", "top_n": 20} or '
-        '{"mode": "holdings", "symbol": "510300.SH", "disclosure": "full", '
-        '"top_n": 400} or {"mode": "lookup", "query": "semiconductor"}.'
+        '{"mode": "lookup", "query": "semiconductor"}.'
     )
     parameters = {
         "type": "object",
@@ -1696,31 +719,16 @@ class EtfHoldingsTool(BaseTool):
             "symbol": {
                 "type": "string",
                 "description": (
-                    "Required for mode='holdings'. A U.S. ETF ticker ('IVV', "
-                    "'SOXX', 'ARKK') or an A-share fund code ('510050.SH', "
-                    "'159915.SZ', or bare '510050')."
+                    "Required for mode='holdings'. A U.S. ETF ticker such as "
+                    "'IVV', 'SOXX' or 'ARKK'."
                 ),
             },
             "query": {
                 "type": "string",
                 "description": (
                     "Required for mode='lookup'. A ticker, fund name or theme "
-                    "keyword, e.g. 'IVV', 'semiconductor', '黄金'."
+                    "keyword, e.g. 'IVV' or 'semiconductor'."
                 ),
-            },
-            "market": {
-                "type": "string",
-                "enum": list(_MARKETS),
-                "description": (
-                    "Override the auto-detected market (case-insensitive). In "
-                    "'auto' a lookup query goes to the A-share path when it is "
-                    "a six-digit fund code or contains Chinese characters. "
-                    "A-share fund names are Chinese, so a CN keyword search "
-                    "only matches a Chinese query ('黄金', '半导体') — a "
-                    "Latin-script keyword against market='CN' legitimately "
-                    "returns zero matches."
-                ),
-                "default": "auto",
             },
             "top_n": {
                 "type": "integer",
@@ -1738,37 +746,6 @@ class EtfHoldingsTool(BaseTool):
                 ),
                 "default": _DEFAULT_LOOKUP,
             },
-            "disclosure": {
-                "type": "string",
-                "enum": list(_DISCLOSURES),
-                "description": (
-                    "A-share holdings only; ignored for U.S. funds, which are "
-                    "always the full portfolio. 'latest' (default) returns the "
-                    "newest report period, which between reports is a quarterly "
-                    "top-N disclosure. 'full' returns the newest period whose "
-                    "COMPLETE portfolio has been published — only the interim "
-                    "(June) and annual (December) reports carry it, so this is "
-                    "the fuller but older answer; it searches back through "
-                    "earlier years automatically unless 'year' pins one. "
-                    "'cross_reference' additionally expands the quarterly "
-                    "periods to include positions disclosed by the ISSUER "
-                    "rather than the fund (the fund entered that company's "
-                    "top-10 float holders); those rows are real but come from a "
-                    "different filing and are labelled disclosure_source on "
-                    "every holding."
-                ),
-                "default": "latest",
-            },
-            "year": {
-                "type": "integer",
-                "description": (
-                    "A-share holdings only: calendar year of the reports to "
-                    "request. Omit for the most recent. The endpoint silently "
-                    "ignores an unavailable year, so always read the returned "
-                    "'as_of' rather than assuming this value. Pinning a year "
-                    "also stops disclosure='full' from searching earlier ones."
-                ),
-            },
             "offset": {
                 "type": "integer",
                 "description": (
@@ -1783,14 +760,12 @@ class EtfHoldingsTool(BaseTool):
     }
 
     def execute(self, **kwargs: Any) -> str:
-        """Route to the requested mode and market, returning a JSON envelope.
+        """Route to the requested mode, returning a JSON envelope.
 
         Args:
             **kwargs: ``mode`` ("lookup"|"holdings", required), ``symbol``
                 (required for holdings), ``query`` (required for lookup),
-                ``market`` ("auto"|"US"|"CN"), ``disclosure``
-                ("latest"|"full"|"cross_reference", A-share holdings only),
-                ``top_n``, ``limit``, ``year`` and ``offset``.
+                ``top_n``, ``limit`` and ``offset``.
 
         Returns:
             A JSON string. On success ``{"ok": true, "mode", "market",
@@ -1800,12 +775,6 @@ class EtfHoldingsTool(BaseTool):
         mode = kwargs.get("mode")
         if mode not in _MODES:
             return _error(f"mode must be one of {list(_MODES)}")
-
-        # Models routinely send 'us'/'cn'/'Auto'; case is not a user error.
-        market = str(kwargs.get("market") or "auto").strip()
-        market = "auto" if market.lower() == "auto" else market.upper()
-        if market not in _MARKETS:
-            return _error(f"market must be one of {list(_MARKETS)}")
 
         try:
             offset = max(int(kwargs.get("offset") or 0), 0)
@@ -1817,22 +786,12 @@ class EtfHoldingsTool(BaseTool):
             if not isinstance(query, str) or not query.strip():
                 return _error("'query' is required and must be a non-empty string for mode='lookup'")
             limit = _clamp(kwargs.get("limit", _DEFAULT_LOOKUP), _DEFAULT_LOOKUP, _MAX_LOOKUP)
-            resolved = market if market != "auto" else _classify_query_market(query)
-            return _lookup_cn(query, limit, offset) if resolved == "CN" else _lookup_us(query, limit, offset)
+            return _lookup_us(query, limit, offset)
 
         symbol = kwargs.get("symbol")
         if not isinstance(symbol, str) or not symbol.strip():
             return _error("'symbol' is required and must be a non-empty string for mode='holdings'")
         top_n = _clamp(kwargs.get("top_n", _DEFAULT_TOP_N), _DEFAULT_TOP_N, _MAX_TOP_N)
-        resolved = market if market != "auto" else _classify_market(symbol)
-        if resolved == "CN":
-            year = kwargs.get("year")
-            if year is not None and (not isinstance(year, int) or isinstance(year, bool)):
-                return _error("year must be an integer")
-            disclosure = str(kwargs.get("disclosure") or "latest").strip().lower()
-            if disclosure not in _DISCLOSURES:
-                return _error(f"disclosure must be one of {list(_DISCLOSURES)}")
-            return _holdings_cn(symbol, top_n, offset, year, disclosure)
         return _holdings_us(symbol, top_n, offset)
 
 

@@ -269,12 +269,8 @@ def _resolve_sections(sections: Optional[List[str]]) -> List[str]:
 def _market_for(ticker: str) -> str:
     """Classify a ticker into a coarse market label for the envelope."""
     upper = ticker.strip().upper()
-    if upper.endswith(".HK"):
-        return "hk"
-    if upper.endswith(".L"):
-        return "uk"
-    if upper.endswith(".BA"):
-        return "ar"
+    if upper.endswith(".TO") or upper.endswith(".V"):
+        return "ca"
     return "us"
 
 
@@ -283,8 +279,7 @@ class StockProfileTool(BaseTool):
 
     name = "get_stock_profile"
     description = (
-        "Fetch a read-only company profile for a US, Hong Kong, UK (LSE .L), or "
-        "Argentina (BYMA .BA) "
+        "Fetch a read-only company profile for a US or Canadian "
         "listing from Yahoo Finance: valuation key statistics, analyst price "
         "targets and earnings/revenue estimates, institutional and insider "
         "ownership, and the analyst recommendation trend. Always includes "
@@ -301,9 +296,9 @@ class StockProfileTool(BaseTool):
             "ticker": {
                 "type": "string",
                 "description": (
-                    "US, HK, UK (LSE .L), or Argentina (BYMA .BA) symbol. US uses a bare or .US suffix "
-                    "(AAPL or AAPL.US); HK uses a zero-padded .HK code "
-                    "(00700.HK); UK uses the .L suffix (VOD.L)."
+                    "US or Canadian symbol. US uses a bare or .US suffix "
+                    "(AAPL or AAPL.US); Canada uses the .TO/.V suffix "
+                    "(TD.TO or PNG.V)."
                 ),
             },
             "sections": {
