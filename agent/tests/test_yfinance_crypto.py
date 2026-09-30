@@ -1,4 +1,4 @@
-"""Tests for yfinance loader crypto support: symbol conversion and market registration."""
+"""Tests for yfinance loader symbol conversion and market registration."""
 
 from __future__ import annotations
 
@@ -9,19 +9,16 @@ from backtest.loaders.yfinance_loader import DataLoader, _to_yfinance_symbol
 
 
 # ---------------------------------------------------------------------------
-# _to_yfinance_symbol — crypto conversions
+# _to_yfinance_symbol — suffix conversions
 # ---------------------------------------------------------------------------
 
 
-class TestToYfinanceSymbolCrypto:
-    def test_usdt_suffix_converted_to_usd(self) -> None:
-        assert _to_yfinance_symbol("BTC-USDT") == "BTC-USD"
-
-    def test_usdc_suffix_converted_to_usd(self) -> None:
-        assert _to_yfinance_symbol("ETH-USDC") == "ETH-USD"
-
-    def test_lowercase_normalized(self) -> None:
-        assert _to_yfinance_symbol("sol-usdt") == "SOL-USD"
+class TestToYfinanceSymbol:
+    def test_crypto_suffixes_are_no_longer_rewritten(self) -> None:
+        # Crypto markets were removed with the US/CA refactor; a stablecoin pair
+        # is passed through instead of being mapped onto its USD form.
+        assert _to_yfinance_symbol("BTC-USDT") == "BTC-USDT"
+        assert _to_yfinance_symbol("ETH-USDC") == "ETH-USDC"
 
     def test_existing_usd_pair_unchanged(self) -> None:
         assert _to_yfinance_symbol("BTC-USD") == "BTC-USD"
@@ -39,16 +36,13 @@ class TestToYfinanceSymbolCrypto:
         assert _to_yfinance_symbol("TD.TO") == "TD.TO"
         assert _to_yfinance_symbol("PNG.V") == "PNG.V"
 
-    def test_whitespace_stripped(self) -> None:
-        assert _to_yfinance_symbol("  BTC-USDT  ") == "BTC-USD"
-
 
 # ---------------------------------------------------------------------------
-# DataLoader — crypto market registration
+# DataLoader — market registration
 # ---------------------------------------------------------------------------
 
 
-class TestDataLoaderCryptoMarket:
+class TestDataLoaderMarkets:
     def test_us_equity_still_supported(self) -> None:
         assert "us_equity" in DataLoader.markets
 

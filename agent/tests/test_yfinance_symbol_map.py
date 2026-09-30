@@ -20,5 +20,7 @@ def test_plain_tickers_unchanged() -> None:
 
 
 def test_crypto_and_suffix_forms_untouched() -> None:
-    assert _to_yfinance_symbol("BTC-USDT") == "BTC-USD"
+    # Crypto markets were removed with the US/CA refactor, so a stablecoin pair
+    # is no longer rewritten onto its USD form; Canada suffixes pass through.
+    assert _to_yfinance_symbol("BTC-USDT") == "BTC-USDT"
     assert _to_yfinance_symbol("TD.TO") == "TD.TO"

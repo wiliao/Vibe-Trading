@@ -6,7 +6,6 @@
 
 from typing import Dict, List
 
-import numpy as np
 import pandas as pd
 
 
@@ -24,7 +23,7 @@ class SignalEngine:
 
     Example:
         >>> engine = SignalEngine(bullish_months=[1, 2, 3], bearish_months=[5, 6, 7, 8, 9])
-        >>> signals = engine.generate({"000001.SZ": df})
+        >>> signals = engine.generate({"AAPL.US": df})
     """
 
     def __init__(

@@ -62,8 +62,8 @@ _MAX_TRACKED_SYMBOLS = 5_000
 # checked when it appears under a symbol argument key, but it is not accepted
 # as user-provided identity because it lacks venue information.
 #
-# A joined crypto pair (``BTCUSDT``, ``ETHUSDT`` …) is recognized alongside
-# the dashed/slashed form so a user message like ``Get BTCUSDT spot price``
+# A joined crypto pair (base + stablecoin quote, no separator) is recognized
+# alongside the dashed/slashed form so a user message naming such a pair
 # seeds an asserted identity and the asserted-symbol conflict check at
 # ``_ingest_resolution`` runs against it. The base is restricted to alpha
 # so a numeric prefix cannot masquerade as a joined pair, and the suffix
@@ -176,8 +176,8 @@ def _normalize_symbol(value: Any) -> str:
         The canonical spelling — uppercased, with Shanghai's ``.SS`` alias
         folded onto ``.SH``, an exchange prefix rewritten as a suffix, a Hong
         Kong code zero-padded, and a crypto pair hyphenated. A joined crypto
-        pair with no separator (``BTCUSDT``) is rewritten as the dashed form
-        (``BTC-USDT``) so every downstream check sees one identity. Text that
+        pair with no separator is rewritten as the dashed form so every
+        downstream check sees one identity. Text that
         is not a symbol is returned uppercased and otherwise untouched.
     """
     # A fiat/fiat pair is one FX instrument regardless of spelling: ``GBP/USD``
@@ -198,7 +198,7 @@ def _normalize_symbol(value: Any) -> str:
         return f"{prefixed.group(2)}.{prefixed.group(1)}"
     base, dot, suffix = symbol.rpartition(".")
     if not dot:
-        # No separator at all: rewrite a joined crypto pair (``BTCUSDT``)
+        # No separator at all: rewrite a joined crypto pair
         # as the dashed form so the dash/slash branch and the canonical
         # regex both match. The base must be all-alpha so a numeric prefix
         # cannot collide with another numeric-code branch downstream.

@@ -54,7 +54,7 @@ def _to_yfinance_symbol(code: str) -> str:
     """Convert project symbols into yfinance symbols.
 
     Args:
-        code: Project symbol, for example ``AAPL.US``, ``700.HK``, or
+        code: Project symbol, for example ``AAPL.US``, ``BRK.B.US``, or
             ``TD.TO``.
 
     Returns:
@@ -69,14 +69,7 @@ def _to_yfinance_symbol(code: str) -> str:
         digits = upper[:-3]
         width = max(4, len(digits))
         return f"{digits.zfill(width)}.HK"
-    # Crypto: BTC-USDT -> BTC-USD, ETH-USDT -> ETH-USD, etc.
-    if upper.endswith("-USDT"):
-        return upper[:-5] + "-USD"
-    if upper.endswith("-USDC"):
-        return upper[:-5] + "-USD"
-    # India NSE/BSE (RELIANCE.NS, 500325.BO), Korea KRX (005930.KS,
-    # 247540.KQ), Canada TSX/TSXV (TD.TO, PNG.V), and Vietnam HOSE (VIC.VN):
-    # yfinance carries these suffixes as-is.
+    # Canada TSX/TSXV (TD.TO, PNG.V) and other suffixes yfinance carries as-is.
     return upper
 
 
@@ -348,11 +341,11 @@ class DataLoader:
                     logger.warning("yfinance returned no usable data for %s", symbol)
                     continue
 
-                # uk_equity is one static GBP pool and ar_equity one ARS pool,
-                # while LSE and BYMA each list lines in other currencies. The
-                # suffix identifies the venue, never the currency, so read the
-                # declared one (a metadata request, made only for these venues)
-                # and reject a line outside the pool's unit.
+                # LSE is one static GBP pool and BYMA one ARS pool, while those
+                # venues each list lines in other currencies. The suffix
+                # identifies the venue, never the currency, so read the declared
+                # one (a metadata request, made only for these venues) and
+                # reject a line outside the pool's unit.
                 if declared_currency_required(symbol):
                     declared = _declared_currency(symbol)
                     normalized = normalize_declared_quote_currency(

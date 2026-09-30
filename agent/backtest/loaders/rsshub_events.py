@@ -1,7 +1,7 @@
 """RSSHub event/sentiment provider with point-in-time safeguards.
 
-A news / announcement / sentiment provider that runs parallel to the Tushare
-fundamental layer (:mod:`backtest.loaders.tushare_fundamentals`). It pulls feeds
+A news / announcement / sentiment provider that runs alongside the price
+loaders. It pulls feeds
 from a self-hosted `RSSHub <https://docs.rsshub.app>`_ instance, normalises each
 item into the ``event-driven`` skill schema (``date, event_type, score, source,
 summary``), and attaches a point-in-time-safe ``event_score`` column to daily
@@ -21,7 +21,6 @@ judge, as the ``event-driven`` skill describes) to override it.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
@@ -75,18 +74,18 @@ CODE_STYLES: frozenset[str] = frozenset({"raw", "exchange_prefix", "bare"})
 
 
 def format_code_for_route(code: str, style: str) -> str:
-    """Convert a backtest code (e.g. ``"600519.SH"``) to a route's expected form.
+    """Convert a backtest code (e.g. ``"AAPL.US"``) to a route's expected form.
 
     RSSHub routes disagree on instrument formatting: some take the exchange-
-    prefixed form (``SH600519``, e.g. xueqiu), some the bare number (``600519``),
+    prefixed form (``USAAPL``, e.g. xueqiu), some the bare ticker (``AAPL``),
     some a vendor-specific string. The backtest engine always passes the dotted
-    ``"600519.SH"`` form, so a feed declares the shape its route needs.
+    ``"AAPL.US"`` form, so a feed declares the shape its route needs.
 
     Args:
-        code: Dotted instrument code (``"600519.SH"``); passed through if it has
+        code: Dotted instrument code (``"AAPL.US"``); passed through if it has
             no ``.`` suffix.
         style: One of :data:`CODE_STYLES` — ``"raw"`` (unchanged), ``"bare"``
-            (symbol only, ``"600519"``), or ``"exchange_prefix"`` (``"SH600519"``).
+            (symbol only, ``"AAPL"``), or ``"exchange_prefix"`` (``"USAAPL"``).
 
     Returns:
         The code formatted for the route.

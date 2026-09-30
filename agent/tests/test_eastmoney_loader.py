@@ -73,26 +73,26 @@ class TestToCompactDate:
 
 
 class TestFetchWithMockedClient:
-    def test_a_share_builds_canonical_frame(self) -> None:
+    def test_us_symbol_builds_canonical_frame(self) -> None:
         loader = DataLoader()
         with patch.object(
-            eastmoney_client, "resolve_secid", return_value="1.600519"
+            eastmoney_client, "resolve_secid", return_value="105.AAPL"
         ) as resolve, patch.object(
             eastmoney_client, "fetch_kline", return_value=_client_rows()
         ) as fetch_kline:
             out = loader.fetch(
-                ["600519.SH"], "2024-01-01", "2024-01-31", interval="1D"
+                ["AAPL.US"], "2024-01-01", "2024-01-31", interval="1D"
             )
 
-        resolve.assert_called_once_with("600519.SH")
+        resolve.assert_called_once_with("AAPL.US")
         # 1D -> klt 101, compact dates passed through.
         _, kwargs = fetch_kline.call_args
         assert kwargs["klt"] == eastmoney_client.KLT_BY_INTERVAL["1D"]
         assert kwargs["beg"] == "20240101"
         assert kwargs["end"] == "20240131"
 
-        assert set(out) == {"600519.SH"}
-        df = out["600519.SH"]
+        assert set(out) == {"AAPL.US"}
+        df = out["AAPL.US"]
         assert list(df.columns) == ["open", "high", "low", "close", "volume"]
         assert df.index.name == "trade_date"
         assert isinstance(df.index, pd.DatetimeIndex)
@@ -106,7 +106,7 @@ class TestFetchWithMockedClient:
         with patch.object(eastmoney_client, "resolve_secid") as resolve, patch.object(
             eastmoney_client, "fetch_kline"
         ) as fetch_kline:
-            out = loader.fetch(["600519.SH"], "2024-01-01", "2024-01-31", interval="3m")
+            out = loader.fetch(["AAPL.US"], "2024-01-01", "2024-01-31", interval="3m")
 
         assert out == {}
         resolve.assert_not_called()
@@ -126,10 +126,10 @@ class TestFetchWithMockedClient:
         loader = DataLoader()
 
         def _resolve(symbol: str) -> str | None:
-            return "1.600519" if symbol == "600519.SH" else "0.000001"
+            return "105.AAPL" if symbol == "AAPL.US" else "104.MSFT"
 
         def _fetch_kline(secid: str, **_kwargs: object) -> List[dict]:
-            if secid == "0.000001":
+            if secid == "104.MSFT":
                 raise RuntimeError("eastmoney boom")
             return _client_rows()
 
@@ -137,25 +137,25 @@ class TestFetchWithMockedClient:
             eastmoney_client, "fetch_kline", side_effect=_fetch_kline
         ):
             out = loader.fetch(
-                ["000001.SZ", "600519.SH"], "2024-01-01", "2024-01-31"
+                ["MSFT.US", "AAPL.US"], "2024-01-01", "2024-01-31"
             )
 
         # The boom symbol is dropped; the healthy one survives.
-        assert set(out) == {"600519.SH"}
+        assert set(out) == {"AAPL.US"}
 
     def test_empty_klines_omitted(self) -> None:
         loader = DataLoader()
         with patch.object(
-            eastmoney_client, "resolve_secid", return_value="116.00700"
+            eastmoney_client, "resolve_secid", return_value="105.AAPL"
         ), patch.object(eastmoney_client, "fetch_kline", return_value=[]):
-            out = loader.fetch(["00700.HK"], "2024-01-01", "2024-01-31")
+            out = loader.fetch(["AAPL.US"], "2024-01-01", "2024-01-31")
 
         assert out == {}
 
     def test_invalid_date_range_raises(self) -> None:
         loader = DataLoader()
         with pytest.raises(ValueError):
-            loader.fetch(["600519.SH"], "2024-02-01", "2024-01-01")
+            loader.fetch(["AAPL.US"], "2024-02-01", "2024-01-01")
 
 
 # ---------------------------------------------------------------------------
@@ -164,9 +164,9 @@ class TestFetchWithMockedClient:
 
 
 class TestFetchEndToEndHttpMocked:
-    def test_a_share_through_real_client(self) -> None:
+    def test_us_through_real_client(self) -> None:
         # push2his kline rows: "date,open,close,high,low,volume,amount".
-        payload = {
+        kline_payload = {
             "data": {
                 "klines": [
                     "2024-01-02,1700.00,1710.00,1720.00,1690.00,100000,1.7e8",
@@ -174,18 +174,25 @@ class TestFetchEndToEndHttpMocked:
                 ]
             }
         }
+        search_payload = {
+            "QuotationCodeTable": {"Data": [{"Code": "AAPL", "QuoteID": "105.AAPL"}]}
+        }
+
+        def _fake_get_json(url: str, **_kwargs: object) -> dict:
+            return search_payload if url == eastmoney_client._SEARCH_URL else kline_payload
+
         loader = DataLoader()
         with patch.object(
-            eastmoney_client, "throttled_get_json", return_value=payload
+            eastmoney_client, "throttled_get_json", side_effect=_fake_get_json
         ) as http:
-            out = loader.fetch(["600519.SH"], "2024-01-01", "2024-01-31")
+            out = loader.fetch(["AAPL.US"], "2024-01-01", "2024-01-31")
 
-        http.assert_called_once()
-        _, kwargs = http.call_args
-        assert kwargs["params"]["secid"] == "1.600519"
-        assert kwargs["host_key"] == "eastmoney"
+        assert http.call_count == 2
+        kline_call = http.call_args_list[-1]
+        assert kline_call.kwargs["params"]["secid"] == "105.AAPL"
+        assert kline_call.kwargs["host_key"] == "eastmoney"
 
-        df = out["600519.SH"]
+        df = out["AAPL.US"]
         assert list(df.columns) == ["open", "high", "low", "close", "volume"]
         assert len(df) == 2
         assert df.iloc[1]["close"] == pytest.approx(1705.0)

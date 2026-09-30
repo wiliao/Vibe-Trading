@@ -660,11 +660,10 @@ class PortfolioService:
         """Map one held position onto a symbol the market-data loaders accept.
 
         The loader chain routes on the market suffix, so the connector-reported
-        ticker is used as-is when it already carries one (``700.HK``,
-        ``600519.SH``) and is qualified from the position's currency/market
-        otherwise (IBKR reports a bare ``AAPL``, which would be read as an
-        A-share code). A symbol whose market cannot be established is not
-        guessed at.
+        ticker is used as-is when it already carries one (``SHOP.TO``,
+        ``TD.TO``) and is qualified from the position's currency/market
+        otherwise (IBKR reports a bare ``AAPL``, whose venue is unstated). A
+        symbol whose market cannot be established is not guessed at.
 
         Args:
             position: A valued position row from a stored snapshot.

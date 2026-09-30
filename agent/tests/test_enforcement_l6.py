@@ -324,23 +324,23 @@ def test_normalization_preserves_asset_class(live_runtime: Path) -> None:
 
     ``check_mandate`` prefers an explicit ``intent.asset_class`` over the
     instrument-type default (enforcement.py:524) precisely so a multi-market
-    connector's HK/A-share order buckets correctly. If the rebuild drops it, an
-    HK order falls back to the EQUITY default (us_equity) and passes a mandate
+    connector's non-US order buckets correctly. If the rebuild drops it, that
+    order falls back to the EQUITY default (us_equity) and passes a mandate
     that permits only us_equity — a fail-open on the universe check.
     """
     _write_mandate(live_runtime, max_order_notional_usd=10_000.0)
     guard = _guard(_BrokerQuoteAdapter(price=100.0))
     intent = enforcement.OrderIntent(
-        symbol="0700.HK",
+        symbol="600519.SH",
         side="buy",
         notional_usd=None,
         quantity=10.0,
         instrument_type=InstrumentType.EQUITY,
-        asset_class=AssetClass.HK_EQUITY,
+        asset_class=AssetClass.CN_EQUITY,
     )
     normalized = guard._normalize_intent_notional(intent)
     assert normalized is not None
-    assert normalized.asset_class is AssetClass.HK_EQUITY
+    assert normalized.asset_class is AssetClass.CN_EQUITY
     # And the notional reconciliation it exists for still happened.
     assert normalized.notional_usd == pytest.approx(1000.0)
 

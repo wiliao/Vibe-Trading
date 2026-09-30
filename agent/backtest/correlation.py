@@ -106,7 +106,7 @@ def _rolling_correlation_matrix(
     for code in codes:
         ts = closes[code]
         # Normalize to date-only (midnight) so that cross-market assets
-        # (e.g. crypto via OKX/CCXT at UTC midnight vs US equity via
+        # (e.g. a Canadian .TO line stamped at ET midnight vs a US line from
         # yfinance at EDT midnight = 04:00 UTC) align correctly.
         ts.index = ts.index.normalize()
         # ``fill_method=None`` is explicit because under the project's

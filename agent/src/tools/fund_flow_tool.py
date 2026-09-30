@@ -219,7 +219,6 @@ class FundFlowTool(BaseTool):
             "ok": True,
             "market": "stock",
             "source": "eastmoney",
-            "fallback_sources": ["tushare"],
             "period": period,
             "buckets": list(_BUCKETS),
             "data": results,

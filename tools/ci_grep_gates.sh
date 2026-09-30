@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ci_grep_gates.sh — repo-wide safety floor enforced in CI.
 #
-# Four gates run sequentially; any failure exits non-zero and names the
+# Gates run sequentially; any failure exits non-zero and names the
 # offending files. Run locally before pushing:
 #
 #     bash tools/ci_grep_gates.sh
@@ -20,6 +20,12 @@
 #   (e) No raw `os.getenv` / `os.environ.get` / `os.environ["KEY"]` reads
 #       outside the centralized config layer (`agent/src/config/`).
 #       AST-based; uses `tools/ci_env_var_gate.py`.
+#   (f) No process-wide `os` module patches in tests.
+#   (g) No removed-market strings in shipped code (US/CA-only scope).
+#       Greps the deny-list in `tools/us-ca-scope-deny.json` over agent/src,
+#       agent/backtest and frontend/src, minus its allow entries; uses
+#       `tools/ci_us_ca_scope_gate.py`. The Python twin of this gate is
+#       `agent/tests/test_us_ca_scope_gate.py` (same JSON policy).
 #
 # Exclusions: .git, node_modules, __pycache__, .venv, dist, build, this
 # script itself. The HTML scan in (c) is scoped to wiki/alpha-library/**
@@ -40,6 +46,12 @@ NC=$'\033[0m'
 FAILED=0
 SELF="tools/ci_grep_gates.sh"
 EXCLUDE_DIRS=(--exclude-dir=.git --exclude-dir=node_modules --exclude-dir=__pycache__ --exclude-dir=.venv --exclude-dir=dist --exclude-dir=build --exclude-dir=.pytest_cache --exclude-dir=.ruff_cache)
+# Prefer the repo's own interpreter; fall back to whatever python3 is on PATH.
+if [ -x "$ROOT/.venv/bin/python" ]; then
+    PY="$ROOT/.venv/bin/python"
+else
+    PY=python3
+fi
 
 # -------------------------------------------------------------- gate (a)
 echo "[gate a] no unsafe yaml.load() ..."
@@ -154,6 +166,22 @@ if [ -n "$F_OUTPUT" ]; then
     echo "${RED}FAIL${NC}: patch the module's os reference, not the shared os module:"
     echo "$F_OUTPUT"
     echo "  use: from tests.module_os_helpers import patch_module_os"
+    FAILED=1
+else
+    echo "${GREEN}ok${NC}"
+fi
+
+# -------------------------------------------------------------- gate (g)
+# Deny-list/allowlist policy lives in tools/us-ca-scope-deny.json (single
+# source of truth). The helper greps the deny tokens over the US/CA scan roots
+# and filters out the allow entries per path; it also refuses a malformed or
+# unexplained allowlist.
+echo "[gate g] no removed-market strings in shipped code (US/CA scope) ..."
+G_OUTPUT=$("$PY" tools/ci_us_ca_scope_gate.py 2>&1)
+G_RC=$?
+if [ "$G_RC" -ne 0 ]; then
+    echo "${RED}FAIL${NC}: removed-market strings found in shipped code:"
+    echo "$G_OUTPUT"
     FAILED=1
 else
     echo "${GREEN}ok${NC}"

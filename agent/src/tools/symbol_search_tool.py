@@ -66,7 +66,7 @@ _CANADIAN_SYMBOL_RE = re.compile(r"^[A-Z0-9&.\-]+\.(?:TO|V)\b", re.IGNORECASE)
 # two tiers:
 #
 #   * Stablecoin quotes (FDUSD / USDT / USDC / BUSD / TUSD) are unambiguous -
-#     a ``BTC-USDT`` or ``XAUT-USDC`` cannot be confused with anything outside
+#     a stablecoin-quoted pair cannot be confused with anything outside
 #     crypto. These are accepted on any alphanumeric base.
 #   * ``USD`` is ambiguous: a ``BTC-USD`` is a real Coinbase crypto pair, but
 #     ``XAU-USD`` is spot gold, ``EUR-USD`` is forex, and ``GBP-USD`` is
@@ -91,7 +91,7 @@ _CRYPTO_USD_BASES = frozenset(
 #: Spot precious metals. Their pairs are shaped exactly like FX (three-letter
 #: base, fiat quote) but the base is not a fiat code, so ``canonical_fx_pair``
 #: rejects them and the crypto resolver must too (``XAU-USD`` is spot gold,
-#: ``XAUT-USDT`` is the token).
+#: the stablecoin-gold token is the crypto reading).
 _METAL_CODES = frozenset({"XAU", "XAG", "XPT", "XPD"})
 
 
@@ -415,7 +415,7 @@ def _canonical_crypto_pair(value: str) -> str | None:
                 # fiat/fiat has no crypto reading at all, so it gives up;
                 # a non-whitelisted USD base only rules out THIS quote asset,
                 # so it must `continue` and let a longer quote (USDT/USDC)
-                # still match — returning here would strand e.g. XAUT-USDT.
+                # still match — returning here would strand a longer-quoted pair.
                 if base in FIAT_CODES and quote in FIAT_CODES:
                     return None  # fiat/fiat is an FX pair, not crypto
                 if quote == "USD" and base not in _CRYPTO_USD_BASES:
@@ -722,11 +722,11 @@ def _format_symbol(code: str, suffix: str) -> Optional[str]:
     HK codes are zero-padded to five digits to match the loader/secid scheme.
 
     Args:
-        code: Bare instrument code (e.g. ``"600519"``, ``"700"``, ``"AAPL"``).
-        suffix: One of ``SH``/``SZ``/``BJ``/``HK``/``US``.
+        code: Bare instrument code (e.g. ``"AAPL"``, ``"BRK.B"``).
+        suffix: Exchange suffix, e.g. ``"US"``, ``"TO"``, ``"V"``.
 
     Returns:
-        The formatted symbol (``"600519.SH"``, ``"00700.HK"``, ``"AAPL.US"``),
+        The formatted symbol (``"AAPL.US"``, ``"SHOP.TO"``, ``"BRK.B.US"``),
         or ``None`` when the code is empty.
     """
     code = code.strip().upper()
@@ -780,10 +780,10 @@ def _search_yahoo(query: str) -> tuple[List[Dict[str, Any]], str]:
 def _yahoo_candidate(quote: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Map one Yahoo search quote to a normalized candidate, or ``None``.
 
-    Yahoo carries US tickers bare, HK tickers as ``0700.HK``, and Canadian
-    listings with ``.TO`` / ``.V`` suffixes. We translate those into the project
-    convention (``AAPL.US`` / ``00700.HK`` / ``TD.TO`` / ``PNG.V``) and leave
-    other instruments (crypto, indices, FX) on their native Yahoo symbol.
+    Yahoo carries US tickers bare and Canadian listings with ``.TO`` / ``.V``
+    suffixes. We translate those into the project convention (``AAPL.US`` /
+    ``TD.TO`` / ``PNG.V``) and leave other instruments (crypto, indices, FX) on
+    their native Yahoo symbol.
 
     Args:
         quote: One element of Yahoo search's ``quotes`` list.
@@ -812,8 +812,8 @@ def _from_yahoo_symbol(raw_symbol: str, quote: Dict[str, Any]) -> tuple[str, str
     """Translate a Yahoo symbol into the project convention + market label.
 
     Args:
-        raw_symbol: The Yahoo-side symbol (e.g. ``AAPL``, ``0700.HK``,
-            ``TD.TO``, ``PNG.V``, or ``BTC-USD``).
+        raw_symbol: The Yahoo-side symbol (e.g. ``AAPL``, ``TD.TO``,
+            ``PNG.V``, or a crypto pair).
         quote: The full Yahoo quote, used to distinguish a bare US equity from a
             crypto/index instrument via ``quoteType``.
 

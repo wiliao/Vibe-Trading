@@ -1,4 +1,4 @@
-"""Eastmoney loader: free, no-auth OHLCV across A-share, HK and US equities.
+"""Eastmoney loader: free, no-auth OHLCV for US equities.
 
 Eastmoney's ``push2his`` quote endpoints are free and require no token, but the
 service rate-limits aggressively by source IP. All HTTP goes through the shared
@@ -6,10 +6,9 @@ service rate-limits aggressively by source IP. All HTTP goes through the shared
 per-host throttle in :mod:`backtest.loaders._http`. This loader only maps our
 symbol/interval/DataFrame conventions onto that client; it owns no HTTP itself.
 
-Symbol routing is delegated to :func:`eastmoney_client.resolve_secid`:
+Symbol routing is delegated to :func:`eastmoney_client.resolve_secid`, which in
+this build resolves only the US form:
 
-* A-share — ``600519.SH`` / ``000001.SZ`` / ``430139.BJ``
-* Hong Kong — ``00700.HK`` (numeric code zero-padded to five digits)
 * US — ``AAPL.US`` (market prefix discovered via Eastmoney search, cached)
 """
 
@@ -76,7 +75,7 @@ class DataLoader:
         """Fetch OHLCV for each symbol; a single failure never aborts the batch.
 
         Args:
-            codes: Symbols such as ``"600519.SH"``, ``"00700.HK"``, ``"AAPL.US"``.
+            codes: Symbols such as ``"AAPL.US"`` or ``"SHOP.US"``.
             start_date: Inclusive start date (``YYYY-MM-DD``).
             end_date: Inclusive end date (``YYYY-MM-DD``).
             interval: Bar interval label (e.g. ``"1D"``, ``"1H"``, ``"5m"``).

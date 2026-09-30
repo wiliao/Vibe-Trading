@@ -23,7 +23,7 @@ route through the shared throttle because Yahoo rate-limits by source IP.
 
 Name | Type | Required | Description
 ---- | ---- | -------- | -----------
-symbol | str | Y | Project-side symbol (`AAPL.US`, `00700.HK`). Mapped to Yahoo form via `map_symbol`.
+symbol | str | Y | Project-side symbol (`AAPL.US`, `TD.TO`). Mapped to Yahoo form via `map_symbol`.
 modules | list[str] | Y | Yahoo module names to request, joined as the `modules` query param.
 
 Commonly used module names:

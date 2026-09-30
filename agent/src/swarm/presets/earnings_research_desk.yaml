@@ -226,5 +226,5 @@ tasks:
 
 variables:
   - name: target
-    description: "Target stock (e.g., AAPL.US, NVDA.US, 700.HK, 600519.SH)"
+    description: "Target stock (e.g., AAPL.US, NVDA.US, TD.TO)"
     required: true

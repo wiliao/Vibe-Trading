@@ -108,7 +108,7 @@ class OrderIntent:
     """Broker-agnostic normalized order, units explicit.
 
     Attributes:
-        symbol: Normalized upper-case symbol (e.g. ``AAPL``, ``BTC-USDT``).
+        symbol: Normalized upper-case symbol (e.g. ``AAPL``, ``SHOP.TO``).
         side: ``"buy"`` or ``"sell"``.
         notional_usd: Order notional in USD when derivable.
         quantity: Share/contract/coin quantity when notional is not given.

@@ -18,7 +18,7 @@ class InstrumentType(str, Enum):
     """Instrument classes the broker may report or accept.
 
     ``CFD`` covers margin contracts-for-difference that are not spot forex
-    pairs (MT5 metals like XAUUSD, index/energy/crypto CFDs). Like ``OPTION``
+    pairs (metals like XAUUSD, index/energy CFDs). Like ``OPTION``
     it has no universe asset-class bucket and is admitted only when the user's
     mandate explicitly lists ``"cfd"`` in ``allowed_instruments``.
     """
@@ -36,7 +36,6 @@ class AssetClass(str, Enum):
 
     US_EQUITY = "us_equity"
     US_ETF = "us_etf"
-    HK_EQUITY = "hk_equity"
     CN_EQUITY = "cn_equity"
     IN_EQUITY = "in_equity"
     CRYPTO = "crypto"
@@ -86,7 +85,7 @@ class UniverseConstraint:
         min_avg_daily_volume_usd: Liquidity floor as trailing avg daily dollar
             volume, USD. ``None`` == no floor.
         exclude_symbols: Hard per-symbol denylist (normalized upper-case,
-            e.g. ``BTC-USDT`` style for crypto). Takes precedence over every
+            e.g. ``SHOP.TO`` or ``AAPL.US``). Takes precedence over every
             other universe rule.
     """
 

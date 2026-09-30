@@ -7,7 +7,7 @@ This layer is stacked on the desktop lifecycle shell and adds only:
 - the existing production frontend and the upstream hash-locked base Python
   dependencies;
 - the verified native DLL subset required for WeasyPrint PDF output;
-- Electron `safeStorage` for LLM, Tushare, and QVeris credentials.
+- Electron `safeStorage` for LLM and QVeris credentials.
 
 ## Deliberate exclusions
 
@@ -70,6 +70,20 @@ Python 3.12, from the base requirements (not an optional IM extra):
 python -m pip install pip-tools
 python -m piptools compile --generate-hashes --allow-unsafe --resolver=backtracking --output-file=desktop/electron/requirements-windows-lock.txt agent/requirements.txt
 ```
+
+**Outstanding: the committed lock was hand-pruned, not regenerated.** After the
+US + Canada scope change removed the tushare/akshare/ccxt providers from
+`agent/requirements.txt`, the committed lock still pinned them and their
+now-orphaned transitive dependencies. Because regeneration requires a Windows
+host with Python 3.12, the committed file was hand-pruned in place instead: the
+three provider blocks and 14 packages referenced only by them were deleted, and
+the surviving `# via` comments of 26 packages were rewritten in pip-compile's
+format. No hash was altered. The result pins 166 distributions (down from 183)
+and parses as a `--require-hashes` file. This is a best-effort edit: it has not
+been produced by `piptools`, so regenerate it with the command above from a real
+Windows environment and review the diff before the next signed release. (The
+"183 installed third-party Python distributions" entry in the local validation
+record below describes the pre-prune artifact.)
 
 ## Credential boundary
 

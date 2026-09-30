@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import tempfile
 import threading
 import time
@@ -178,14 +179,39 @@ def _parse_expected_cost(value: Any) -> float | None:
     """Return the flat per-call price a QVeris quote states, or None.
 
     The leading number of a quote is not a price when the quote is per result:
-    "1 credits/result" billed 9.66 credits for one stock-year (#1494). Shared
-    with the bar loader so the two budget gates read a quote the same way.
+    "1 credits/result" billed 9.66 credits for one stock-year (#1494).
     """
-    # Imported lazily: the qveris bar loader is being retired, and importing it
-    # at module scope registered a source the US/CA build no longer lists.
-    from backtest.loaders.qveris_loader import quoted_call_cost
-
     return quoted_call_cost(value)
+
+
+#: A quote bounds the bill only when it is a flat price per call: "24.2
+#: credits", "1 credits/call", or a bare number. ``cn_financial_pro.
+#: history_quotation.v1`` quoted "1 credits/result" and billed 9.66 credits for
+#: one stock-year, 244 rows x 30 fields at 0.00132 credits a value (#1494), so
+#: a quote priced per any other unit, or in a shape not listed here, reserves
+#: nothing that caps the charge and prices as unknown. Moved here from the
+#: retired qveris bar loader (US/CA refactor); this is the single budget gate
+#: both QVeris tools read a quote through.
+_FLAT_QUOTE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:credits?)?\s*(?:(?:/|per)\s*(call|request))?")
+
+
+def quoted_call_cost(value: Any) -> float | None:
+    """Return the credits one call can cost under ``value``, or None.
+
+    Args:
+        value: A capability's ``expected_cost`` quote.
+
+    Returns:
+        The flat per-call price, or None when the quote does not bound the
+        bill: absent, negative, priced per result/row/value, or in any shape
+        ``_FLAT_QUOTE`` does not describe.
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if math.isfinite(value) and value >= 0 else None
+    match = _FLAT_QUOTE.fullmatch(str(value).strip().lower())
+    return float(match.group(1)) if match else None
 
 
 def _quote_from_tool(tool: dict[str, Any] | None) -> dict[str, Any]:

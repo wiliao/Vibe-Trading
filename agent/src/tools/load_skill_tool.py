@@ -4,9 +4,8 @@ Skill documents *are* the implementation for a large part of this product — th
 bond maths, the implied-vol solver, the impact models and the China market
 structure all live in markdown the agent reads and executes. A tool result is
 capped at :data:`src.config.limits.TOOL_RESULT_LIMIT` characters, and measured on
-the bundled corpus 35 of the 88 skills do not fit one result: ``tushare``
-delivers 9.1% of its 102,890 characters in a page, ``social-media-intelligence``
-23.2%, ``options-payoff`` 32.0%.
+the bundled corpus many skills do not fit one result: ``social-media-intelligence``
+delivers 23.2% of its characters in a page, ``options-payoff`` 32.0%.
 
 Character paging alone makes those documents reachable but not usable — to see
 one named section the agent has to walk every page before it. So an oversized
@@ -16,7 +15,7 @@ the section it wants. Sequential ``offset`` paging is unchanged and remains the
 escape hatch for documents with no headings, and for reading a giant section
 whole.
 
-Short skills — the 53 that fit — are returned complete in one call exactly as
+Short skills — those that fit — are returned complete in one call exactly as
 before, and the trigger is the delivered envelope rather than a size guess, so a
 document that fits by one character is never turned into a map.
 """

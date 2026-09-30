@@ -77,8 +77,8 @@ _OTHER_CURRENCY_PREFIXES = "美加"
 _TOLERANCE = 0.005
 
 #: A plain integer is read as a price only for an instrument quoted in the
-#: thousands (600519.SH, an index, BTC). Below that, a prose integer is a window,
-#: a horizon or a count ("20 日均线", "200-day") and stays unchecked.
+#: thousands (an index level, a high-priced share). Below that, a prose integer
+#: is a window, a horizon or a count ("20 日均线", "200-day") and stays unchecked.
 _INTEGER_PRICE_FLOOR = 1000.0
 
 #: Price fields a rejected prose figure is pointed at, in order (#1433).
@@ -1684,8 +1684,8 @@ class _PolicyMixin:
         issues: list[dict[str, Any]] = []
         folded = content.casefold()
         symbols = sorted({record.symbol for record in records if record.symbol})
-        # ``_scan_symbols`` canonicalizes, so an answer that writes Shanghai as
-        # ``600519.SS`` still surfaces the ``600519.SH`` identity it names.
+        # ``_scan_symbols`` canonicalizes, so an answer that writes a US class
+        # share as ``BRK-B`` still surfaces the ``BRK.B.US`` identity it names.
         written = _scan_symbols(content)
         mentioned = [
             symbol

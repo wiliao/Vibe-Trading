@@ -164,8 +164,8 @@ def fetch_market_data(
 
     When ``source="auto"`` (or any resolved source), if the chosen loader
     raises during :meth:`fetch` the call falls through to the next source in
-    the market's :data:`backtest.loaders.registry.FALLBACK_CHAINS` (e.g. crypto
-    OKX → Binance → CCXT → Yahoo). At most ``max_fallback_attempts`` retries
+    the market's :data:`backtest.loaders.registry.FALLBACK_CHAINS` (e.g. yahoo
+    → stooq → sina → yfinance). At most ``max_fallback_attempts`` retries
     are attempted before the symbol is recorded as ``_unresolved``.
 
     With ``include_provenance=True`` each symbol carries ``_provenance``
@@ -243,9 +243,9 @@ def fetch_market_data(
         # An env-configured order override (MARKET_DATA_ORDER_<MARKET>, set
         # via the Settings page) rewrites the attempt order for auto-detected
         # sources: the override list IS the attempt order, so a user who put
-        # tushare first actually starts there. Guards: explicit source
+        # stooq first actually starts there. Guards: explicit source
         # requests stay src-first; the fallback_chain_provider test hook wins;
-        # local:/qveris/tickerall/fmp keep their no-network entry point
+        # local:/fmp keep their no-network entry point
         # (explicit fmp must not silently return yahoo on Stable 403 — issue #1270).
         # Sources in _NO_NETWORK_FALLBACK_SOURCES never walk the chain.
         if src in _NO_NETWORK_FALLBACK_SOURCES:
@@ -404,7 +404,7 @@ def fetch_market_data(
                 continue
             src = detect_source(code) if source == "auto" else source
             if src in _NO_NETWORK_FALLBACK_SOURCES:
-                # Explicit local/tickerall/qveris requests must not silently
+                # Explicit local/fmp requests must not silently
                 # fall through to a network loader (registry contract).
                 continue
             market = _detect_market(code)

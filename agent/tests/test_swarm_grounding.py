@@ -25,18 +25,17 @@ from src.swarm.worker import build_worker_prompt
 # extract_symbols_from_user_vars
 # --------------------------------------------------------------------------- #
 
-def test_extract_us_hk_a_share_and_crypto_symbols() -> None:
+def test_extract_suffixed_symbols() -> None:
     user_vars = {
         "target": "NVDA.US",
         "secondary": "Compare with 700.HK and 600519.SH",
-        "crypto": "Hedge with BTC-USDT",
         "shenzhen": "000001.SZ for liquidity",
         "beijing": "Listed on 430090.BJ recently",
         "canada": "Compare TD.TO with TSX Venture name PNG.V",
     }
     found = grounding.extract_symbols_from_user_vars(user_vars)
     assert set(found) == {
-        "NVDA.US", "700.HK", "600519.SH", "BTC-USDT", "000001.SZ", "430090.BJ",
+        "NVDA.US", "700.HK", "600519.SH", "000001.SZ", "430090.BJ",
         "TD.TO", "PNG.V",
     }
 
@@ -95,9 +94,9 @@ def test_extract_bare_ticker_does_not_duplicate_suffixed_symbol() -> None:
 
 
 def test_extract_bare_scan_does_not_split_suffixed_symbols() -> None:
-    # BTC-USDT must stay one crypto pair; neither BTC.US nor USDT.US may leak.
-    user_vars = {"goal": "Hedge BTC-USDT exposure into quarter end"}
-    assert grounding.extract_symbols_from_user_vars(user_vars) == ["BTC-USDT"]
+    # A Canadian symbol must stay whole; neither SHOP.US nor TO.US may leak.
+    user_vars = {"goal": "Hedge SHOP.TO exposure into quarter end"}
+    assert grounding.extract_symbols_from_user_vars(user_vars) == ["SHOP.TO"]
 
 
 def test_extract_explicit_symbols_rank_before_bare_promotions() -> None:

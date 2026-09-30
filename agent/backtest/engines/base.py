@@ -16,7 +16,6 @@ import re as _re
 import sys
 from abc import ABC, abstractmethod
 from collections import Counter
-from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,12 +30,6 @@ from backtest.loaders.rsshub_events import (
     RSSHubEventProvider,
     enrich_price_frames_with_events,
     feed_specs_from_config,
-)
-from backtest.loaders.tushare_fundamentals import (
-    SUBDAILY_POLICIES,
-    SubdailyPitError,
-    TushareFundamentalProvider,
-    enrich_price_frames_with_fundamentals,
 )
 from backtest.metrics import (
     bar_returns,
@@ -114,7 +107,6 @@ def _run_card_data_sources(config: Dict[str, Any], loader: Any) -> List[str]:
 
 # ─── Market detection (lightweight, for signal alignment only) ───
 
-_CRYPTO_RE = _re.compile(r"^[A-Z]+-USDT$|^[A-Z]+/USDT$", _re.I)
 # Forex / metals in their explicit Yahoo notations, plus the bare-6-char
 # whitelist for XAUUSD / XAGUSD / XPTUSD / XPDUSD and G10 currencies. Mirrors
 # ``backtest.engines._market_hooks._MARKET_PATTERNS`` so the ffill-limit
@@ -130,9 +122,11 @@ _FX_RE = _re.compile(
 
 
 def _detect_market_for_align(code: str) -> str:
-    """Lightweight market detection for ffill_limit calculation."""
-    if _CRYPTO_RE.match(code):
-        return "crypto"
+    """Lightweight market detection for ffill_limit calculation.
+
+    Crypto was removed with the US/CA refactor, so the only cross-market split
+    left is equity vs forex/metals.
+    """
     if _FX_RE.match(code):
         return "forex"
     return "equity"
@@ -385,68 +379,21 @@ def _load_optimizer(config: Dict[str, Any]) -> Optional[Callable]:
     return optimize
 
 
-def _normalise_fundamental_fields(config: Dict[str, Any]) -> dict[str, list[str]]:
-    """Read the optional statement-table field map from backtest config."""
-    raw_fields = config.get("fundamental_fields")
-    if raw_fields in (None, {}):
-        return {}
-    if not isinstance(raw_fields, dict):
-        raise ValueError("fundamental_fields must map table names to field-name lists")
+def _reject_fundamental_fields(config: Dict[str, Any]) -> None:
+    """Fail loud on the retired statement-enrichment path.
 
-    normalized: dict[str, list[str]] = {}
-    for table, fields in raw_fields.items():
-        if not isinstance(table, str) or not table.strip():
-            raise ValueError("fundamental_fields table names must be non-empty strings")
-        if fields is None:
-            continue
-        if isinstance(fields, str) or not isinstance(fields, Iterable):
-            raise ValueError(f"fundamental_fields[{table!r}] must be a list of field names")
-
-        field_list = list(fields)
-        if not field_list:
-            continue
-        invalid = [field for field in field_list if not isinstance(field, str) or not field.strip()]
-        if invalid:
-            raise ValueError(f"fundamental_fields[{table!r}] contains invalid field names")
-        normalized[table.strip()] = field_list
-    return normalized
-
-
-def _maybe_enrich_fundamentals(
-    data_map: Dict[str, pd.DataFrame],
-    config: Dict[str, Any],
-) -> Dict[str, pd.DataFrame]:
-    """Attach configured Tushare statement fields before signal generation."""
-    fields_by_table = _normalise_fundamental_fields(config)
-    if not fields_by_table:
-        return data_map
-
-    subdaily = str(config.get("fundamental_subdaily", "reject")).strip().lower()
-    if subdaily not in SUBDAILY_POLICIES:
+    The A-share statement-enrichment provider was deleted with the US/CA
+    refactor (see ``agent/scripts/us_ca_prune.py``), so ``fundamental_fields``
+    now names a capability this build does not have. Rejecting it keeps a
+    stale config from silently producing signals without the requested data;
+    PIT-safe US/CA panels come from the ``get_fundamentals`` tool instead.
+    """
+    if config.get("fundamental_fields"):
         raise ValueError(
-            f"fundamental_subdaily must be one of {SUBDAILY_POLICIES}, got {subdaily!r}"
+            "fundamental_fields is retired in the US/CA build "
+            "(the statement-enrichment provider was removed); "
+            "fetch PIT-safe panels with the get_fundamentals tool instead"
         )
-
-    try:
-        provider = TushareFundamentalProvider()
-        return enrich_price_frames_with_fundamentals(
-            data_map,
-            provider,
-            fields_by_table,
-            as_of=config.get("end_date", ""),
-            periods=config.get("fundamental_periods"),
-            subdaily=subdaily,
-        )
-    except SubdailyPitError:
-        # A contract error (an intraday frame under the default reject policy)
-        # is the caller's to fix and must not be reworded as a provider
-        # failure. Narrow on purpose: a stray ValueError from inside the
-        # enrichment is a failure and keeps the wrapped message.
-        raise
-    except Exception as exc:
-        raise RuntimeError(
-            f"fundamental_fields requested but Tushare enrichment failed: {exc}"
-        ) from exc
 
 
 def _event_feed_specs(config: Dict[str, Any]) -> List[FeedSpec]:
@@ -658,9 +605,10 @@ class BaseEngine(ABC):
             if pd.notna(value) and float(value) > 0:
                 return float(value)
 
-        # Last resort: reconstruct the prior close from tushare's pct_chg, which
-        # is in percentage points. Both inputs sit on the current bar, but their
-        # ratio is the PREVIOUS close, so the result is still historical.
+        # Last resort: reconstruct the prior close from a percentage-change
+        # field, which is in percentage points. Both inputs sit on the current
+        # bar, but their ratio is the PREVIOUS close, so the result is still
+        # historical.
         if "pct_chg" in bar.index and "close" in bar.index:
             pct, close = bar["pct_chg"], bar["close"]
             if pd.notna(pct) and pd.notna(close) and float(close) > 0:
@@ -913,7 +861,7 @@ class BaseEngine(ABC):
         if not data_map:
             print(json.dumps({"error": "No data fetched"}))
             sys.exit(1)
-        data_map = _maybe_enrich_fundamentals(data_map, config)
+        _reject_fundamental_fields(config)
         data_map = _maybe_enrich_events(data_map, config)
 
         # 2. Generate signals

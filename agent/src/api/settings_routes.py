@@ -5,7 +5,6 @@ Mounted by ``agent/api_server.py`` via ``register_settings_routes(app, ...)``.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import sys as _sys
@@ -121,9 +120,6 @@ class SourceOrderUpdate(BaseModel):
 class DataSourceSettingsResponse(BaseModel):
     """Current data source credential settings."""
 
-    baostock_supported: bool
-    baostock_installed: bool
-    baostock_message: str
     env_path: str
     source_orders: List[SourceOrderEntry] = Field(default_factory=list)
 
@@ -188,10 +184,9 @@ def _desktop_secure_credentials_enabled() -> bool:
 def _host():
     """Return the ``api_server`` module for late-access attribute reads.
 
-    Tests monkeypatch ``ENV_PATH``, ``ENV_EXAMPLE_PATH``, ``_baostock_supported``
-    and ``_baostock_installed`` directly on the ``api_server`` module; every
-    function that reads these symbols goes through ``_host()`` so monkeypatched
-    values take effect.
+    Tests monkeypatch ``ENV_PATH`` and ``ENV_EXAMPLE_PATH`` directly on the
+    ``api_server`` module; every function that reads these symbols goes through
+    ``_host()`` so monkeypatched values take effect.
     """
     return _sys.modules.get("api_server") or _sys.modules.get("agent.api_server")
 
@@ -199,19 +194,6 @@ def _host():
 # ---------------------------------------------------------------------------
 # Settings-exclusive helpers
 # ---------------------------------------------------------------------------
-
-
-def _baostock_supported() -> bool:
-    """Check whether the project has a BaoStock loader implementation."""
-    host = _host()
-    agent_dir = host.AGENT_DIR if host is not None else _AGENT_DIR
-    loader_dir = agent_dir / "backtest" / "loaders"
-    return any((loader_dir / name).exists() for name in ("baostock.py", "baostock_loader.py"))
-
-
-def _baostock_installed() -> bool:
-    """Check whether the optional BaoStock package is importable."""
-    return importlib.util.find_spec("baostock") is not None
 
 
 def _read_settings_env_values() -> Dict[str, str]:
@@ -465,21 +447,7 @@ def _build_data_source_settings_response(
     """Build the public data source settings payload."""
     host = _host()
     env_values = values if values is not None else _read_settings_env_values()
-    # Late-access baostock helpers for monkeypatch compat.
-    baostock_sup = getattr(host, "_baostock_supported", _baostock_supported)
-    baostock_ins = getattr(host, "_baostock_installed", _baostock_installed)
-    supported = baostock_sup()
-    installed = baostock_ins()
-    if supported:
-        baostock_message = "BaoStock loader is available."
-    elif installed:
-        baostock_message = "BaoStock package is installed, but this project has no BaoStock loader."
-    else:
-        baostock_message = "No BaoStock loader is registered in this project."
     return DataSourceSettingsResponse(
-        baostock_supported=supported,
-        baostock_installed=installed,
-        baostock_message=baostock_message,
         env_path=host._project_relative_path(host.ENV_PATH),
         source_orders=_build_source_orders(env_values),
     )

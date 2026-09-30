@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # every non-GBP/unknown line before the static GBP market accounting sees it.
 _GBP_PENCE_CURRENCY = "GBp"
 _PRICE_COLUMNS = ("open", "high", "low", "close")
-_UK_EQUITY_PATTERN = re.compile(r"^[A-Z0-9&.\-]+\.L$", re.I)
+_LSE_SYMBOL_PATTERN = re.compile(r"^[A-Z0-9&.\-]+\.L$", re.I)
 # Venues that list lines in a second currency, whose market is one static
 # pool in the first. BYMA quotes GGAL.BA in ARS and GGALD.BA in USD (the
 # trailing D is not a rule: YPFD.BA is a peso line); the TSX quotes DLR.TO in
@@ -56,7 +56,7 @@ def is_lse_symbol(code: str) -> bool:
     still inspect source metadata through :func:`normalize_lse_quote_currency`
     before emitting bars.
     """
-    return bool(_UK_EQUITY_PATTERN.match(str(code).strip()))
+    return bool(_LSE_SYMBOL_PATTERN.match(str(code).strip()))
 
 
 def scale_pence_to_currency(
@@ -138,8 +138,8 @@ def normalize_lse_quote_currency(
 
     Raises:
         ValueError: If the source declares USD/another currency or omits the
-            currency. Passing such bars into the static ``uk_equity=GBP``
-            accounting contract would silently mix currencies.
+            currency. Passing such bars into the GBP-only accounting contract
+            would silently mix currencies.
     """
     declared = currency.strip() if isinstance(currency, str) else ""
     normalized = frame.copy()
@@ -257,8 +257,8 @@ def validate_ohlc(
 
 
 # ---------------------------------------------------------------------------
-# Bounded retry / budget helpers (shared by ccxt_loader, okx, and any future
-# loader calling a flaky external API).
+# Bounded retry / budget helpers (shared by every network loader calling a
+# flaky external API).
 # ---------------------------------------------------------------------------
 
 DEFAULT_BACKOFF: tuple[float, ...] = (0.5, 1.5, 4.0)
@@ -383,7 +383,7 @@ def check_budget(deadline: float, label: str, budget_s: float | None = None) -> 
     Args:
         deadline: ``time.monotonic()`` instant past which we abort.
         label: Free-form label used in the exception message
-            (e.g. ``"ccxt fetch for BTC/USDT"``).
+            (e.g. ``"yahoo fetch for AAPL.US"``).
         budget_s: Original budget in seconds, included verbatim in the
             message when present.
     """
@@ -419,7 +419,7 @@ def retry_with_budget(
         transient: Exception class(es) considered transient and retryable.
         deadline: ``time.monotonic()`` instant past which retries are aborted.
         label: Free-form label used in the TimeoutError message
-            (e.g. ``"OKX fetch for BTC-USDT"``).
+            (e.g. ``"stooq fetch for TD.TO"``).
         max_retries: Additional attempts after the first call. Total
             attempts = ``max_retries + 1``.
         backoff: Per-retry sleep seconds. Must have at least
@@ -459,16 +459,17 @@ LOADER_CACHE_ROOT_ENV = "VIBE_TRADING_DATA_CACHE_ROOT"
 _LOADER_CACHE_TRUE_VALUES = {"1", "true", "yes", "on"}
 # Bump when the key payload or on-disk layout changes so stale entries are
 # simply never matched (old files become unreachable garbage, safe to delete).
-# v4: baostock volume normalized from shares to lots (#1062) — entries cached
-# under the pre-normalization unit must never be served again.
+# v4: a removed-market source's volume was normalized from shares to lots
+# (#1062) — entries cached under the pre-normalization unit must never be
+# served again.
 # v5: UK (.L) prices normalized from GBp to GBP (÷100) (#1206).
 # v6: LSE quote currency is fail-closed and per-symbol conversion provenance is
 # persisted. v5 USD/unknown .L entries must never be served as static GBP.
 # v7: tencent fqkline paginates backward (#1410) — entries cached under the
 # forward walk hold tail-truncated multi-year series and must never be served.
-# v8: US/CA refactor — removed-market loaders (tushare/akshare/ccxt/…) and their
-# source names are gone; a frame cached by a deleted source must not be served
-# into a build whose chain no longer contains it.
+# v8: US/CA refactor — removed-market loaders and their source names are gone;
+# a frame cached by a deleted source must not be served into a build whose
+# chain no longer contains it.
 _LOADER_CACHE_VERSION = 8
 _LOADER_FRAME_METADATA_ATTRS = ("quote_currency", "currency_conversion")
 
@@ -858,8 +859,8 @@ class DataLoaderProtocol(Protocol):
     Optional class attribute ``volume_units: dict[str, str]`` (not part of the
     structural check so existing loaders keep working): declares the unit of
     the ``volume`` column per market, keyed by market name — e.g.
-    ``{"a_share": "lots", "hk_equity": "shares"}``. ``"lots"`` means board
-    lots (1 A-share lot = 100 shares); ``"shares"`` means single shares.
+    ``{"us_equity": "shares", "ca_equity": "shares"}``. ``"lots"`` means board
+    lots (1 board lot = 100 shares); ``"shares"`` means single shares.
     Sources differ natively (see HKUDS/Vibe-Trading#1062), so consumers must
     read the per-symbol ``volume_unit`` from ``_provenance`` instead of
     assuming a unit; a missing market entry surfaces as ``null`` (undeclared).

@@ -14,9 +14,8 @@ from src.agent.tools import BaseTool
 logger = logging.getLogger(__name__)
 
 _VALID_FREQS = ("annual", "quarterly", "ttm")
-# Mirrors what ``load_fundamental_panel`` actually accepts. Advertising
-# ``eastmoney``/``tushare`` here made the agent pick a source the loader rejects
-# at runtime.
+# Mirrors what ``load_fundamental_panel`` actually accepts. Advertising a
+# source the loader rejects made the agent pick one that fails at runtime.
 _VALID_SOURCES = ("auto", "sec")
 
 

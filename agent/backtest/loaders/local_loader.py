@@ -19,9 +19,9 @@ Example config::
           volume: "Volume"
         date_format: "%Y-%m-%d"
 
-      - symbol: "BTC-USDT"
+      - symbol: "TD.TO"
         type: parquet
-        path: "~/data/btc.parquet"
+        path: "~/data/td.parquet"
 
       - symbol: "MYINDEX"
         type: duckdb

@@ -37,8 +37,6 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(api_server, "ENV_PATH", env_path)
     monkeypatch.setattr(api_server, "LEGACY_ENV_PATH", tmp_path / "legacy" / ".env", raising=False)
     monkeypatch.setattr(api_server, "ENV_EXAMPLE_PATH", env_example)
-    monkeypatch.setattr(api_server, "_baostock_supported", lambda: False)
-    monkeypatch.setattr(api_server, "_baostock_installed", lambda: False)
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
     return TestClient(api_server.app, client=("127.0.0.1", 50000))
 
@@ -405,16 +403,11 @@ def test_get_data_source_settings_exposes_only_surviving_fields(
     assert response.status_code == 200
     body = response.json()
     # The removed-market credential surface is gone; the JSON shape is pinned
-    # so a reintroduced tushare/gildata field fails here.
+    # so a reintroduced tushare/gildata/baostock field fails here.
     assert set(body) == {
-        "baostock_supported",
-        "baostock_installed",
-        "baostock_message",
         "env_path",
         "source_orders",
     }
-    assert body["baostock_supported"] is False
-    assert body["baostock_installed"] is False
     assert not Path(body["env_path"]).is_absolute()
     assert body["env_path"].endswith(".env")
     assert not (tmp_path / ".env").exists()

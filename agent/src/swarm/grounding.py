@@ -12,8 +12,7 @@ What this module does
 ---------------------
 * Scans every value in ``user_vars`` for tokens that match one of the
   data-source-suffixed symbol shapes the loaders already understand
-  (``NVDA.US``, ``700.HK``, ``TD.TO``, ``PNG.V``, ``600519.SH``,
-  ``BTC-USDT``, etc.).
+  (``NVDA.US``, ``TD.TO``, ``PNG.V``, ``SHOP.TO``, etc.).
 * Pulls the last ``DEFAULT_WINDOW_DAYS`` of OHLCV for each detected
   symbol via ``backtest.loaders.registry.resolve_loader`` with
   ``source="auto"``. Failures (delisted ticker, network blip) are
@@ -31,8 +30,9 @@ real prompts say "long or short on NVDA", not "NVDA.US" (#198):
   never single letters — too collision-prone);
 * a stopword list drops common finance/English acronyms (``ETF``,
   ``CEO``, ``GDP``, ``USD``, bare crypto symbols, …);
-* text already matched by a suffixed pattern is blanked first, so
-  ``BTC-USDT`` never leaks a bogus ``BTC.US``;
+* text already matched by a suffixed pattern is blanked first, so it
+  never leaks a bogus bare-ticker promotion (``SHOP.TO`` must not also
+  promote ``SHOP.US``);
 * promotions sort *after* explicit symbols, so explicit symbols win
   the ``DEFAULT_MAX_SYMBOLS`` cap;
 * the per-symbol fetch remains the final validator — a promoted token
@@ -52,7 +52,6 @@ from __future__ import annotations
 
 import logging
 import math
-import os
 import re
 from datetime import date, timedelta
 from typing import Iterable
@@ -86,7 +85,6 @@ _SYMBOL_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b\d{3,5}\.HK\b"),
     re.compile(r"\b\d{6}\.(?:SZ|SH|BJ)\b"),
     re.compile(r"\b[A-Z0-9&.-]+\.(?:TO|V)\b"),
-    re.compile(r"\b[A-Z]{2,6}-USDT\b"),
 )
 
 # Bare-ticker promotion: 2–5 uppercase letters. Single letters (A, F, T …)
@@ -143,7 +141,7 @@ def extract_symbols_from_user_vars(user_vars: dict[str, str]) -> list[str]:
             for match in pattern.findall(remainder):
                 explicit.setdefault(match, None)
             # Blank matched spans so the bare scan can't split a suffixed
-            # symbol into bogus fragments (BTC-USDT -> BTC.US).
+            # symbol into bogus fragments (SHOP.TO -> SHOP.US).
             remainder = pattern.sub(" ", remainder)
         for token in _BARE_US_TICKER_PATTERN.findall(remainder):
             if token not in _BARE_TICKER_STOPWORDS:

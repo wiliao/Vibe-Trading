@@ -81,7 +81,7 @@ class BacktestConfigSchema(BaseModel):
     codes: List[str]
     start_date: str
     end_date: str
-    source: str = "tushare"
+    source: str = "yahoo"
     interval: str = "1D"
     engine: str = "daily"
     position_adjustment: Literal["hold", "rebalance"] = "hold"
@@ -331,7 +331,7 @@ def _validate_class_body(node: ast.ClassDef) -> None:
 #
 # It is deliberately scoped to *reachable* code, not the whole file: the bundled
 # skill examples (agent/src/skills/*/example_signal_engine.py) legitimately carry
-# ``import requests`` + ``requests.get`` inside standalone ``_fetch_okx`` helpers
+# ``import requests`` + ``requests.get`` inside standalone helper functions
 # and ``if __name__ == "__main__"`` demo blocks that the runner never executes
 # (it does ``import module; SignalEngine().generate(data_map)``). Blocking those
 # imports file-wide would reject strategies generated from ~12 shipped skills, so
@@ -903,22 +903,23 @@ def _get_loader(source: str):
     """Return a DataLoader class for a source name, with fallback.
 
     Args:
-        source: Source name (tushare/okx/yfinance/akshare/ccxt).
+        source: Source name (yahoo / yfinance / stooq / eastmoney / fmp / local).
 
     Returns:
         DataLoader class.
+
+    Raises:
+        NoAvailableSourceError: When no loader can serve ``source``. The build
+            fails loud instead of substituting a removed source.
     """
-    try:
-        return get_loader_cls_with_fallback(source)
-    except NoAvailableSourceError:
-        # Ultimate fallback for unknown sources
-        if "tushare" in LOADER_REGISTRY:
-            return LOADER_REGISTRY["tushare"]
-        raise
+    return get_loader_cls_with_fallback(source)
 
 
 def _normalize_codes(codes: List[str], source: str) -> List[str]:
     """Normalize symbol strings for a source.
+
+    Crypto pair rewriting (slash-form pairs to dash-form) was removed with the
+    US/CA refactor; every surviving source takes the symbol verbatim.
 
     Args:
         codes: Raw code list.
@@ -927,8 +928,6 @@ def _normalize_codes(codes: List[str], source: str) -> List[str]:
     Returns:
         Normalized codes.
     """
-    if source in ("okx", "ccxt"):
-        return [c.replace("/", "-").upper() for c in codes]
     return codes
 
 
@@ -1234,7 +1233,7 @@ def main(run_dir: Path) -> None:
         sys.exit(1)
 
     config = raw_config
-    source = config.get("source", "tushare")
+    source = config.get("source", "yahoo")
     codes = config.get("codes", [])
 
     # Load signal engine
@@ -1582,14 +1581,14 @@ def _fetch_auto(codes: List[str], config: dict, interval: str = "1D") -> dict:
             loader = resolve_loader(market)
         except NoAvailableSourceError as exc:
             # Fallback: try legacy source mapping
-            legacy_src = _MARKET_TO_SOURCE.get(market, "tushare")
+            legacy_src = _MARKET_TO_SOURCE.get(market, "yahoo")
             logger.warning("Fallback chain failed for %s: %s — trying %s", market, exc, legacy_src)
             LoaderCls = _get_loader(legacy_src)
             loader = LoaderCls()
 
         src_name = getattr(loader, "name", "unknown")
         normalized_codes = _normalize_codes(market_codes, src_name)
-        fields = config.get("extra_fields") if src_name == "tushare" else None
+        fields = config.get("extra_fields") or None
         result = loader.fetch(
             normalized_codes,
             start_date,
@@ -1664,7 +1663,7 @@ def fetch_data_map(config: dict) -> DataFetchResult:
         NoAvailableSourceError: If a requested symbol cannot be served.
     """
     config = copy.deepcopy(config)
-    source = str(config.get("source") or "tushare")
+    source = str(config.get("source") or "yahoo")
     codes = list(config.get("codes") or [])
     # Weekly and monthly bars are built from daily ones after the fetch, so
     # every loader below is asked for daily bars (#1479).
@@ -1701,10 +1700,10 @@ def fetch_data_map(config: dict) -> DataFetchResult:
         primary_source = source
         loader = _get_loader(source)()
         # ``_get_loader`` may hand back a *different* loader when the requested
-        # one is unavailable (e.g. an optional package like pykrx is missing, so
-        # the kr_equity chain resolves to yahoo). Record who actually served the
-        # bars, never the name that was asked for — a run card that claims
-        # ``pykrx`` while Yahoo supplied the data is a provenance lie.
+        # one is unavailable (e.g. an optional package is missing, so the
+        # market's chain resolves to the next source). Record who actually
+        # served the bars, never the name that was asked for — a run card that
+        # claims ``fmp`` while Yahoo supplied the data is a provenance lie.
         served_by = str(getattr(loader, "name", source) or source)
         if served_by != source:
             logger.warning(
@@ -1807,7 +1806,7 @@ def fetch_data_map(config: dict) -> DataFetchResult:
     caliber_stamps = {
         code: stamp for code, stamp in caliber_stamps.items() if code in data_map
     }
-    # Both warnings can apply at once (a tencent+baostock basket mixes calibers
+    # Both warnings can apply at once (a yahoo+fmp basket mixes calibers
     # *and* serves an additive one), and each says something the other does not,
     # so they are reported together rather than one shadowing the other.
     caliber_warning = (

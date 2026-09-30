@@ -160,7 +160,7 @@ TRADING_COMMON_PARAMETERS = {
     "market_type": {
         "type": "string",
         "enum": ["spot", "usdm"],
-        "description": ("Optional Binance read market. USD-M is accepted only by the live read-only Binance profile."),
+        "description": ("Optional read market for connector profiles that expose one (e.g. spot vs USD-M)."),
     },
     "observation_absolute_tolerance": {
         "type": "number",
@@ -805,7 +805,7 @@ class TradingCancelOrderTool(BaseTool):
         "properties": {
             **TRADING_COMMON_PARAMETERS,
             "order_id": {"type": "string", "description": "Broker order id to cancel."},
-            "symbol": {"type": "string", "description": "Symbol (required by some brokers, e.g. OKX/Binance)."},
+            "symbol": {"type": "string", "description": "Symbol (required by some brokers)."},
         },
         "required": ["order_id"],
     }

@@ -28,7 +28,6 @@ const ENV_CREDENTIALS = new Set([
   "MODELSCOPE_API_KEY",
   "SPARK_API_KEY",
   "ZAI_API_KEY",
-  "TUSHARE_TOKEN",
   "QVERIS_API_KEY",
 ]);
 
@@ -39,7 +38,6 @@ const PLACEHOLDER_VALUES = new Set([
   "sk-xxx",
   "xxx",
   "gsk_xxx",
-  "your-tushare-token",
 ]);
 
 export type CredentialStatus = {
@@ -87,6 +85,9 @@ export class SecureCredentialStore {
     }
     await this.load();
     await this.migrateDotenv(path.join(this.homeDirectory, ".vibe-trading", ".env"));
+    // QVeris survives as the paid tool marketplace; its backend tool
+    // (agent/src/tools/qveris_tool.py) still loads ~/.vibe-trading/qveris.json
+    // and honours the QVERIS_API_KEY environment override this migration feeds.
     await this.migrateJsonField(
       path.join(this.homeDirectory, ".vibe-trading", "qveris.json"),
       "api_key",

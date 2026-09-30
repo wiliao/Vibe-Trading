@@ -20,7 +20,7 @@ or default-enabled updater exists.
 - Local Vibe-Trading sessions, reports, configuration, and research data.
 - Any credentials already present in the environment inherited by the Python
   process.
-- LLM, Tushare, and QVeris credentials managed by the desktop host.
+- LLM and QVeris credentials managed by the desktop host.
 - The integrity of the executable selected as the backend.
 - The ability to invoke authenticated local API routes.
 - Future update publisher policy, release digest metadata, and the integrity of

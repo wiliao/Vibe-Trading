@@ -5,10 +5,10 @@ Uses progressive disclosure at two levels:
 - Full docs loaded on demand (get_content, called by the load_skill tool).
 - Inside one document, :func:`split_sections` maps the heading structure so the
   load_skill tool can hand back a skeleton plus one section at a time instead of
-  a blind character page. Measured on the bundled corpus: 35 of the 88 skills
-  do not fit a single tool result, and ``tushare`` delivers 9.1% of its 102,890
-  characters in the first page — sequential paging means the agent must read ten
-  more pages to reach a section it could have named.
+  a blind character page. Measured on the bundled corpus: most skills do not fit
+  a single tool result, and the largest ones deliver only a small fraction of
+  their characters in the first page — sequential paging means the agent must
+  read many more pages to reach a section it could have named.
 """
 
 from __future__ import annotations
@@ -59,7 +59,8 @@ class Skill:
             return None
 
 
-from src.agent.frontmatter import parse_frontmatter as _parse_frontmatter  # shared util
+# Shared util, imported late to keep this module's import graph light.
+from src.agent.frontmatter import parse_frontmatter as _parse_frontmatter  # noqa: E402
 
 
 def _load_skill_dir(dir_path: Path) -> Optional[Skill]:

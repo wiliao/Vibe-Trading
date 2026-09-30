@@ -1,5 +1,5 @@
 {
-  "description": "US/CA-only refactor deny-list (docs/refactor-plan.md Phase 10): removed markets, data sources, and symbols that must not reappear in shipped code. Matched case-insensitively as substrings, scoped to agent/src, agent/backtest, and frontend/src. Intentional mentions (with a reason) belong in the companion allowlist field once one exists.",
+  "description": "US/CA-only refactor deny-list (docs/refactor-plan.md Phase 10): removed markets, data sources, and symbols that must not reappear in shipped code. Matched case-insensitively as substrings, scoped to agent/src, agent/backtest, and frontend/src. Intentional mentions belong in `allow` below, each with a non-empty reason; an allow entry suppresses exactly the listed tokens for the matching path (repo-relative path or fnmatch glob). agent/tests/test_us_ca_scope_gate.py enforces both the deny-list and the allowlist's honesty (every entry must carry a reason and must still suppress a real hit).",
   "case_insensitive": true,
   "deny": [
     "a_share",
@@ -34,5 +34,77 @@
     "VIC.VN",
     "-USDT",
     "BTCUSDT"
+  ],
+  "allow": [
+    {
+      "path": "agent/src/tools/qveris_tool.py",
+      "tokens": ["qveris"],
+      "reason": "QVeris survives the refactor as a paid tool marketplace (not a data source); this module implements its search/inspect/execute tools."
+    },
+    {
+      "path": "agent/src/api/qveris_routes.py",
+      "tokens": ["qveris"],
+      "reason": "REST routes for the surviving QVeris marketplace settings and credit status."
+    },
+    {
+      "path": "agent/src/config/env_schema.py",
+      "tokens": ["qveris"],
+      "reason": "QVERIS_API_KEY / QVERIS_BASE_URL are live settings fields read by the surviving QVeris marketplace tools."
+    },
+    {
+      "path": "agent/src/api/settings_routes.py",
+      "tokens": ["qveris"],
+      "reason": "The settings API reports QVERIS_API_KEY credential status for the surviving QVeris marketplace."
+    },
+    {
+      "path": "agent/src/core/runner.py",
+      "tokens": ["qveris"],
+      "reason": "The agent sandbox must re-expose ~/.vibe-trading/qveris.json so the surviving QVeris marketplace tools stay configured."
+    },
+    {
+      "path": "agent/src/skills/qveris/SKILL.md",
+      "tokens": ["qveris"],
+      "reason": "Bundled skill documentation for the surviving QVeris marketplace."
+    },
+    {
+      "path": "agent/src/skills/qveris/references/coverage.md",
+      "tokens": ["qveris"],
+      "reason": "Bundled QVeris marketplace coverage reference."
+    },
+    {
+      "path": "agent/src/skills/qveris/references/rest-api.md",
+      "tokens": ["qveris"],
+      "reason": "Bundled QVeris marketplace REST API reference."
+    },
+    {
+      "path": "frontend/src/components/settings/QVerisSettings.tsx",
+      "tokens": ["qveris"],
+      "reason": "Settings UI for the surviving QVeris marketplace (paid mode, API key, credit balance)."
+    },
+    {
+      "path": "frontend/src/pages/Settings.tsx",
+      "tokens": ["qveris"],
+      "reason": "Settings page mounts the surviving QVeris marketplace card."
+    },
+    {
+      "path": "frontend/src/pages/__tests__/SettingsQVeris.test.tsx",
+      "tokens": ["qveris"],
+      "reason": "Tests for the surviving QVeris marketplace settings card."
+    },
+    {
+      "path": "frontend/src/i18n/locales/*.json",
+      "tokens": ["qveris"],
+      "reason": "User-facing copy for the surviving QVeris marketplace (one qveris string block per locale)."
+    },
+    {
+      "path": "agent/src/tools/symbol_search_tool.py",
+      "tokens": ["okx", "binance", "ccxt", "mt5"],
+      "reason": "Connector names are user-defined local connector plugin ids, not built-in profiles: the tool must still dispatch to whatever connector a user's profile declares. The built-in okx/binance/ccxt/mt5 loaders and connectors are gone (see agent/scripts/us_ca_prune.py)."
+    },
+    {
+      "path": "agent/src/trading/service.py",
+      "tokens": ["binance", "mt5"],
+      "reason": "Same reason: these branches dispatch user-defined local connector plugins by connector id; no built-in binance/mt5 connector ships any more."
+    }
   ]
 }

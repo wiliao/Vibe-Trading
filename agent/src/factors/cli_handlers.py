@@ -149,13 +149,6 @@ def _handle_exception(args: argparse.Namespace, prefix: str, exc: BaseException)
     _err(f"{prefix}: {exc}")
     if getattr(args, "verbose", False):
         traceback.print_exception(type(exc), exc, exc.__traceback__)
-    # Surface a helpful banner for the common TUSHARE_TOKEN error case.
-    if "TUSHARE_TOKEN" in str(exc):
-        _err("")
-        _err("How to fix:")
-        _err("  1. Register for a free token at https://tushare.pro/register")
-        _err("  2. Add 'TUSHARE_TOKEN=<your_token>' to agent/.env  (or ~/.vibe-trading/.env)")
-        _err("  3. Re-run this command")
     return 1
 
 
@@ -654,12 +647,6 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
             }
             print(json.dumps(envelope, indent=2, default=str))
             _err(f"alpha bench failed: {err_msg}")
-            if "TUSHARE_TOKEN" in str(err_msg):
-                _err("")
-                _err("How to fix:")
-                _err("  1. Register for a free token at https://tushare.pro/register")
-                _err("  2. Add 'TUSHARE_TOKEN=<your_token>' to agent/.env  (or ~/.vibe-trading/.env)")
-                _err("  3. Re-run this command")
             return 1
 
         # --- 6. Render HTML report (delegating to alpha_bench_tool helpers) -#

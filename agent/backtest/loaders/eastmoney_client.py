@@ -133,18 +133,6 @@ def get_json(url: str, *, params: dict[str, Any]) -> Any:
     )
 
 
-def _resolve_a_share_secid(code: str, suffix: str) -> str | None:
-    """Map an A-share ``code`` + exchange ``suffix`` to its Eastmoney secid.
-
-    SH instruments live on market ``1``; SZ and BJ (Beijing exchange) on ``0``.
-    """
-    if suffix == "SH":
-        return f"1.{code}"
-    if suffix in ("SZ", "BJ"):
-        return f"0.{code}"
-    return None
-
-
 def _parse_us_secid(payload: Any) -> str | None:
     """Extract a US ``<market>.<code>`` secid from a search/suggest payload.
 
@@ -239,16 +227,15 @@ def _resolve_us_secid(code: str) -> str | None:
 def resolve_secid(symbol: str) -> str | None:
     """Map a Vibe-Trading symbol to its Eastmoney secid.
 
-    Supported suffixes: ``.SH`` / ``.SZ`` / ``.BJ`` (A-share), ``.HK`` (Hong
-    Kong, code zero-padded to five digits), ``.US`` (resolved via search and
-    cached). A symbol with no recognized suffix, or a US ticker the search
-    cannot place, returns ``None``.
+    Only the ``.US`` form resolves (via search, cached). The CN/HK venue
+    branches were removed with the US/CA refactor, so every other suffix — and
+    a US ticker the search cannot place — returns ``None``.
 
     Args:
-        symbol: Symbol such as ``"600519.SH"``, ``"00700.HK"`` or ``"AAPL.US"``.
+        symbol: Symbol such as ``"AAPL.US"``.
 
     Returns:
-        The Eastmoney secid (e.g. ``"1.600519"``), or ``None`` if unresolvable.
+        The Eastmoney secid (e.g. ``"105.AAPL"``), or ``None`` if unresolvable.
     """
     if not symbol or "." not in symbol:
         return None
@@ -258,10 +245,6 @@ def resolve_secid(symbol: str) -> str | None:
     if not code:
         return None
 
-    if suffix in ("SH", "SZ", "BJ"):
-        return _resolve_a_share_secid(code, suffix)
-    if suffix == "HK":
-        return f"116.{code.zfill(5)}"
     if suffix == "US":
         return _resolve_us_secid(code)
     return None

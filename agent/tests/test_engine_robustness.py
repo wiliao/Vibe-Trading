@@ -136,64 +136,21 @@ class TestSymbolIsolation:
         assert len(engine.trades) > 0
         assert all(t.symbol == "GOOD" for t in engine.trades)
 
-    def test_backtest_enriches_data_map_with_configured_fundamental_fields(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path,
-    ) -> None:
-        """A-share backtests should expose configured statement fields to strategies."""
-        dates = pd.bdate_range("2024-04-01", periods=3)
-        bars = pd.DataFrame(
-            {
-                "open": [10.0, 11.0, 12.0],
-                "high": [10.5, 11.5, 12.5],
-                "low": [9.5, 10.5, 11.5],
-                "close": [10.2, 11.2, 12.2],
-                "volume": [1000, 1100, 1200],
-            },
-            index=dates,
-        )
+    def test_retired_fundamental_fields_fail_loud(self) -> None:
+        """The A-share statement-enrichment provider is retired.
 
-        class FakeLoader:
-            def fetch(self, *args, **kwargs):
-                return {"000001.SZ": bars.copy()}
+        A config that still asks for ``fundamental_fields`` must fail rather
+        than silently produce signals without the requested data.
+        """
+        config = {
+            "end_date": "2024-04-30",
+            "fundamental_fields": {"income": ["total_revenue"]},
+        }
+        with pytest.raises(ValueError, match="fundamental_fields is retired"):
+            base_engine._reject_fundamental_fields(config)
 
-        class SignalEngine:
-            def generate(self, data_map):
-                frame = data_map["000001.SZ"]
-                assert "income_total_revenue" in frame.columns
-                assert frame["income_total_revenue"].iloc[-1] == 120.0
-                return {"000001.SZ": pd.Series(0.0, index=frame.index)}
-
-        def fake_enrich(
-            data_map, provider, fields_by_table, *, as_of, periods=None, subdaily="reject"
-        ):
-            assert fields_by_table == {"income": ["total_revenue"]}
-            assert as_of == "2024-04-30"
-            # #1387: the engine forwards the sub-daily PIT policy, and the
-            # default must stay the fail-closed one.
-            assert subdaily == "reject"
-            enriched = {code: frame.copy() for code, frame in data_map.items()}
-            enriched["000001.SZ"]["income_total_revenue"] = [None, 80.0, 120.0]
-            return enriched
-
-        monkeypatch.setattr(base_engine, "TushareFundamentalProvider", lambda: object(), raising=False)
-        monkeypatch.setattr(base_engine, "enrich_price_frames_with_fundamentals", fake_enrich, raising=False)
-
-        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
-        engine.run_backtest(
-            {
-                "codes": ["000001.SZ"],
-                "start_date": "2024-04-01",
-                "end_date": "2024-04-30",
-                "source": "tushare",
-                "fundamental_fields": {"income": ["total_revenue"]},
-                "initial_cash": 1_000_000,
-            },
-            FakeLoader(),
-            SignalEngine(),
-            tmp_path,
-        )
+    def test_absent_fundamental_fields_is_a_noop(self) -> None:
+        assert base_engine._reject_fundamental_fields({}) is None
 
     def test_backtest_records_explicit_benchmark_metadata(
         self,
@@ -304,25 +261,14 @@ class TestSymbolIsolation:
 
     def test_configured_fundamental_enrichment_failure_is_not_silent(
         self,
-        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Explicit statement-field requests should fail rather than degrade silently."""
-        dates = pd.bdate_range("2024-04-01", periods=1)
-        bars = pd.DataFrame({"close": [10.0]}, index=dates)
-
-        def fake_enrich(*args, **kwargs):
-            raise RuntimeError("provider failed")
-
-        monkeypatch.setattr(base_engine, "TushareFundamentalProvider", lambda: object(), raising=False)
-        monkeypatch.setattr(base_engine, "enrich_price_frames_with_fundamentals", fake_enrich, raising=False)
-
-        with pytest.raises(RuntimeError, match="fundamental_fields.*provider failed"):
-            base_engine._maybe_enrich_fundamentals(
-                {"000001.SZ": bars},
+        with pytest.raises(ValueError, match="fundamental_fields.*retired"):
+            base_engine._reject_fundamental_fields(
                 {
                     "end_date": "2024-04-30",
                     "fundamental_fields": {"income": ["total_revenue"]},
-                },
+                }
             )
 
 

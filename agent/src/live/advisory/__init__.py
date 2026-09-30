@@ -64,7 +64,7 @@ class AdvisoryContext:
     specific broker's order payload or account snapshot shape.
 
     Attributes:
-        symbol: Normalized upper-case symbol (e.g. ``AAPL``, ``BTC-USDT``).
+        symbol: Normalized upper-case symbol (e.g. ``AAPL``, ``SHOP.TO``).
         side: ``"buy"`` or ``"sell"``.
         notional_usd: Order notional in USD.
         account_equity: Current account equity in USD.

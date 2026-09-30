@@ -1,14 +1,11 @@
-"""Yahoo Finance loader: free, no-auth US/HK equity OHLCV via direct HTTP.
+"""Yahoo Finance loader: free, no-auth US/Canada equity OHLCV via direct HTTP.
 
 Wraps the shared :mod:`backtest.loaders.yahoo_client` (the public v8 chart
 endpoint) rather than the ``yfinance`` package, so it pulls in no new
 dependency and shares the process-wide throttle/session that keeps Yahoo from
-IP-rate-limiting us. Covers US equities (``AAPL.US``), HK equities
-(``00700.HK``), Canadian equities (``TD.TO`` / ``PNG.V``), and Vietnamese
-equities (``VIC.VN``); the client maps each project symbol to Yahoo's ticker
+IP-rate-limiting us. Covers US equities (``AAPL.US``) and Canadian equities
+(``TD.TO`` / ``PNG.V``); the client maps each project symbol to Yahoo's ticker
 form.
-
-Yahoo officially lists HOSE under ``.VN``; HNX and UPCOM are not supported.
 
 The chart endpoint returns each bar's ``trade_date`` as an epoch-second
 timestamp; this loader converts those to a tz-naive ``DatetimeIndex`` and clips
@@ -217,8 +214,8 @@ class DataLoader:
         """Fetch OHLCV history keyed by the original project symbols.
 
         Args:
-            codes: Project symbols such as ``AAPL.US``, ``00700.HK``,
-                ``TD.TO``, and ``VIC.VN``.
+            codes: Project symbols such as ``AAPL.US``, ``BRK.B.US``, and
+                ``TD.TO``.
             start_date: Inclusive start date (``YYYY-MM-DD``).
             end_date: Inclusive end date (``YYYY-MM-DD``).
             interval: Backtest interval such as ``1D`` or ``1H``.

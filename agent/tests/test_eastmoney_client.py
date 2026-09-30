@@ -19,24 +19,15 @@ def _clear_us_cache():
     ec._US_SECID_CACHE.clear()
 
 
-class TestResolveSecidAShare:
-    """A-share / HK secid mapping is pure and needs no network."""
+class TestResolveSecidRemovedVenues:
+    """The CN/HK venue branches were removed; those suffixes resolve to ``None``."""
 
-    def test_shanghai_uses_market_1(self):
-        assert ec.resolve_secid("600519.SH") == "1.600519"
-
-    def test_shenzhen_uses_market_0(self):
-        assert ec.resolve_secid("000001.SZ") == "0.000001"
-
-    def test_beijing_uses_market_0(self):
-        assert ec.resolve_secid("830799.BJ") == "0.830799"
-
-    def test_hong_kong_zero_pads_to_five(self):
-        assert ec.resolve_secid("00700.HK") == "116.00700"
-        assert ec.resolve_secid("700.HK") == "116.00700"
-
-    def test_case_insensitive_suffix(self):
-        assert ec.resolve_secid("600519.sh") == "1.600519"
+    def test_removed_venues_return_none(self):
+        assert ec.resolve_secid("600519.SH") is None
+        assert ec.resolve_secid("000001.SZ") is None
+        assert ec.resolve_secid("830799.BJ") is None
+        assert ec.resolve_secid("00700.HK") is None
+        assert ec.resolve_secid("700.HK") is None
 
     def test_unrecognized_suffix_returns_none(self):
         assert ec.resolve_secid("BTC-USD") is None

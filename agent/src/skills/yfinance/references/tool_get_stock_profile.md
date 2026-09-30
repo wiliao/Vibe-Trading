@@ -21,7 +21,7 @@ The tool selects the right Yahoo quoteSummary modules, unwraps Yahoo
 
 Name | Type | Required | Description
 ---- | ---- | -------- | -----------
-ticker | str | Y | US (`AAPL` or `AAPL.US`), HK (`00700.HK`, zero-padded), or UK LSE (`VOD.L`) symbol.
+ticker | str | Y | US (`AAPL` or `AAPL.US`) or Canadian (`SHOP.TO`) symbol.
 sections | list[str] | N | Which sections to return (one or more of the section names below). Defaults to all sections. Unknown names return an error envelope.
 
 Section name → underlying Yahoo module:
@@ -72,8 +72,8 @@ Failures are returned as an envelope (never raised) — e.g. a missing/blank
 ```text
 get_stock_profile(ticker="AAPL.US")
 get_stock_profile(ticker="AAPL", sections=["key_stats", "financials"])
-get_stock_profile(ticker="00700.HK", sections=["key_stats"])
-get_stock_profile(ticker="VOD.L", sections=["key_stats"])
+get_stock_profile(ticker="SHOP.TO", sections=["key_stats"])
+get_stock_profile(ticker="BRK.B.US", sections=["key_stats"])
 ```
 
 <br>

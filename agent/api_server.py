@@ -217,8 +217,6 @@ from src.api.settings_routes import register_settings_routes  # noqa: E402
 register_settings_routes(app)
 
 from src.api.settings_routes import (  # noqa: F401, E402
-    _baostock_supported,
-    _baostock_installed,
     _load_llm_providers,
 )
 

@@ -95,7 +95,7 @@ class TradeRecord:
 
     Attributes:
         datetime: ISO8601 timestamp, e.g. "2026-01-15 09:35:00".
-        symbol: Exchange-qualified symbol, e.g. "600519.SH" / "AAPL" / "BTC-USDT".
+        symbol: Exchange-qualified symbol, e.g. "AAPL.US" / "SHOP.TO" / "AAPL".
         name: Human-readable instrument name.
         side: "buy", "sell" or "dividend" (cash payout; amount is the cash).
         quantity: Filled quantity.

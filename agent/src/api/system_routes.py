@@ -274,7 +274,7 @@ def register_system_routes(
     @app.get("/correlation", dependencies=[Depends(require_auth)])
     async def get_correlation_matrix(
         request: Request,
-        codes: str = Query(..., description="Comma-separated asset codes, e.g. BTC-USDT,ETH-USDT,SPY"),
+        codes: str = Query(..., description="Comma-separated asset codes, e.g. AAPL.US,TD.TO,SPY"),
         days: int = Query(90, description="Lookback window in days", ge=7, le=365),
         method: str = Query("pearson", description="Correlation method: pearson or spearman"),
     ):
@@ -311,7 +311,7 @@ def register_system_routes(
     @app.get("/correlation/regime", dependencies=[Depends(require_auth)])
     async def get_correlation_regime(
         request: Request,
-        codes: str = Query(..., description="Comma-separated asset codes, e.g. BTC-USDT,ETH-USDT,SPY"),
+        codes: str = Query(..., description="Comma-separated asset codes, e.g. AAPL.US,TD.TO,SPY"),
         days: int = Query(90, description="Timeline length in daily bars", ge=30, le=365),
         corr_window: int = Query(60, description="Rolling correlation window in bars", ge=5, le=250),
         edge_threshold: float = Query(0.5, description="|corr| level at which a pair counts as an edge", gt=0.0, lt=1.0),

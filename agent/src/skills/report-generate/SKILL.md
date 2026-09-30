@@ -190,9 +190,9 @@ After a backtest is completed, read `metrics.csv` and `equity.csv` to generate:
 
 ## Strategy Overview
 - **Strategy type**: momentum / mean reversion / multi-factor / ...
-- **Instruments**: 000001.SZ, 600519.SH, ...
+- **Instruments**: AAPL.US, TD.TO, ...
 - **Backtest period**: 2016-01-01 to 2026-01-01
-- **Initial capital**: ¥1,000,000
+- **Initial capital**: $1,000,000
 
 ## Performance Summary
 

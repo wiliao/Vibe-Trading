@@ -924,8 +924,9 @@ def _normalize_notional(intent: OrderIntent, connector_module: Any, config: Any)
 def _implied_notional(intent: OrderIntent, connector_module: Any, config: Any) -> float | None:
     """USD notional implied by ``intent.quantity``, fail-closed.
 
-    A connector whose quantities are not unit-sized (MT5 lots: 1 lot EURUSD ==
-    100,000 EUR) exposes ``quantity_notional_usd(config, symbol, quantity)``.
+    A connector whose quantities are not unit-sized (lot-quoted FX/CFD
+    connectors: 1 lot EURUSD == 100,000 EUR) exposes
+    ``quantity_notional_usd(config, symbol, quantity)``.
     When present the hook is AUTHORITATIVE and there is deliberately NO fallback
     to ``quantity x quote price`` — that product under-states a lot-sized order
     by roughly the contract size, which would silently disarm every USD cap.

@@ -40,7 +40,7 @@ one you need rather than loading them all:
 > two skills both carry is reported as ambiguous rather than guessed.
 
 The Yahoo client uses the project ticker convention (`AAPL.US` → `AAPL`,
-`00700.HK` → `0700.HK`, `TD.TO` and `PNG.V` pass through); see the
+`BRK.B.US` → `BRK-B`, `TD.TO` and `PNG.V` pass through); see the
 [Ticker Format Conversion](#ticker-format-conversion) table below — the same
 rules apply across all of the interfaces above.
 
@@ -50,7 +50,7 @@ Preferred OHLCV tool call:
 
 ```json
 {
-  "codes": ["AAPL.US", "700.HK", "TD.TO", "PNG.V"],
+  "codes": ["AAPL.US", "NVDA.US", "TD.TO", "PNG.V"],
   "start_date": "2025-01-01",
   "end_date": "2026-01-01",
   "source": "yfinance",
@@ -83,8 +83,7 @@ The project uses a unified ticker format. The DataLoader automatically converts 
 |---------------|----------------|--------|
 | `AAPL.US` | `AAPL` | US stock |
 | `MSFT.US` | `MSFT` | US stock |
-| `700.HK` | `0700.HK` | HK stock |
-| `9988.HK` | `9988.HK` | HK stock |
+| `BRK.B.US` | `BRK-B` | US stock (class share) |
 | `TD.TO` | `TD.TO` | Toronto Stock Exchange stock |
 | `PNG.V` | `PNG.V` | TSX Venture stock |
 | `SPY.US` | `SPY` | US ETF |

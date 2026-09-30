@@ -24,7 +24,7 @@ Without this flag, the `/scheduled-runs` endpoints still record jobs but nothing
 curl -X POST http://localhost:8899/scheduled-runs \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Run a decay scan on all active factors in the CSI300 universe. For any factors showing decay signals, generate a summary report.",
+    "prompt": "Run a decay scan on all active factors in the sp500 universe. For any factors showing decay signals, generate a summary report.",
     "schedule": "0 2 * * 1",
     "config": {}
   }'
@@ -37,11 +37,11 @@ The API returns a job record with `id`, `status`, `next_run_at`, and the full sc
 For operators tracking factors across multiple universes, create separate jobs per universe:
 
 ```bash
-# CSI300 weekly scan
+# sp500 weekly scan
 curl -X POST http://localhost:8899/scheduled-runs \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Run a decay scan on all active factors in the CSI300 universe. Generate a decay report with status transitions.",
+    "prompt": "Run a decay scan on all active factors in the sp500 universe. Generate a decay report with status transitions.",
     "schedule": "0 2 * * 1",
     "config": {}
   }'
@@ -92,7 +92,7 @@ Cron fields: `minute hour day-of-month month day-of-week`. Each field accepts a 
 
 When the executor fires a scheduled decay scan job, the agent session performs the following steps:
 
-1. **Invoke `sdm_decay_scan`** -- Calls the decay scan tool with the configured universe (e.g., `sdm_decay_scan(universe="CSI300")`).
+1. **Invoke `sdm_decay_scan`** -- Calls the decay scan tool with the configured universe (e.g., `sdm_decay_scan(universe="sp500")`).
 
 2. **Evaluate decay signals** -- For each active factor, computes rolling IC mean, IR, IC positive ratio, and Sharpe ratio. Compares each metric against the thresholds defined in `decay_thresholds.md`.
 

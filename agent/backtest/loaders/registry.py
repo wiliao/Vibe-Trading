@@ -61,8 +61,8 @@ def _ensure_registered() -> None:
 
     Safe to call multiple times — only runs the imports once.
     Concurrent callers wait until the import pass finishes.
-    Loaders whose dependencies are missing (e.g. ``akshare`` not installed)
-    are silently skipped.
+    Loaders whose optional dependencies are missing (e.g. ``finnhub`` without
+    its SDK) are silently skipped.
     """
     # Re-check env overrides even when already registered — a subprocess may
     # have loaded ~/.vibe-trading/.env (or synced os.environ) after this
@@ -307,7 +307,7 @@ def additive_caliber_warning(stamps: dict[str, tuple[str, str]]) -> str | None:
 # Users can reprioritize a market's chain via one env var per market
 # (persisted to ~/.vibe-trading/.env by the Settings page's "source
 # priority" card):
-#     MARKET_DATA_ORDER_A_SHARE=tushare,tencent,mootdx,...
+#     MARKET_DATA_ORDER_US_EQUITY=yahoo,stooq,sina,eastmoney,...
 # The value must be a permutation of the market's default chain —
 # reordering is allowed, adding/dropping sources is not. Invalid values
 # warn and keep the default chain, so a typo can never silently strip a
@@ -334,7 +334,7 @@ _LAST_ORDER_ENV_SNAPSHOT: dict[str, str] | None = None
 def source_order_env_var(market: str) -> str:
     """Return the env var name overriding ``market``'s source order.
 
-    ``"a_share"`` -> ``"MARKET_DATA_ORDER_A_SHARE"``.
+    ``"us_equity"`` -> ``"MARKET_DATA_ORDER_US_EQUITY"``.
     """
     return _SOURCE_ORDER_ENV_PREFIX + market.upper()
 
@@ -343,7 +343,7 @@ def parse_source_order(raw: str) -> list[str]:
     """Parse a comma-separated source order string.
 
     Tokens are stripped, lowercased, and empty ones dropped, so
-    ``" TUSHARE, tencent ,, "`` parses to ``["tushare", "tencent"]``.
+    ``" YAHOO, stooq ,, "`` parses to ``["yahoo", "stooq"]``.
     Validating against the market's default chain is a separate step
     (:func:`is_valid_source_order`).
     """
@@ -446,9 +446,9 @@ def resolve_loader(market: str) -> Any:
         if name not in LOADER_REGISTRY:
             continue
         tried.append(name)
-        # Issue #50 — some loaders (e.g. Tushare) call into the SDK during
-        # __init__ and raise on missing credentials. Treat that the same as
-        # is_available()=False so the fallback chain keeps walking.
+        # Issue #50 — some loaders call into their SDK during __init__ and raise
+        # on missing credentials. Treat that the same as is_available()=False so
+        # the fallback chain keeps walking.
         try:
             loader = LOADER_REGISTRY[name]()
         except Exception as exc:

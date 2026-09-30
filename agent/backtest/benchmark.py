@@ -72,7 +72,7 @@ def resolve_benchmark(
 
     Args:
         strategy_codes: Instruments being backtested (used for market inference).
-        source:         Data source name (tushare / yfinance / okx / akshare / ccxt).
+        source:         Data source name (yahoo / yfinance / stooq / eastmoney / fmp / local).
         start_date:     Backtest start date.
         end_date:       Backtest end date.
         interval:       Bar interval (1m / 5m / 15m / 30m / 1H / 4H / 1D / 1W / 1M).
@@ -140,46 +140,24 @@ def _resolve_ticker(
     if explicit:
         return explicit
 
-    # Infer market from source + first code pattern
+    # Infer market from the first code's suffix
     market = _infer_market(codes, source)
-    ticker = MARKET_BENCHMARKS.get(market)
-
-    # yfinance is the universal fallback for benchmark fetch
-    # but it only works for global-equity market types
-    if ticker and market not in {"us_equity", "hk_equity", "ca_equity"}:
-        # Only use benchmark if we can actually fetch it
-        pass
-
-    return ticker
+    return MARKET_BENCHMARKS.get(market)
 
 
 def _infer_market(codes: list[str], source: str) -> str:
-    """Rough market inference from symbol patterns and source."""
+    """Market inference from symbol patterns.
+
+    Only the two settled markets exist in this build; ``source`` is accepted for
+    call-site compatibility and no longer changes the answer.
+    """
     if not codes:
         return "us_equity"
 
     first = codes[0].upper()
 
-    if first.endswith(".US"):
-        return "us_equity"
-    if first.endswith(".HK"):
-        return "hk_equity"
     if first.endswith((".TO", ".V")):
         return "ca_equity"
-    if first.endswith((".NS", ".BO")):
-        return "india_equity"
-    if first.endswith((".KS", ".KQ")):
-        return "kr_equity"
-    crypto_quotes = ("-USDT", "-USDC", "-USD", "-BTC", "-ETH")
-    if source in ("okx", "ccxt", "binance") or "/" in first or first.endswith(crypto_quotes):
-        return "crypto"
-    if source in ("tushare", "akshare"):
-        if first.isdigit() and len(first) == 6:
-            return "a_share"
-        if first.startswith(("IF", "IC", "IH", "IM", "T", "TF")):
-            return "futures"
-        return "a_share"
-
     return "us_equity"
 
 
