@@ -5,6 +5,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Scope reduced to US and Canada equity.** This fork now supports only the
+  `us_equity`, `ca_equity`, and `index` markets; every A-share, Hong Kong, UK,
+  India, Korea, Vietnam, Argentina, Taiwan, crypto, forex, and futures surface
+  was removed from the data loaders, backtest engines, agent tools, broker
+  connectors, prompts, skills, swarm presets, and frontend. Market-data sources
+  are `yahoo`, `yfinance`, `stooq`, `sina`, `eastmoney`, `finnhub`,
+  `alphavantage`, `tiingo`, `fmp`, and `local` (`auto` for routing). Six broker
+  connectors remain: `alpaca`, `futu`, `ibkr`, `longbridge`, `robinhood`, and
+  `tiger`. The Alpha Zoo is 271 alphas across `alpha101`, `qlib158`, `academic`,
+  and `fundamental`; the `gtja191` zoo is gone and factor benchmarking is
+  `sp500`-only. Canada is market-data and backtest only — it has no live path.
+
 ### Added
 
 - **Stock profiles carry the listing's own identity** (#1577). `get_stock_profile`

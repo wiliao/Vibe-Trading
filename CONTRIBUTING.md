@@ -27,7 +27,7 @@ already attested by the commit's author field), but community PRs are.
 Sign your commits with `-s`:
 
 ```bash
-git commit -s -m "feat(factors): add gtja191 alpha 042"
+git commit -s -m "feat(factors): add alpha101 alpha 042"
 ```
 
 This appends a trailer like:
@@ -120,7 +120,7 @@ merging. Authors are strongly encouraged to self-check first.
 ## Adding a New Alpha (Quickstart)
 
 1. Pick the target zoo directory under `agent/src/factors/zoo/` (e.g.
-   `gtja191/`, `alpha101/`, `qlib158/`, `academic/`).
+   `alpha101/`, `qlib158/`, `academic/`, `fundamental/`).
 2. Create `<alpha_id_short>.py` in that directory. Define `__alpha_meta__`
    (must satisfy the pydantic `AlphaMeta` schema in
    `agent/src/factors/registry.py`) and a pure `compute(panel)` function
@@ -132,7 +132,7 @@ merging. Authors are strongly encouraged to self-check first.
    ```
 4. (Optional but recommended) Run a quick bench:
    ```bash
-   vibe-trading alpha bench --zoo <zoo_id> --universe csi300 --period 2020-2025
+   vibe-trading alpha bench --zoo <zoo_id> --universe sp500 --period 2020-2025
    ```
 5. Open a PR. Every commit must include `Signed-off-by:` (use
    `git commit -s`). Reviewers will walk the checklist above.
@@ -206,9 +206,10 @@ cd agent
 /tmp/vibe-loader-health-venv/bin/python -m backtest.loader_health --output /tmp/loader-health.json
 ```
 
-Use the isolated environment: mootdx's HTTP client requirement conflicts with
-the application's dependency range. The canary imports the checkout's loader
-code directly, without installing the full application dependency set.
+Use the isolated environment so the canary's loose pins (the public loaders need
+no optional SDKs) never perturb the application's dependency range. The canary
+imports the checkout's loader code directly, without installing the full
+application dependency set.
 
 Each unauthenticated network loader has a liquid canary symbol; the local-file
 loader is explicitly excluded. Adding a public loader requires updating the

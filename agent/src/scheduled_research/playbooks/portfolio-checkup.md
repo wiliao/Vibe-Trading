@@ -1,9 +1,9 @@
 ---
 name: Portfolio Checkup
 description: Periodic risk x-ray of a stated book — exposure, concentration, correlation and drawdown, measured from retrieved prices.
-markets: [global, cn, hk, us, crypto]
+markets: [us, ca, global]
 suggested_schedule: "0 9 * * 6"
-suggested_timezone: Asia/Shanghai
+suggested_timezone: America/New_York
 data_capabilities:
   - Daily price history long enough to compute volatility, correlation and drawdown for every position
   - Portfolio-level risk decomposition — position weights, volatility contribution, correlation structure, drawdown

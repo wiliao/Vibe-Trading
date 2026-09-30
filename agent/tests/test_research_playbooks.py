@@ -31,11 +31,11 @@ from src.scheduled_research.playbooks import (
 from src.scheduled_research.store import ScheduledResearchJobStore
 
 EXPECTED_SLUGS = {
-    "a-share-money-flow",
     "earnings-season-tracker",
     "institutional-holdings-diff",
     "portfolio-checkup",
     "premarket-brief",
+    "us-ca-money-flow",
 }
 
 # 2026-08-04T12:00:00Z, fixed so first-fire assertions never depend on the clock.
@@ -94,9 +94,9 @@ class TestBundledCatalogue:
         slugs = [p.slug for p in list_playbooks()]
         assert slugs == sorted(slugs)
 
-    def test_covers_more_than_us_markets(self) -> None:
+    def test_covers_canada_and_global_markets(self) -> None:
         markets = {m for p in list_playbooks() for m in p.markets}
-        assert "cn" in markets and "global" in markets
+        assert "ca" in markets and "global" in markets
 
     @pytest.mark.parametrize("slug", sorted(EXPECTED_SLUGS))
     def test_suggested_schedule_is_valid(self, slug: str) -> None:
@@ -345,7 +345,7 @@ class TestToJob:
         assert job.created_at == NOW_MS
 
     def test_first_fire_matches_the_cron_evaluator(self) -> None:
-        playbook = get_playbook("a-share-money-flow")
+        playbook = get_playbook("us-ca-money-flow")
         job = playbook.to_job(now_ms=NOW_MS)
         assert job.next_run_at == next_due(
             playbook.suggested_schedule, NOW_MS, playbook.suggested_timezone

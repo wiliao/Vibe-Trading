@@ -1,9 +1,9 @@
 ---
 name: Pre-market Brief
 description: Overnight global market moves plus today's watch items, assembled before the home session opens.
-markets: [global, cn, hk, us]
+markets: [us, ca, global]
 suggested_schedule: "30 8 * * 1-5"
-suggested_timezone: Asia/Shanghai
+suggested_timezone: America/New_York
 data_capabilities:
   - Daily index levels and percentage changes for the major overnight equity sessions
   - Overnight moves in benchmark commodities, major FX pairs and government bond yields
@@ -11,7 +11,7 @@ data_capabilities:
   - Recent daily price and volume history for the symbols on the user's watch list
   - Macro releases and corporate events scheduled for the current date
 variables:
-  home_market: China A-shares
+  home_market: US equities
   watchlist: (no watch list configured)
 ---
 

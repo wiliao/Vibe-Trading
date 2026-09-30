@@ -108,14 +108,12 @@ class TestEnvConfigDefaults:
 
     def test_data_defaults(self) -> None:
         c = EnvConfig()
-        assert c.data.tushare_token == ""
         assert c.data.futu_host == "127.0.0.1"
         assert c.data.futu_port == 11111
         assert c.data.finnhub_api_key == ""
         assert c.data.alphavantage_api_key == ""
         assert c.data.tiingo_api_key == ""
         assert c.data.fmp_api_key == ""
-        assert c.data.gildata_token == ""
         assert c.data.fred_api_key == ""
         assert c.data.vibe_trading_sec_ua == ""
         assert c.data.vibe_trading_data_cache is False
@@ -317,22 +315,22 @@ class TestEnvConfigOverride:
     ) -> None:
         monkeypatch.setenv("LANGCHAIN_PROVIDER", "deepseek")
         monkeypatch.setenv("TIMEOUT_SECONDS", "60")
-        monkeypatch.setenv("TUSHARE_TOKEN", "test_token_123")
+        monkeypatch.setenv("FINNHUB_API_KEY", "test_token_123")
 
         c = EnvConfig()
         assert c.llm.langchain_provider == "deepseek"
         assert c.llm.timeout_seconds == 60
-        assert c.data.tushare_token == "test_token_123"
+        assert c.data.finnhub_api_key == "test_token_123"
 
         # Remove env vars and create a new config → defaults restored.
         monkeypatch.delenv("LANGCHAIN_PROVIDER")
         monkeypatch.delenv("TIMEOUT_SECONDS")
-        monkeypatch.delenv("TUSHARE_TOKEN")
+        monkeypatch.delenv("FINNHUB_API_KEY")
 
         c2 = EnvConfig()
         assert c2.llm.langchain_provider == "openai"
         assert c2.llm.timeout_seconds == 120
-        assert c2.data.tushare_token == ""
+        assert c2.data.finnhub_api_key == ""
 
     def test_multiple_overrides_simultaneously(
         self, monkeypatch: pytest.MonkeyPatch
@@ -582,8 +580,8 @@ class TestSubModelDirectConstruction:
         assert cfg.timeout_seconds == 60
 
     def test_data_config_direct(self) -> None:
-        cfg = DataConfig(tushare_token="my_token", fmp_api_key="fmp-key")
-        assert cfg.tushare_token == "my_token"
+        cfg = DataConfig(finnhub_api_key="finnhub-token", fmp_api_key="fmp-key")
+        assert cfg.finnhub_api_key == "finnhub-token"
         assert cfg.fmp_api_key == "fmp-key"
 
     def test_swarm_config_direct(self) -> None:

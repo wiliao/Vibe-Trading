@@ -121,10 +121,6 @@ class SourceOrderUpdate(BaseModel):
 class DataSourceSettingsResponse(BaseModel):
     """Current data source credential settings."""
 
-    tushare_token_configured: bool
-    tushare_token_hint: Optional[str] = None
-    gildata_token_configured: bool
-    gildata_token_hint: Optional[str] = None
     baostock_supported: bool
     baostock_installed: bool
     baostock_message: str
@@ -135,10 +131,6 @@ class DataSourceSettingsResponse(BaseModel):
 class UpdateDataSourceSettingsRequest(BaseModel):
     """Update project-local data source credentials."""
 
-    tushare_token: Optional[str] = None
-    clear_tushare_token: bool = False
-    gildata_token: Optional[str] = None
-    clear_gildata_token: bool = False
     source_orders: Optional[List[SourceOrderUpdate]] = None
 
 
@@ -173,13 +165,11 @@ LLM_PROVIDER_BY_NAME = {provider.name: provider for provider in LLM_PROVIDERS}
 # needs to allow function tools on gpt-5.6-* models.
 LLM_REASONING_EFFORTS = {"", "none", "low", "medium", "high", "max"}
 LLM_API_KEY_PLACEHOLDERS = {"", "sk-or-v1-your-key-here", "sk-xxx", "xxx", "gsk_xxx"}
-TUSHARE_TOKEN_PLACEHOLDERS = {"", "your-tushare-token"}
-GILDATA_TOKEN_PLACEHOLDERS = {"", "your-gildata-token"}
 
 
 def _desktop_secure_credential_names() -> set[str]:
     """Return secrets owned by the desktop host when secure storage is active."""
-    names = {"TUSHARE_TOKEN", "QVERIS_API_KEY", "GILDATA_TOKEN"}
+    names = {"QVERIS_API_KEY"}
     names.update(
         provider.api_key_env for provider in LLM_PROVIDERS if provider.api_key_env
     )
@@ -475,10 +465,6 @@ def _build_data_source_settings_response(
     """Build the public data source settings payload."""
     host = _host()
     env_values = values if values is not None else _read_settings_env_values()
-    token = env_values.get("TUSHARE_TOKEN", "")
-    token_configured = host._is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS)
-    gildata = env_values.get("GILDATA_TOKEN", "")
-    gildata_configured = host._is_configured_secret(gildata, GILDATA_TOKEN_PLACEHOLDERS)
     # Late-access baostock helpers for monkeypatch compat.
     baostock_sup = getattr(host, "_baostock_supported", _baostock_supported)
     baostock_ins = getattr(host, "_baostock_installed", _baostock_installed)
@@ -491,10 +477,6 @@ def _build_data_source_settings_response(
     else:
         baostock_message = "No BaoStock loader is registered in this project."
     return DataSourceSettingsResponse(
-        tushare_token_configured=token_configured,
-        tushare_token_hint=None,
-        gildata_token_configured=gildata_configured,
-        gildata_token_hint=None,
         baostock_supported=supported,
         baostock_installed=installed,
         baostock_message=baostock_message,
@@ -758,23 +740,8 @@ def register_settings_routes(
     )
     async def update_data_source_settings(payload: UpdateDataSourceSettingsRequest):
         """Persist project-local data source credentials and update the running process."""
-        host_ref = _host()
         current_values = _read_settings_env_values()
         updates: Dict[str, str] = {}
-
-        if payload.clear_tushare_token:
-            updates["TUSHARE_TOKEN"] = ""
-        elif payload.tushare_token is not None and payload.tushare_token.strip():
-            updates["TUSHARE_TOKEN"] = payload.tushare_token.strip()
-        elif "TUSHARE_TOKEN" in current_values:
-            updates["TUSHARE_TOKEN"] = current_values["TUSHARE_TOKEN"]
-
-        if payload.clear_gildata_token:
-            updates["GILDATA_TOKEN"] = ""
-        elif payload.gildata_token is not None and payload.gildata_token.strip():
-            updates["GILDATA_TOKEN"] = payload.gildata_token.strip()
-        elif "GILDATA_TOKEN" in current_values:
-            updates["GILDATA_TOKEN"] = current_values["GILDATA_TOKEN"]
 
         # Per-market source-order overrides: validate first (400 on a bad
         # permutation *before* anything is persisted), then merge only the
@@ -791,16 +758,6 @@ def register_settings_routes(
 
         if updates:
             saved_values = _persist_settings_updates(updates)
-            token = updates.get("TUSHARE_TOKEN", "").strip()
-            if host_ref._is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS):
-                os.environ["TUSHARE_TOKEN"] = token
-            else:
-                os.environ.pop("TUSHARE_TOKEN", None)
-            gildata_token = updates.get("GILDATA_TOKEN", "").strip()
-            if host_ref._is_configured_secret(gildata_token, GILDATA_TOKEN_PLACEHOLDERS):
-                os.environ["GILDATA_TOKEN"] = gildata_token
-            else:
-                os.environ.pop("GILDATA_TOKEN", None)
             # Hot-apply source-order overrides in this process.
             for env_var, value in order_updates.items():
                 if value:

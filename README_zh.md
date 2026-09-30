@@ -52,6 +52,8 @@
 
 > ⚠️ **安全警告：** X 账号 `VibeTrading_HKU`、Virtuals 项目 `101845` 及代币合约 `0x640BDBF77b6447E8b7DB7894cED84BD1c40571f4` 均非 Vibe-Trading 官方。我们从未发行或背书任何代币或 meme 币。请勿购买、连接钱包或签名。[详细说明](SECURITY.md#official-channels--impersonation)。
 
+
+- **2026-09-29** 🍁 **范围收窄至美股 + 加拿大股票**：本分支从数据 loader、回测引擎、agent 与 MCP 工具、券商连接器、提示词和前端等所有层移除 A 股、港股、英国、印度、韩国、越南股票以及加密、外汇和期货。现在发布的是 10 个行情数据 loader（以 Yahoo / yfinance 为主，支持 TSX `.TO` / TSXV `.V`）、2 个市场回测引擎（另含 composite 与期权组合）、271 个 alpha、58 个 skills、25 个 swarm preset 和 6 家券商连接器（Alpaca、Futu、IBKR、Longbridge、Robinhood、Tiger）。加拿大仅支持行情数据 + 回测：没有接入加拿大券商执行通道。以下历史条目保持原样。
 - **2026-09-28** 🛠️ **数据源健康检查与券商能力透明化**：定时检查通过有时限、不携带凭据的公开数据源探测报告连接故障和数据异常（[#1627](https://github.com/HKUDS/Vibe-Trading/pull/1627)）；BaoStock socket 请求增加超时控制，并串行隔离并发会话（[#1615](https://github.com/HKUDS/Vibe-Trading/pull/1615)）。Copilot 凭据查询在短期缓存到期后重新读取（[#1619](https://github.com/HKUDS/Vibe-Trading/pull/1619)）。自动生成的券商矩阵分别列出各 profile 的模拟盘／实盘权限，明确区分能力声明与运行验证（[#1629](https://github.com/HKUDS/Vibe-Trading/pull/1629)）。 **数值核验与 MT5 补充修复**：保留证据中的显式标的及精确字段引用，本地化数字分组沿用既有数值容差（[#1584](https://github.com/HKUDS/Vibe-Trading/pull/1584)、[#1586](https://github.com/HKUDS/Vibe-Trading/pull/1586)、[#1588](https://github.com/HKUDS/Vibe-Trading/pull/1588)）；纯文本纠错受次数限制（[#1600](https://github.com/HKUDS/Vibe-Trading/pull/1600)）。MT5 搜索使用指定终端，拒绝歧义券商后缀；回测沙箱只接收校验后的终端连接设置（[#1597](https://github.com/HKUDS/Vibe-Trading/pull/1597)、[#1598](https://github.com/HKUDS/Vibe-Trading/pull/1598)）。
 
 - **2026-09-27** 🛠️ **可复核的运行卡片与更可靠的研究流程**：运行卡片在 JSON、Markdown 和运行详情页展示回测执行哈希记录及已核验的指标 CSV 引用（[#1612](https://github.com/HKUDS/Vibe-Trading/pull/1612)）。GTJA 高低点远近因子修正计日与并列极值处理（[#1604](https://github.com/HKUDS/Vibe-Trading/pull/1604)），印度市场回测平空仓按买入方向检查涨跌停（[#1608](https://github.com/HKUDS/Vibe-Trading/pull/1608)）。token 用量可读，同时不放行任意凭据字符串（[#1606](https://github.com/HKUDS/Vibe-Trading/pull/1606)）；异常 MCP schema 保留对象属性（[#1607](https://github.com/HKUDS/Vibe-Trading/pull/1607)）；即时下单目标检查不再误拦研究问题（[#1605](https://github.com/HKUDS/Vibe-Trading/pull/1605)）。配置文档明确默认使用 OpenRouter（[#1609](https://github.com/HKUDS/Vibe-Trading/issues/1609)）。
@@ -298,7 +300,7 @@
       <img src="assets/feature-multi-agent-trading-teams.png" height="130" alt="Multi-agent trading teams"/><br>
       <h3>🐝 多智能体交易团队</h3>
       <div align="left">
-        • 投资、量化、加密与风控团队<br>
+        • 投资、量化与风控团队<br>
         • 流式进度与持久化报告<br>
         • Worker 基于已获取的市场数据展开分析
       </div>
@@ -309,7 +311,7 @@
       <img src="assets/feature-cross-market-data-backtesting.png" height="130" alt="Cross-market data and backtesting"/><br>
       <h3>📊 跨市场数据与回测</h3>
       <div align="left">
-        • A 股、港股、美股、加拿大、英国、印度、韩国、加密、期货与外汇<br>
+        • 美股、加拿大股票、ETF 与期权<br>
         • 数据 fallback 与组合回测<br>
         • PIT 数据、验证与 run cards
       </div>
@@ -345,10 +347,10 @@ Vibe-Trading 是一个开源研究工作台，用于把金融问题转化为可�
 | **读取文档与图表** | 用可插拔 OCR 解析 PDF / DOCX / XLSX / PPTX / 图片（`read_document`），并用视觉模型语义化读取图表截图（`analyze_image`）。 Web 聊天可通过文件选择、拖放或剪贴板粘贴一次附加最多五个文件。 |
 | **读取机构持仓与基金底仓** | SEC 13F 持仓（含季度环比变动）、跨市场 ETF 成分穿透、事件合约隐含概率、arXiv / OpenAlex 因子提取 —— 全部只读，基于免费公开数据源。 |
 | **改进重复研究** | 持久记忆和可编辑 skills 将有用流程变成可复用工作流。 |
-| **运行分析师团队** | 面向投资、量化、加密、宏观和风控工作流的多智能体研究评审。 |
+| **运行分析师团队** | 面向投资、量化、宏观和风控工作流的多智能体研究评审。 |
 | **把研究接入 IM 通道** | 通过 WebSocket、Telegram、Slack、Discord、Matrix、WhatsApp、Signal、QQ/NapCat、微信/企业微信、飞书/Lark、钉钉、Teams、email、Mochat，在 CLI、REST 和 Web UI 中管理同一套 session runtime。 |
-| **交付可用成果** | 报告、TradingView Pine Script、TDX、MetaTrader 5、MCP tools，以及可延续的研究 sessions。 |
-| **跑预置 alpha zoo 横评** | 462 个 alpha 因子（Qlib 158 + Kakushadze 101 + GTJA 191 + academic + PIT-safe fundamental），一行 CLI 在你选的 universe 上算 IC + IR + alive/reversed/dead 分类 |
+| **交付可用成果** | 报告、TradingView Pine Script、MCP tools，以及可延续的研究 sessions。 |
+| **跑预置 alpha zoo 横评** | 271 个 alpha 因子（Qlib 158 + Kakushadze 101 + academic + PIT-safe fundamental），一行 CLI 在你选的 universe 上算 IC + IR + alive/reversed/dead 分类 |
 | **识别相关性状态** | `/correlation` 界面上的边密度 + 迟滞时间线，显示市场何时融合为一个板块——属于描述性风险上下文，而非交易信号。 |
 
 ---
@@ -359,10 +361,10 @@ Vibe-Trading 是一个开源研究工作台，用于把金融问题转化为可�
 pip install vibe-trading-ai
 
 # 自然语言研究
-vibe-trading run -p "Backtest a BTC-USDT 20/50 moving-average strategy for 2024, summarize return and drawdown, then export the report"
+vibe-trading run -p "Backtest an AAPL 20/50 moving-average strategy for 2024, summarize return and drawdown, then export the report"
 
 # 一行 CLI 跑预置 alpha zoo 横评
-vibe-trading alpha bench --zoo gtja191 --universe csi300 --period 2018-2025 --top 20
+vibe-trading alpha bench --zoo qlib158 --universe sp500 --period 2018-2025 --top 20
 ```
 
 ```bash
@@ -411,9 +413,9 @@ Web UI 新增只读的 **持仓** 页面，把你选中的券商连接的持仓�
 终端优先的接入方式如下。密钥由本机 CLI 隐藏输入，不要写入 prompt 或命令行参数：
 
 ```bash
-vibe-trading connector setup okx-live-sdk-readonly \
-  --connection-id main-okx \
-  --label "Main OKX"
+vibe-trading connector setup alpaca-paper-trade \
+  --connection-id main-alpaca \
+  --label "Main Alpaca"
 ```
 
 CLI 会把凭证按连接 ID 保存到系统钥匙串，并执行连接器的只读测试。等价的网页流程是：**持仓 → 管理账户 → 打开连接中心 → 选择模板 → 保存到钥匙串 → 测试连接**。MCP 读取工具可以传入 `connection_id`，程序会在本机解析对应凭证，因此密钥不会经过 MCP。现有 `~/.vibe-trading/<connector>.json` 与环境变量配置继续作为兼容回退；一旦某个连接拥有完整的钥匙串凭证，就不会与其他账户的旧配置混用。
@@ -439,53 +441,36 @@ vibe-trading connector install /tmp/my-broker
 | 层 | 发生什么 |
 |----|----------|
 | **Plan** | 选择相关金融 skills、tools、数据源，以及在有帮助时选择 swarm preset。 |
-| **Ground** | 通过可用 loader 拉取 A 股、港股/美股/加拿大/英国股票、加密、期货、外汇、文档或网页上下文。 |
+| **Ground** | 通过可用 loader 拉取美股、加拿大股票、ETF、期权、文档或网页上下文。 |
 | **Execute** | 生成可测试的策略代码，运行工具，并使用匹配的回测引擎或分析工作流。 |
 | **Validate** | 在适用时加入指标、benchmark comparison、Monte Carlo、Bootstrap、Walk-Forward、run cards 和 warnings。 |
-| **Deliver** | 返回报告、artifacts、tool traces，以及面向 TradingView、TDX、MetaTrader 5、MCP clients 或后续 sessions 的导出。 |
+| **Deliver** | 返回报告、artifacts、tool traces，以及面向 TradingView Pine Script、MCP clients 或后续 sessions 的导出。 |
 
 ---
 
 ## 📡 数据源与智能 Fallback
 
-一次 `get_market_data` 调用，**28 个行情数据源**（其中 **QVeris** 是可选的付费市场）。设 `source: "auto"`——loader 按符号自动选源，再沿按 **被封 IP 风险** 排序的同市场链向下走（永不封的公开源在前，限速 / 需 key 的在后）。零配置，无单点故障。
+一次 `get_market_data` 调用，**10 个行情数据源**。设 `source: "auto"`——loader 按符号自动选源，再沿按 **被封 IP 风险** 排序的同市场链向下走（永不封的公开源在前，限速 / 需 key 的在后）。零配置，无单点故障。
 
 | Source | Markets | Auth | Role |
 |--------|---------|------|------|
-| `tencent` · `mootdx` | A-share + HK | none | never IP-banned (`mootdx` = 通达信 TCP) |
-| `eastmoney` | A / US / HK | none | OHLCV + deep fundamentals & flow tools (throttled) |
-| `baostock` · `akshare` | A (+ US/HK/futures/macro/fx) | none | free fallbacks |
-| `tushare` | A / HK / futures / fund / macro | token | richest A-share |
-| `gildata` | A-share | token (Settings / `GILDATA_TOKEN`) | Hundsun Juyuan (恒生聚源) commercial feed — forward-adjusted dailies, joins the A-share chain tail |
-| `yahoo` | 美股 / 港股 / 加拿大 / 英国 | none | direct chart/quotes/options；TSX `.TO` / TSXV `.V`；LSE `.L` 按明示币种归一化 |
-| `sina` · `stooq` | 美股 | none | K-line to 1984 · EOD CSV |
-| `yfinance` | 美股 / 港股 / 加拿大 / 英国 | none | wrapper；TSX `.TO` / TSXV `.V`；LSE `.L` 遵守同一 GBP/GBp 合同 |
-| `longbridge` | 美股 / 港股 | App Key + App Secret + Access Token | 可选历史 OHLCV 数据源；需安装可选 SDK |
-| `finnhub` · `alphavantage` · `tiingo` · `fmp` | US | key | optional providers |
-| `qveris` | 全球多资产 | key · credits | **付费市场** — 一把 key 通 63+ 家（仅显式选用，绝不进 auto 链） |
-| `nobitex` · `wallex` | 加密（伊朗托曼计价对） | 无 | 公开 UDF 端点；**仅显式选用** —— 它们是唯二以托曼计价的源，绝不进 crypto 链，以免用 USDT 计价的序列冒名顶替 |
-| `okx` · `ccxt` · `binance` | crypto | none | OKX + 100+ exchanges + Binance 历史 / USD-M 永续 |
-| `futu` | HK / A | OpenD | optional local FutuOpenD |
-| `mt5` | 外汇 / 贵金属 | MT5 终端 | MetaTrader 5（Exness 风格）外汇 / 贵金属行情，1m–1D |
-| `tickerall` | 外汇 / 贵金属 | key + 账户（只读） | 同一家券商的 MT5 数据源，**托管** —— 无需本地终端，任意操作系统（仅显式选用，绝不进 auto 链） |
-| `pykrx` | 韩国（KRX：KOSPI/KOSDAQ） | 无 | `.KS` / `.KQ` 的 KOSPI / KOSDAQ 日线（可选 `krx` extra） |
-| `india_broker` | 印度（NSE/BSE） | 券商登录 | 只读 Zerodha / Shoonya / Dhan bars，服务 `.NS` / `.BO`（fallback 链尾） |
-| `local` | any | none | your own CSV / Parquet / DuckDB via `local:` prefix |
+| `yahoo` | 美股 / 加拿大 | 无 | 直接 chart/quotes/options；TSX `.TO` / TSXV `.V` |
+| `yfinance` | 美股 / 加拿大 | 无 | Yahoo wrapper；TSX `.TO` / TSXV `.V` |
+| `stooq` | 美股 | 无 | EOD CSV（非浏览器客户端会遇到浏览器验证页） |
+| `sina` | 美股 | 无 | K 线历史 |
+| `eastmoney` | 美股 | 无 | OHLCV（限速） |
+| `tiingo` · `fmp` · `finnhub` · `alphavantage` | 美股 | key | 可选、需 key 的提供方 |
+| `local` | 任意 | 无 | 自己的 CSV / Parquet / DuckDB，用 `local:` 前缀 |
 
 **Fallback 链（按被封 IP 风险排序）：**
 
-- **A股** → `tencent` · `mootdx` · `eastmoney` · `baostock` · `akshare` · `tushare` · `gildata` · `local`
-- **美股** → `yahoo` · `stooq` · `sina` · `eastmoney` · `yfinance` · `tiingo` · `fmp` · `finnhub` · `alphavantage` · `longbridge` · `akshare` · `local`
-- **港股** → `tencent` · `eastmoney` · `yahoo` · `futu` · `akshare` · `yfinance` · `tushare` · `longbridge` · `local`
-- **印度（NSE/BSE）** → `yahoo` · `yfinance` · `india_broker` · `local`
-- **韩国（KOSPI/KOSDAQ）** → `pykrx` · `yahoo` · `yfinance` · `local`
-- **英国（LSE）** → `yahoo` · `yfinance` · `local` *（仅接受明示为 GBP/GBp 的报价）*
-- **加密** → `okx` · `ccxt` · `binance` · `yfinance` · `local`
-- **外汇 / 贵金属** → `mt5` · `yfinance` · `akshare` · `local` &nbsp;·&nbsp; *(期货 / 基金 / 宏观 → `tushare`/`akshare` → `local`)*
+- **美股** → `yahoo` · `stooq` · `sina` · `eastmoney` · `yfinance` · `tiingo` · `fmp` · `finnhub` · `alphavantage` · `local`
+- **加拿大股** → `yahoo` · `yfinance` · `local`
+- **指数** → `yahoo` · `yfinance` · `local`
 
 ### 显式使用长桥
 
-Longbridge 是可选的美股/港股历史 OHLCV 数据源。安装 SDK：
+Longbridge 是可选的美股/加拿大历史 OHLCV 数据源。安装 SDK：
 
 ```bash
 pip install "vibe-trading-ai[longbridge]"
@@ -520,7 +505,7 @@ LONGBRIDGE_ACCESS_TOKEN=...
 
 <img src="https://www.qveris.com/logo-color.png" alt="QVeris" height="36">
 
-**数据可走免费，也可按需上付费。** 默认仍是 23 个内置免费源：自动 fallback、无需 key、无成本。通过 QVeris 可用一个 key 解锁 63+ provider、10,000+ capabilities（per QVeris），覆盖期权 Greeks、高级基本面、中国/港股/全球数据、宏观、加密、新闻与 filings；失败调用不扣费。入口在 Settings → QVeris 或 `vibe-trading data mode paid`。
+**数据可走免费，也可按需上付费。** 默认仍是 10 个内置免费源：自动 fallback、无需 key、无成本。通过 QVeris 可用一个 key 解锁 63+ provider、10,000+ capabilities（per QVeris），覆盖期权 Greeks、高级基本面、中国/港股/全球数据、宏观、加密、新闻与 filings；失败调用不扣费。入口在 Settings → QVeris 或 `vibe-trading data mode paid`。
 
 *QVeris 披露：通过 [Vibe-Trading 推荐链接](https://qveris.ai/?ref=Vyjjo5G_1cAHJA) 注册可额外获得 **1,000 积分**，同时支持本项目。*
 <!-- QVERIS-END -->
@@ -532,23 +517,21 @@ LONGBRIDGE_ACCESS_TOKEN=...
 为保持主 README 易读，详细清单折叠在下方。需要检查可用构件时可展开查看。
 
 <details>
-<summary><b>Finance Skill Library</b> <sub>9 个类别中的 90 个 skills</sub></summary>
+<summary><b>Finance Skill Library</b> <sub>7 个类别中的 58 个 skills</sub></summary>
 
-- 📊 90 个专业金融 skills，分布在 9 个类别中
-- 🌐 覆盖传统市场、加密与 DeFi
+- 📊 58 个专业金融 skills，分布在 7 个类别中
+- 🌐 覆盖美股与加拿大股票、ETF 与期权
 - 🔬 从数据源到量化研究的完整能力链路
 
 | 类别 | Skills | 示例 |
 |------|--------|------|
-| Data Source | 10 | `data-routing`, `tushare`, `yfinance`, `okx-market`, `akshare`, `mootdx`, `ccxt`, `eastmoney`, `sec-edgar`, `qveris` |
-| Strategy | 19 | `strategy-generate`, `cross-market-strategy`, `technical-basic`, `candlestick`, `ichimoku`, `elliott-wave`, `smc`, `multi-factor`, `ml-strategy` |
-| Analysis | 23 | `factor-research`, `correlation-regime`, `macro-analysis`, `global-macro`, `valuation-model`, `investor-lenses`, `credit-analysis`, `dividend-analysis` |
-| Asset Class | 9 | `options-strategy`, `options-advanced`, `convertible-bond`, `etf-analysis`, `asset-allocation`, `sector-rotation` |
-| Crypto | 7 | `perp-funding-basis`, `liquidation-heatmap`, `stablecoin-flow`, `defi-yield`, `onchain-analysis` |
-| Flow | 8 | `hk-connect-flow`, `us-etf-flow`, `edgar-sec-filings`, `financial-statement`, `adr-hshare` |
-| Tool | 10 | `backtest-diagnose`, `report-generate`, `pine-script`, `doc-reader`, `web-reader`, `vnpy-export`, `trade-journal` |
+| Data Source | 4 | `data-routing`, `yfinance`, `sec-edgar`, `qveris` |
+| Strategy | 18 | `strategy-generate`, `cross-market-strategy`, `technical-basic`, `candlestick`, `ichimoku`, `elliott-wave`, `smc`, `multi-factor`, `ml-strategy` |
+| Analysis | 19 | `factor-research`, `correlation-regime`, `macro-analysis`, `valuation-model`, `investor-lenses`, `credit-analysis`, `dividend-analysis` |
+| Asset Class | 5 | `options-strategy`, `options-advanced`, `options-payoff`, `hedging-strategy`, `asset-allocation` |
+| Flow | 3 | `us-etf-flow`, `edgar-sec-filings`, `research-goal` |
+| Tool | 6 | `backtest-diagnose`, `report-generate`, `doc-reader`, `web-reader`, `geopolitical-risk`, `social-media-intelligence` |
 | Research | 3 | `alpha-zoo`, `strategy-dev-manager`, `strategy-discovery` |
-| Risk Analysis | 1 | `ashare-pre-st-filter` |
 
 </details>
 
@@ -568,7 +551,7 @@ LONGBRIDGE_ACCESS_TOKEN=...
    @register
    class DataLoader:
        name = "mysource"            # the value you pass as source=
-       markets = {"us_equity"}      # a_share/us_equity/hk_equity/crypto/futures/fund/macro/forex
+       markets = {"us_equity"}      # us_equity/ca_equity/index
        requires_auth = False
 
        def is_available(self) -> bool:
@@ -589,15 +572,14 @@ LONGBRIDGE_ACCESS_TOKEN=...
 5. **使用** —— 在回测配置里写 `source="mysource"`，或经 CLI / agent 调用。
 
 > **实时 ticks / 盘口深度不在 loader 范围内** —— loader 层只负责 point-in-time
-> 历史 K 线。实时行情走 broker connector：加密用 `okx` / `binance` / `ccxt`，
-> 股票用 `futu` / `tiger`。
+> 历史 K 线。实时行情走 broker connector：`futu` / `tiger`。
 
 </details>
 
 <details>
 <summary><b>Broker Connectors</b> <sub>6 家券商——读取 + 模拟盘，支持的券商可受约束实盘</sub></summary>
 
-连接器优先（connector-first）的配置档。多数连接器支持读取 + 模拟盘下单 —— IBKR 只读，Robinhood 只有实盘（没有模拟盘），Scalable Capital 只读（完全没有模拟盘账户），Trading 212 与 Toss Securities 连模拟盘下单也一律拒绝；实盘下单受用户定义的 mandate 约束（标的白名单、下单规模 / 敞口上限、每日交易次数上限、即时 kill switch），且从不托管资金——由券商执行。下单类工具不经 MCP 暴露（仅 agent + CLI）。研究 / 回测路径在结构上被隔离，无法触达任何实盘端点。
+连接器优先（connector-first）的配置档。多数连接器支持读取 + 模拟盘下单 —— IBKR 只读，Robinhood 只有实盘（没有模拟盘）；实盘下单受用户定义的 mandate 约束（标的白名单、下单规模 / 敞口上限、每日交易次数上限、即时 kill switch），且从不托管资金——由券商执行。下单类工具不经 MCP 暴露（仅 agent + CLI）。研究 / 回测路径在结构上被隔离，无法触达任何实盘端点。
 
 | Broker | Markets | Capabilities |
 |--------|---------|--------------|
@@ -615,32 +597,31 @@ LONGBRIDGE_ACCESS_TOKEN=...
 <details>
 <summary><b>Preset Trading Teams</b> <sub>25 个 swarm presets</sub></summary>
 
-- 🏢 30 个开箱即用的智能体团队
+- 🏢 25 个开箱即用的智能体团队
 - ⚡ 预配置金融工作流
 - 🎯 投资、交易与风险管理 presets
 
 | Preset | 工作流 |
 |--------|--------|
 | `investment_committee` | 多空辩论 → 风险审查 → PM 最终决策 |
-| `global_equities_desk` | A 股 + 港/美股 + 加密研究员 → 全球策略师 |
-| `crypto_trading_desk` | Funding/basis + liquidation + flow → 风险经理 |
+| `global_equities_desk` | 美股 / 加拿大股票研究员 → 全球策略师 |
 | `earnings_research_desk` | 基本面 + 预期修正 + options → 财报策略师 |
 | `macro_rates_fx_desk` | 利率 + 外汇 + 商品 → 宏观 PM |
 | `quant_strategy_desk` | 筛选 + 因子研究 → 回测 → 风险审计 |
 | `technical_analysis_panel` | 经典 TA + Ichimoku + harmonic + Elliott + SMC → 共识 |
 | `risk_committee` | 回撤 + 尾部风险 + regime review → 审批 |
-| `global_allocation_committee` | A 股 + 加密 + 港/美股 → 跨市场配置 |
+| `global_allocation_committee` | 美股 / 加拿大股票 + ETF → 跨市场配置 |
 
-<sub>另有 20+ 专业 presets，可运行 vibe-trading --swarm-presets 查看全部。
+<sub>另有 16 个专业 presets，可运行 vibe-trading --swarm-presets 查看全部。
 
 </sub>
 
 </details>
 
 <details>
-<summary><b>Alpha Zoo</b> <sub>462 个预置 alpha，覆盖 5 个家族</sub></summary>
+<summary><b>Alpha Zoo</b> <sub>271 个预置 alpha，覆盖 4 个家族</sub></summary>
 
-- 🧬 462 个横截面 alpha，算子层即禁用 lookahead
+- 🧬 271 个横截面 alpha，算子层即禁用 lookahead
 - 📈 一条 CLI 命令完成 IC + IR + alive/reversed/dead 分类
 - 🔬 AST 纯函数门禁 + 300 行 lookahead 哨兵测试 + `pytest-socket` 网络阻断
 - 📦 Qlib 部分附 Apache-2 出处声明；每个 zoo 一份 `LICENSE.md`，声明公式属于数学内容
@@ -650,7 +631,7 @@ LONGBRIDGE_ACCESS_TOKEN=...
 |-----|------|------|------|
 | **qlib158** | 154 | Microsoft Qlib `Alpha158`（Apache-2.0，锁定 commit） | Apache-2.0 |
 | **alpha101** | 101 | Kakushadze (2015), "101 Formulaic Alphas", arXiv:1601.00991 | 公式属于数学内容 |
-| **gtja191** | 191 | 国君证券 (2014)《191 个短周期交易型 alpha 因子》研报 | 公式属于数学内容 |
+| **qlib158** | 191 | 国君证券 (2014)《191 个短周期交易型 alpha 因子》研报 | 公式属于数学内容 |
 | **academic** | 12 | Fama-French 5 因子 + Carhart 动量（基于价格的代理实现） + Jegadeesh reversal + George-Hwang 52-week-high + Amihud illiquidity + Harvey-Siddique skew + Frazzini-Pedersen betting-against-beta + correlation-rewiring 稳定性 | 公开学术文献 |
 | **fundamental** | 4 | PIT 安全的 SEC company facts——盈利收益率、ROE、毛利率因子、资产增长（按 filed-date 锚定） | 公开财务数据 |
 
@@ -659,19 +640,12 @@ LONGBRIDGE_ACCESS_TOKEN=...
 </details>
 
 <details>
-<summary><b>Backtest Engines</b> <sub>10 个引擎 + options portfolio，跨市场 composite</sub></summary>
+<summary><b>Backtest Engines</b> <sub>2 个引擎 + options portfolio，跨市场 composite</sub></summary>
 
 | 引擎 | 市场 | 说明 |
 |------|------|------|
-| **ChinaA** | A 股 | T+1、涨跌停、pre-ST 筛选 |
-| **GlobalEquity** | 美股 / 港股 / 加拿大 / 英国 | 支持日内往返；按市场应用手数、最小价位、结算币种和成本 |
-| **IndiaEquity** | 印度（NSE/BSE） | T+1、熔断带、config 驱动的 STT / 印花税 / SEBI / GST 成本栈 |
-| **KoreaEquity** | 韩国（KRX：KOSPI/KOSDAQ） | 只做多，统一最小价位网格上于成交时刻判定 ±30% 涨跌停，2026 年 0.20% 证券交易税 |
-| **VietnamEquity** | 越南（HOSE） | 只做多，T+2 交收锁定，10/50/100 越南盾最小价位网格上 ±7% 涨跌停，100 股整手，0.1% 卖出方税 |
-| **Crypto** | 加密现货 / USD-M 永续 | 资金费结算、成交价/标记价分离 |
-| **ChinaFutures** · **GlobalFutures** | 期货 | 保证金、合约乘数 |
-| **Forex** | 外汇 / 贵金属 | 经 `mt5` loader |
-| **Composite** | 跨市场 | 跨市场共享单一资金池（`source="auto"`） |
+| **GlobalEquity** | 美股 / 加拿大 | 支持日内往返；按市场应用手数、最小价位、结算币种和成本 |
+| **Composite** | 美股 / 加拿大 / 指数 | 跨市场共享单一资金池（`source="auto"`） |
 | **options_portfolio** | 期权 | 多腿、Greeks、payoff/scenario |
 
 Bar 周期：1m / 5m / 15m / 30m / 1H / 4H / 1D，以及由日线合成的周线 / 月线（1W / 1M）。15 项指标 + benchmark 对比，**5 个组合优化器**（equal-volatility / risk-parity / mean-variance / max-diversification / turnover-aware），以及 3 个验证工具（Monte Carlo / Bootstrap / Walk-Forward）。
@@ -787,7 +761,7 @@ pip install vibe-trading-ai
 
 ```bash
 vibe-trading init
-vibe-trading run -p "Backtest a BTC-USDT 20/50 moving-average strategy for 2024 and summarize return and drawdown"
+vibe-trading run -p "Backtest an AAPL 20/50 moving-average strategy for 2024 and summarize return and drawdown"
 ```
 
 > **从旧版本升级？** 0.1.10 升级到了 LangChain 1.x。若在 0.1.10 之前的安装上执行 `pip install -U vibe-trading-ai` 后导入报错（例如 langgraph 无法导入），请重建 venv 或运行 `pip install --force-reinstall vibe-trading-ai`。全新安装不受影响。
@@ -825,7 +799,7 @@ vibe-trading-mcp               # start MCP server (stdio)
 
 > **支持的 LLM providers：** OpenRouter、OpenAI、Anthropic（原生 Messages API）、DeepSeek、Gemini、Groq、DashScope/Qwen、Zhipu、Moonshot/Kimi、MiniMax、SiliconFlow（CN + Global）、Xiaomi MIMO、Novita AI、iFlytek 星火、Z.ai、NVIDIA NIM、ModelScope、GitHub Copilot、Ollama（本地）。未设置 `*_BASE_URL` 时，每个 provider 会回退到其规范端点，因此只需一个 key 即可。配置见 `.env.example`。
 
-> **提示：** 由于自动 fallback，所有市场都可以在没有任何 API key 的情况下工作。yfinance/Yahoo（港股/美股/加拿大/英国）、OKX（加密）、mootdx（A 股，TCP 直连不封 IP）和 AKShare（A 股、美股、港股、期货、外汇）都是免费的。LSE `.L` 报价必须明示为 GBP 或 GBp，以便在英镑记账前将便士归一化。Tushare token 是可选项 —— mootdx 是首选的免 token A 股 fallback，AKShare 作为覆盖更广的兜底。
+> **提示：** 由于自动 fallback，美股与加拿大市场无需任何 API key 即可工作。Yahoo 与 yfinance（美股/加拿大）、Stooq、Sina、Eastmoney（美股）免费；Finnhub、Alpha Vantage、Tiingo、FMP 为可选的需 key 提供方。
 
 ### Path A: Docker（零配置）
 
@@ -910,7 +884,6 @@ skill + MCP config 会下载到你的智能体 skills 目录。详情见 [ClawHu
 | `<PROVIDER>_API_KEY` | Yes* | API key（`OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY` 等） |
 | `<PROVIDER>_BASE_URL` | Yes | API endpoint URL |
 | `LANGCHAIN_MODEL_NAME` | Yes | 模型名称（例如 `deepseek-v4-pro`） |
-| `TUSHARE_TOKEN` | No | A 股数据的 Tushare Pro token（会 fallback 到 AKShare） |
 | `TIMEOUT_SECONDS` | No | LLM 调用超时，默认 120s |
 | `API_AUTH_KEY` | 网络部署推荐 | API 可被非本地客户端访问时要求的 Bearer token |
 | `VIBE_TRADING_ENABLE_SHELL_TOOLS` | No | 在远程 API/MCP-SSE 风格部署中显式启用 shell-capable tools |
@@ -922,7 +895,7 @@ skill + MCP config 会下载到你的智能体 skills 目录。详情见 [ClawHu
 
 <sub>* Ollama 不需要 API key。OpenAI Codex 使用 ChatGPT OAuth，并通过 `oauth-cli-kit` 存储 token，不写入 `agent/.env`。</sub>
 
-**免费数据（无需 key）：** A 股通过 AKShare，港股/美股/加拿大/英国股票通过 Yahoo/yfinance，加密通过 OKX，100+ 加密交易所通过 CCXT。系统会为每个市场自动选择最佳可用数据源。
+**免费数据（无需 key）：** 美股与加拿大股票通过 Yahoo/yfinance，美股行情通过 Stooq、Sina、Eastmoney。系统会为每个市场自动选择最佳可用数据源。
 
 ### 🎯 Recommended Models
 
@@ -944,7 +917,7 @@ Vibe-Trading 是高度依赖工具的智能体：skills、backtests、memory 和
 vibe-trading               # interactive TUI
 vibe-trading run -p "..."  # single run
 vibe-trading serve         # API server
-vibe-trading alpha list    # 浏览 462 个预置 alpha；支持 show / bench / compare / export-manifest 子命令
+vibe-trading alpha list    # 浏览 271 个预置 alpha；支持 show / bench / compare / export-manifest 子命令
 vibe-trading playbook list # 五个定时研究模板；支持 show / create 子命令
 vibe-trading channels status --local  # 检查 IM 通道配置和依赖安装提示
 vibe-trading provider doctor  # 打印脱敏后的 provider/proxy/依赖诊断
@@ -989,7 +962,7 @@ vibe-trading provider doctor  # 打印脱敏后的 provider/proxy/依赖诊断
 <summary><b>Single run 与 flags</b></summary>
 
 ```bash
-vibe-trading run -p "Backtest BTC-USDT MACD strategy, last 30 days"
+vibe-trading run -p "Backtest AAPL MACD strategy, last 30 days"
 vibe-trading run -p "Analyze AAPL momentum" --json
 vibe-trading run -f strategy.txt
 echo "Backtest 000001.SZ RSI" | vibe-trading run
@@ -1003,13 +976,13 @@ vibe-trading --swarm-run investment_committee '{"topic":"BTC outlook"}'
 vibe-trading --list
 vibe-trading --show <run_id>
 vibe-trading --code <run_id>
-vibe-trading --pine <run_id>           # Export indicators (TradingView + TDX + MT5)
+vibe-trading --pine <run_id>           # Export indicators (TradingView Pine Script)
 vibe-trading --trace <run_id>
 vibe-trading --continue <run_id> "refine the strategy"
 vibe-trading --upload report.pdf
-vibe-trading alpha list --zoo gtja191 --limit 10
-vibe-trading alpha show gtja191_171
-vibe-trading alpha bench --zoo gtja191 --universe csi300 --period 2018-2025 --top 20
+vibe-trading alpha list --zoo qlib158 --limit 10
+vibe-trading alpha show qlib158_beta10
+vibe-trading alpha bench --zoo qlib158 --universe sp500 --period 2018-2025 --top 20
 ```
 
 </details>
@@ -1059,31 +1032,31 @@ vibe-trading channels pairing --channel telegram list
 # Moving average crossover on US equities
 vibe-trading run -p "Backtest a 20/50-day moving average crossover on AAPL for the past year, show Sharpe ratio and max drawdown"
 
-# RSI mean-reversion on crypto
-vibe-trading run -p "Test RSI(14) mean-reversion on BTC-USDT: buy below 30, sell above 70, last 6 months"
+# RSI mean-reversion on US equities
+vibe-trading run -p "Test RSI(14) mean-reversion on AAPL: buy below 30, sell above 70, last 6 months"
 
-# Multi-factor strategy on A-shares
-vibe-trading run -p "Backtest a momentum + value + quality multi-factor strategy on CSI 300 constituents over 2 years"
+# Multi-factor strategy on US large caps
+vibe-trading run -p "Backtest a momentum + value + quality multi-factor strategy on S&P 500 constituents over 2 years"
 
-# After backtesting, export to TradingView / TDX / MetaTrader 5
+# After backtesting, export the indicators to TradingView
 vibe-trading --pine <run_id>
 ```
 
 **一行命令横评预置 alpha zoo**：
 ```bash
-vibe-trading alpha bench --zoo gtja191 --universe csi300 --period 2018-2025 --top 20
+vibe-trading alpha bench --zoo qlib158 --universe sp500 --period 2018-2025 --top 20
 ```
 
 **浏览目录** + 查看单个 alpha：
 ```bash
-vibe-trading alpha list --zoo gtja191 --theme reversal --limit 10
-vibe-trading alpha show gtja191_171
+vibe-trading alpha list --zoo qlib158 --theme reversal --limit 10
+vibe-trading alpha show qlib158_beta10
 ```
 
 **用 zoo 因子组合多因子信号**（Python）：
 ```python
 from src.skills.multi_factor.zoo_signal_engine import ZooSignalEngine
-engine = ZooSignalEngine.from_zoo(["gtja191_171", "gtja191_111", "gtja191_163"])
+engine = ZooSignalEngine.from_zoo(["qlib158_beta10", "qlib158_beta20", "qlib158_beta30"])
 panel = ...  # your wide OHLCV panel
 signal = engine.compute_signal(panel)
 ```
@@ -1097,8 +1070,8 @@ vibe-trading run -p "Research NVDA: earnings trend, analyst consensus, option fl
 # Macro analysis
 vibe-trading run -p "Analyze the current Fed rate path, USD strength, and impact on EM equities and gold"
 
-# Crypto on-chain
-vibe-trading run -p "Deep dive BTC on-chain: whale flows, exchange balances, miner activity, and funding rates"
+# Sector rotation scan
+vibe-trading run -p "Deep dive NVDA: earnings trend, institutional flows, analyst revisions, and key risks"
 ```
 
 ### Swarm Workflows
@@ -1110,8 +1083,8 @@ vibe-trading --swarm-run investment_committee '{"topic": "Is TSLA a buy at curre
 # Quant strategy from screening to backtest
 vibe-trading --swarm-run quant_strategy_desk '{"universe": "S&P 500", "horizon": "3 months"}'
 
-# Crypto desk: funding + liquidation + flow → risk manager
-vibe-trading --swarm-run crypto_trading_desk '{"asset": "ETH-USDT", "timeframe": "1w"}'
+# ETF allocation desk: fund selection + macro + flow → allocator
+vibe-trading --swarm-run etf_allocation_desk '{"universe": "US ETFs", "horizon": "1w"}'
 
 # Global macro portfolio allocation
 vibe-trading --swarm-run macro_rates_fx_desk '{"focus": "Fed pivot impact on EM bonds"}'
@@ -1124,7 +1097,7 @@ vibe-trading --swarm-run macro_rates_fx_desk '{"focus": "Fed pivot impact on EM 
 vibe-trading run -p "Remember: I prefer RSI-based strategies, max 10% drawdown, hold period 5–20 days"
 
 # The agent recalls them in future sessions automatically
-vibe-trading run -p "Build a crypto strategy that fits my risk profile"
+vibe-trading run -p "Build a US equity strategy that fits my risk profile"
 ```
 
 ### Upload & Analyze Documents
@@ -1195,7 +1168,7 @@ Shell-capable process tools（`bash` / `background_run` / `cancel_background`）
 
 ### Web UI Settings
 
-Web UI Settings 页面允许本地用户更新 LLM provider/model、base URL、generation parameters、reasoning effort，以及 Tushare token 等可选市场数据凭据。Settings 会持久化到 `agent/.env`；provider defaults 从 `agent/src/providers/llm_providers.json` 加载。
+Web UI Settings 页面允许本地用户更新 LLM provider/model、base URL、generation parameters、reasoning effort。Settings 会持久化到 `agent/.env`；provider defaults 从 `agent/src/providers/llm_providers.json` 加载。
 
 Settings 读取无副作用：`GET /settings/llm` 和 `GET /settings/data-sources` 永远不会创建 `agent/.env`，并且只返回项目相对路径。Settings 读写可能暴露凭据状态或更新凭据/运行时环境，因此在配置了 `API_AUTH_KEY` 时会要求认证。如果 dev mode 下未设置 `API_AUTH_KEY`，settings 访问只接受 loopback clients。
 
@@ -1215,7 +1188,7 @@ VIBE_TRADING_ENABLE_SCHEDULER=1 vibe-trading serve --port 8899
 # 每 6 小时（cron）
 curl -X POST http://localhost:8899/scheduled-runs \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"Scan CSI300 for momentum breakouts and backtest the top 5","schedule":"0 */6 * * *"}'
+  -d '{"prompt":"Scan S&P 500 for momentum breakouts and backtest the top 5","schedule":"0 */6 * * *"}'
 
 # 工作日 23:30（奥克兰挂钟时间，夏令时不漂移）
 curl -X POST http://localhost:8899/scheduled-runs \
@@ -1231,7 +1204,7 @@ curl -X DELETE http://localhost:8899/scheduled-runs/<job_id>
 
 agent 只有一个调度工具 `scheduled_research`：读操作查看状态/任务/模板；`propose_create` 与 `propose_cancel` 只落一份短时效的确认提案，绝不直接改动任务存储。Web 渲染确定性的确认卡片，CLI 询问 `y/N`，IM 会话需准确回复 `confirm`（`确认`）或 `cancel`（`取消`）——只有这些界面动作会调用 commit 端点。任务过了 `end_at` 即标记为 `expired`，不再触发。投递与通道解耦：在 `channels.deliveryTargets` 下配置可复用的不透明目标引用，agent 与确认界面只见 ref/label/channel，永远看不到平台原始 chat/user id；适配器无平台回执时投递状态为 `accepted`，仅当返回平台消息 id 时才是 `sent`（目前飞书已端到端支持）。
 
-调度器自带**五个开箱即用的研究模板** —— `premarket-brief`、`earnings-season-tracker`、`portfolio-checkup`、`a-share-money-flow`、`institutional-holdings-diff`。每个模板用自然语言声明它需要什么数据，而不是点名某个工具，因此工具面扩展时模板依然有效；模板也被要求**指出缺失的输入**，而不是凭记忆补上。CLI、REST、TUI 里的 `/playbook` 三个入口都能用：
+调度器自带**五个开箱即用的研究模板** —— `premarket-brief`、`earnings-season-tracker`、`portfolio-checkup`、`us-ca-money-flow`、`institutional-holdings-diff`。每个模板用自然语言声明它需要什么数据，而不是点名某个工具，因此工具面扩展时模板依然有效；模板也被要求**指出缺失的输入**，而不是凭记忆补上。CLI、REST、TUI 里的 `/playbook` 三个入口都能用：
 
 ```bash
 vibe-trading playbook list                     # 列出五个模板
@@ -1253,7 +1226,7 @@ POST `{}` 即按模板自身的建议节奏和默认变量排程。渲染后的�
 
 ## 🔌 MCP Plugin
 
-Vibe-Trading 为任何 MCP-compatible client 暴露 74 个 MCP tools。它作为 stdio subprocess 运行，无需 server setup。核心 research tools 对港股/美股/加密零 API key 可用；trading connector tools 使用当前选择的 connector profile；只有 `run_swarm` 需要 LLM key。
+Vibe-Trading 为任何 MCP-compatible client 暴露 64 个 MCP tools。它作为 stdio subprocess 运行，无需 server setup。核心 research tools 对美股/加股零 API key 可用；trading connector tools 使用当前选择的 connector profile；只有 `run_swarm` 需要 LLM key。
 
 **环境变量：** server 由 client 自己 spawn，因此在 shell 里 `export` 永远传不进去 —— 请写在 client 的 `env` 块里。生成的回测代码被限制在 allowed run roots 内，所以要把结果写进你自己的工作目录，需要 `VIBE_TRADING_ALLOWED_RUN_ROOTS`：
 
@@ -1309,7 +1282,7 @@ vibe-trading-mcp --transport sse   # legacy SSE (deprecated)
 
 </details>
 
-**暴露的 MCP tools（74）：** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`.
+**暴露的 MCP tools（64）：** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `quantlib_call`, `cashflow_performance`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`.
 
 ### SWARM 的外部 MCP tools
 
@@ -1333,7 +1306,7 @@ npx clawhub@latest install vibe-trading --force
 <details>
 <summary><b>OpenSpace — 自进化 skills</b></summary>
 
-全部 90 个 finance skills 都发布在 [open-space.cloud](https://open-space.cloud)，并通过 OpenSpace 的自进化引擎自主演进。
+全部 58 个 finance skills 都发布在 [open-space.cloud](https://open-space.cloud)，并通过 OpenSpace 的自进化引擎自主演进。
 
 要配合 OpenSpace 使用，请将两个 MCP servers 都加入你的 agent config：
 
@@ -1355,90 +1328,9 @@ npx clawhub@latest install vibe-trading --force
 }
 ```
 
-OpenSpace 会自动发现全部 90 个 skills，启用 auto-fix、auto-improve 和社区分享。在任意已连接 OpenSpace 的智能体中，可通过 `search_skills("finance backtest")` 搜索 Vibe-Trading skills。
+OpenSpace 会自动发现全部 58 个 skills，启用 auto-fix、auto-improve 和社区分享。在任意已连接 OpenSpace 的智能体中，可通过 `search_skills("finance backtest")` 搜索 Vibe-Trading skills。
 
 </details>
-
-### MetaTrader 5（Exness 及其他 MT5 券商）
-
-通过官方 `MetaTrader5` 包连接**本地运行的 MT5 终端**（**仅限 Windows**）：
-
-```bash
-pip install "vibe-trading-ai[mt5]"
-```
-
-配置 `~/.vibe-trading/mt5.json`（手动创建，支持的系统上 chmod 600）：
-
-```json
-{
-  "login": 12345678,
-  "password": "...",
-  "server": "Exness-MT5Trial8",
-  "symbol_suffix": "m",
-  "max_order_volume": 1.0,
-  "max_order_notional_usd": 10000
-}
-```
-
-然后：
-
-```bash
-vibe-trading connector use mt5-paper-sdk
-vibe-trading connector check
-vibe-trading connector account
-vibe-trading connector quote EURUSD
-vibe-trading connector history EURUSD
-```
-
-| Profile | 账户 | 订单 |
-|---------|------|------|
-| `mt5-paper-sdk` | demo | 只读 |
-| `mt5-live-sdk-readonly` | real | 只读 |
-| `mt5-paper-trade` | demo | 直接下单（connector 单笔规模护栏生效） |
-| `mt5-live-trade` | real | mandate + kill-switch 门控 |
-
-安全边界：**“paper” 即券商的 demo 账户**，且每次调用都会校验——终端会回传 `account_info().trade_mode` 和登录账号，因此 paper profile 挂到真实资金账户（或反之）会被硬性拒绝。MT5 以**手（lot）**为单位下单（1 lot EURUSD = 100,000 EUR）；live mandate 门控通过 connector 的 USD 计价 hook 为手数定价，且 connector 自身的 `max_order_volume` / `max_order_notional_usd` 护栏在 demo 和 live 上均生效，且在无法为某笔名义金额定价时 fail-closed。对冲账户（Exness 默认）注意：反向订单会**开出一笔对冲仓**——请按 ticket 平仓（用持仓 ticket 调 `trading_cancel_order`），成交会被钉在该持仓上，只能减少敞口。回滚/停机路径：kill switch 阻断新的 live 订单；撤单始终可用并记入审计日志。Mandate 限额以 USD 计；非 USD 账户货币由券商侧按账户货币做保证金强制。
-
-`mt5` 行情 loader（外汇 fallback 链头）共用同一份 `mt5.json`——没有该文件时，它会以只读方式挂到最近使用且已登录的终端。
-
----
-
-## 🔌 eToro Public API 连接器
-
-通过 API 密钥对（`x-api-key` + `x-user-key`）连接 [eToro Public API](https://builders.etoro.com/) 的模拟盘与实盘账户。模拟与实盘在**结构上**分离：demo 密钥只能访问 `/demo` API 路径。
-
-配置 `~/.vibe-trading/etoro.json`（需自行创建；支持的平台上请 `chmod 600`）：
-
-```json
-{
-  "api_key": "YOUR_PUBLIC_API_KEY",
-  "user_key": "YOUR_USER_KEY",
-  "profile": "paper"
-}
-```
-
-也可以在 `~/.vibe-trading/.env` 里设置 `ETORO_API_KEY` 和 `ETORO_USER_KEY`。
-
-然后：
-
-```bash
-vibe-trading connector use etoro-paper-sdk
-vibe-trading connector check
-vibe-trading connector account
-vibe-trading connector positions
-vibe-trading connector quote BTC
-```
-
-| 配置档 | 账户 | 下单 |
-|--------|------|------|
-| `etoro-paper-sdk` | demo | 只读 |
-| `etoro-live-sdk-readonly` | 实盘 | 只读 |
-| `etoro-paper-trade` | demo | 在 demo 路径上直接下单 |
-| `etoro-live-trade` | 实盘 | 受 mandate + kill switch 约束 |
-
-标的查找走 eToro 的 `internalSymbolFull` 搜索（例如 `BTC` → instrument id `100000`）。交易前请用 `etoro_search_instruments` agent 工具解析代码。
-
-安全边界：模拟与实盘按路径分离且与密钥绑定（`paper_guard: path_separated_key_bound`）。实盘的风险增加类操作（开仓、跟单启动/加仓）需要已授权的 mandate、清晰的未暂停状态，以及一个已验证的 USD 账户用于跟单名义金额的约束。已校验的全部/部分平仓、撤销挂单与跟单平仓在暂停状态下仍可用，并全部记入审计日志。撤销一笔待执行的平仓、以及修改持仓止损止盈是**仅限模拟盘**的：实盘路径 fail-closed，因为这些操作可能增加敞口或额外划转保证金，而 API 数据不足以量化增量 USD 风险。跟单金额以 eToro 账户币种计价，每次跟单启动/调整都需要调用方提供一个 1-35 字符的 URL-safe 引用 id 用于轮询。eToro 专属的写操作工具（`etoro_close_position`、`etoro_copy_*` 等）**仅为 agent 工具**——不经 MCP 或 CLI 暴露。回滚方式：revert 相关 connector commit 或停用配置档；halt 会阻断新的实盘风险增加类操作。
 
 ---
 
@@ -1590,7 +1482,7 @@ Alpaca；被拒绝或超时的**永远不会被发出**。
 > 再重试。
 
 **覆盖范围：** Alpaca 的**下单、撤单和全部五个读取**——即整条 connector 出口，所以任何路径上
-进程都不持有密钥。HMAC 签名类券商（Binance / OKX）是后续项（客户端签名不适合纯出口注入）。
+进程都不持有密钥。需要客户端签名的券商不适合纯出口注入，暂不在覆盖范围内。
 这些 hook 是增量的：它们只活在 Alpaca connector 内部，不改动实盘 mandate 闸门。
 
 ### 配置项参考
@@ -1665,13 +1557,13 @@ Vibe-Trading/
 ├── agent/                          # 后端（Python）
 │   ├── cli/                        # CLI 包 —— 交互式 TUI + 子命令
 │   ├── api_server.py               # FastAPI server —— runs、sessions、upload、swarm、SSE
-│   ├── mcp_server.py               # MCP server —— 74 个工具，面向 OpenClaw / Claude Desktop
+│   ├── mcp_server.py               # MCP server —— 64 个工具，面向 OpenClaw / Claude Desktop
 │   │
 │   ├── src/
 │   │   ├── agent/                  # ReAct agent 内核
 │   │   │   ├── loop.py             #   5 层上下文压缩 + 读/写工具批处理
 │   │   │   ├── context.py          #   system prompt + 持久记忆自动召回
-│   │   │   ├── skills.py           #   skill loader（90 个内置 + 通过 CRUD 创建的用户 skill）
+│   │   │   ├── skills.py           #   skill loader（58 个内置 + 通过 CRUD 创建的用户 skill）
 │   │   │   ├── tools.py            #   tool 基类 + 注册表
 │   │   │   ├── memory.py           #   每个 run 的轻量 workspace 状态
 │   │   │   ├── frontmatter.py      #   共享的 YAML frontmatter 解析器
@@ -1680,7 +1572,7 @@ Vibe-Trading/
 │   │   ├── memory/                 # 跨 session 持久记忆
 │   │   │   └── persistent.py       #   基于文件的记忆（~/.vibe-trading/memory/）
 │   │   │
-│   │   ├── tools/                  # 107 个自动发现的 agent 工具
+│   │   ├── tools/                  # 90 个自动发现的 agent 工具
 │   │   │   ├── backtest_tool.py    #   运行回测
 │   │   │   ├── remember_tool.py    #   跨 session 记忆（save/recall/forget）
 │   │   │   ├── skill_writer_tool.py #  skill CRUD（save/patch/delete/file）
@@ -1689,24 +1581,24 @@ Vibe-Trading/
 │   │   │   ├── web_search_tool.py  #   DuckDuckGo 网络搜索
 │   │   │   └── ...                 #   bash、文件 I/O、因子分析、期权、alpha 浏览 + 横评等
 │   │   │
-│   │   ├── factors/                # Alpha Zoo —— 5 个家族共 462 个 alpha
+│   │   ├── factors/                # Alpha Zoo —— 5 个家族共 271 个 alpha
 │   │   │   ├── base.py             #   19 个算子（rank/scale/ts_*/delta/decay_linear/safe_div/vwap）
 │   │   │   ├── registry.py         #   纯 AST 元数据加载 + 惰性计算 + sanity 校验
 │   │   │   ├── bench_runner.py     #   IC + alive/reversed/dead 分类
-│   │   │   └── zoo/                #   qlib158 (154) + alpha101 (101) + gtja191 (191) + academic (12) + fundamental (4)
+│   │   │   └── zoo/                #   qlib158 (154) + alpha101 (101) + academic (12) + fundamental (4)
 │   │   │
 │   │   ├── api/                    # FastAPI 路由模块
 │   │   │   └── alpha_routes.py     #   /alpha/list、/alpha/{id}、/alpha/bench、SSE 流
 │   │   │
-│   │   ├── skills/                 # 9 个类别共 90 个 finance skills（每个一份 SKILL.md）
+│   │   ├── skills/                 # 7 个类别共 58 个 finance skills（每个一份 SKILL.md）
 │   │   ├── swarm/                  # Swarm DAG 执行引擎
-│   │   │   └── presets/            #   30 个 swarm preset YAML 定义
+│   │   │   └── presets/            #   25 个 swarm preset YAML 定义
 │   │   ├── session/                # 多轮对话 + FTS5 session 搜索
 │   │   └── providers/              # LLM provider 抽象层
 │   │
 │   └── backtest/                   # 回测引擎
-│       ├── engines/                #   9 个引擎 + 跨市场 composite 引擎 + options_portfolio
-│       ├── loaders/                #   28 个数据源：tushare、okx、nobitex、wallex、binance、yfinance、akshare、baostock、tencent、mootdx、ccxt、futu、pykrx、local、eastmoney、sina、stooq、yahoo、finnhub、alphavantage、tiingo、fmp、longbridge、mt5、qveris、india_broker、tickerall、gildata
+│       ├── engines/                #   1 个引擎 + 跨市场 composite 引擎 + options_portfolio
+│       ├── loaders/                #   10 个数据源：yahoo、yfinance、stooq、sina、eastmoney、finnhub、alphavantage、tiingo、fmp、local
 │       │   ├── base.py             #   DataLoader Protocol
 │       │   └── registry.py         #   Registry + 自动 fallback 链路
 │       └── optimizers/             #   MVO、equal vol、max div、risk parity
@@ -1772,7 +1664,7 @@ Vibe-Trading 是 **[HKUDS](https://github.com/HKUDS)** 智能体生态的一部�
 | **Data Bridge** | 自带数据：本地 CSV/Parquet/SQL connectors 与 schema mapping | 本地加载器已发布 |
 | **Options Lab** | Vol surface、Greeks dashboard、payoff/scenario explorer | Planned |
 | **Portfolio Studio** | Risk x-ray、constraints、turnover-aware optimizer、rebalance notes | Turnover-aware optimizer **已发布 0.1.11**；其余 Planned |
-| **Alpha Zoo** | 462 个预置 alpha 因子（Qlib 158 + Kakushadze 101 + GTJA 191 + academic + fundamental），一行 CLI 跑横评，agent 集成，Web UI 浏览 | **已发布 0.1.8**，延续至 0.1.12 |
+| **Alpha Zoo** | 271 个预置 alpha 因子（Qlib 158 + Kakushadze 101 + academic + fundamental），一行 CLI 跑横评，agent 集成，Web UI 浏览 | **已发布 0.1.8**，延续至 0.1.12 |
 | **Strategy Development Manager** | 把论文 / 券商研报注册为因子与策略，配持久化 store + 自动化 IC/Sharpe 衰减生命周期 | **已发布 0.1.11** |
 | **Correlation Regime** | 叠加在 `/correlation` 上的边密度 + 迟滞状态时间线——识别市场何时融合为一个板块 | **已发布 0.1.12** |
 | **Research Delivery** | 通过 Slack / Telegram / email-style IM channels 发送定时 briefs 与实时研究 sessions | 调度器 + IM Runtime 已发布 |

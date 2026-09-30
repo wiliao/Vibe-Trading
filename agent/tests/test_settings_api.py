@@ -28,7 +28,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
                 "TIMEOUT_SECONDS=90",
                 "MAX_RETRIES=3",
                 "LANGCHAIN_REASONING_EFFORT=max",
-                "TUSHARE_TOKEN=your-tushare-token",
+                "FINNHUB_API_KEY=your-finnhub-key",
             ]
         )
         + "\n",
@@ -330,7 +330,7 @@ def test_settings_write_migrates_legacy_env_to_canonical_path(
     legacy_path = tmp_path / "legacy" / ".env"
     legacy_path.parent.mkdir()
     legacy_path.write_text(
-        "LANGCHAIN_PROVIDER=openrouter\nTUSHARE_TOKEN=legacy-token\n",
+        "LANGCHAIN_PROVIDER=openrouter\nFINNHUB_API_KEY=legacy-token\n",
         encoding="utf-8",
     )
 
@@ -347,7 +347,7 @@ def test_settings_write_migrates_legacy_env_to_canonical_path(
     assert response.status_code == 200
     canonical_text = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "LANGCHAIN_PROVIDER=deepseek" in canonical_text
-    assert "TUSHARE_TOKEN=legacy-token" in canonical_text
+    assert "FINNHUB_API_KEY=legacy-token" in canonical_text
     assert legacy_path.read_text(encoding="utf-8").startswith("LANGCHAIN_PROVIDER=openrouter")
 
 
@@ -397,15 +397,22 @@ def test_update_nvidia_settings_persists_provider_namespace(
     assert "NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1" in env_text
 
 
-def test_get_data_source_settings_treats_placeholder_as_unconfigured(
+def test_get_data_source_settings_exposes_only_surviving_fields(
     client: TestClient, tmp_path: Path,
 ) -> None:
     response = client.get("/settings/data-sources")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["tushare_token_configured"] is False
-    assert body["tushare_token_hint"] is None
+    # The removed-market credential surface is gone; the JSON shape is pinned
+    # so a reintroduced tushare/gildata field fails here.
+    assert set(body) == {
+        "baostock_supported",
+        "baostock_installed",
+        "baostock_message",
+        "env_path",
+        "source_orders",
+    }
     assert body["baostock_supported"] is False
     assert body["baostock_installed"] is False
     assert not Path(body["env_path"]).is_absolute()
@@ -421,7 +428,7 @@ def test_settings_response_never_exposes_configured_secret_hints(
             [
                 "LANGCHAIN_PROVIDER=openrouter",
                 "OPENROUTER_API_KEY=or-secret-private-value",
-                "TUSHARE_TOKEN=ts-secret-private-token",
+                "QVERIS_API_KEY=qveris-secret-private-token",
             ]
         )
         + "\n",
@@ -437,12 +444,12 @@ def test_settings_response_never_exposes_configured_secret_hints(
     data_body = data_response.json()
     assert llm_body["api_key_configured"] is True
     assert llm_body["api_key_hint"] is None
-    assert data_body["tushare_token_configured"] is True
-    assert data_body["tushare_token_hint"] is None
+    assert not any("api_key" in key or "token" in key for key in data_body)
     assert "or-secret-private-value" not in llm_response.text
     assert "or-s...alue" not in llm_response.text
-    assert "ts-secret-private-token" not in data_response.text
-    assert "ts-s...oken" not in data_response.text
+    # The data-source payload owns no credential secrets at all now.
+    assert "qveris-secret-private-token" not in data_response.text
+    assert "qve...oken" not in data_response.text
 
 
 def test_settings_reads_reject_remote_dev_mode_clients(
@@ -455,7 +462,7 @@ def test_settings_reads_reject_remote_dev_mode_clients(
             [
                 "LANGCHAIN_PROVIDER=openrouter",
                 "OPENROUTER_API_KEY=or-secret-value",
-                "TUSHARE_TOKEN=ts-secret-token",
+                "QVERIS_API_KEY=qveris-secret-value",
             ]
         )
         + "\n",
@@ -473,7 +480,7 @@ def test_settings_reads_reject_remote_dev_mode_clients(
     assert llm_response.status_code == 403
     assert data_source_response.status_code == 403
     assert "or-s...alue" not in llm_response.text
-    assert "ts-s...oken" not in data_source_response.text
+    assert "qveris-secret-value" not in data_source_response.text
 
 
 def test_settings_reads_require_bearer_on_loopback_when_api_auth_key_configured(
@@ -513,65 +520,34 @@ def test_settings_reads_require_bearer_on_loopback_when_api_auth_key_configured(
     assert "or-s...alue" not in authenticated_response.text
 
 
-def test_update_data_source_settings_persists_tushare_token(
-    client: TestClient, tmp_path: Path,
-) -> None:
-    response = client.put(
-        "/settings/data-sources",
-        json={"tushare_token": "ts-secret-token"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["tushare_token_configured"] is True
-    assert body["tushare_token_hint"] is None
-    assert "ts-secret-token" not in response.text
-    assert "ts-s...oken" not in response.text
-
-    env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "TUSHARE_TOKEN=ts-secret-token" in env_text
-
-
-def test_update_data_source_settings_persists_gildata_token(
-    client: TestClient, tmp_path: Path,
-) -> None:
-    response = client.put(
-        "/settings/data-sources",
-        json={"gildata_token": "gd-secret-token"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["gildata_token_configured"] is True
-    assert body["gildata_token_hint"] is None
-    assert "gd-secret-token" not in response.text
-    assert "gd-s...oken" not in response.text
-
-    env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "GILDATA_TOKEN=gd-secret-token" in env_text
-
-    cleared = client.put(
-        "/settings/data-sources", json={"clear_gildata_token": True},
-    )
-    assert cleared.status_code == 200
-    assert cleared.json()["gildata_token_configured"] is False
-
-
-def test_desktop_secure_mode_never_persists_injected_tushare_token(
+def test_desktop_secure_mode_never_persists_injected_secret(
     client: TestClient,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    _reset_source_order_env,
 ) -> None:
     monkeypatch.setenv("VIBE_TRADING_DESKTOP_SECURE_CREDENTIALS", "1")
-    monkeypatch.setenv("TUSHARE_TOKEN", "dpapi-tushare-token")
+    monkeypatch.setenv("QVERIS_API_KEY", "dpapi-qveris-token")
 
-    response = client.put("/settings/data-sources", json={})
+    response = client.put(
+        "/settings/data-sources",
+        json={
+            "source_orders": [
+                {
+                    "market": "us_equity",
+                    "order": [
+                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
+                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
+                    ],
+                },
+            ],
+        },
+    )
 
     assert response.status_code == 200
-    assert response.json()["tushare_token_configured"] is True
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "dpapi-tushare-token" not in env_text
-    assert "TUSHARE_TOKEN=" in env_text
+    assert "dpapi-qveris-token" not in env_text
+    assert "QVERIS_API_KEY=" in env_text
 
 
 def test_settings_writes_reject_remote_dev_mode_clients(
@@ -585,22 +561,29 @@ def test_settings_writes_reject_remote_dev_mode_clients(
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
     remote_client = TestClient(api_server.app, client=("203.0.113.10", 50000))
 
-    response = remote_client.put(
-        "/settings/data-sources",
-        json={"tushare_token": "ts-secret-token"},
-    )
+    response = remote_client.put("/settings/data-sources", json={})
 
     assert response.status_code == 403
     assert not env_path.exists()
 
 
 def test_update_settings_writes_env_file_with_0600_mode(
-    client: TestClient, tmp_path: Path,
+    client: TestClient, tmp_path: Path, _reset_source_order_env,
 ) -> None:
     """A Web-UI settings write must leave agent/.env owner-read/write only."""
     response = client.put(
         "/settings/data-sources",
-        json={"tushare_token": "ts-secret-token"},
+        json={
+            "source_orders": [
+                {
+                    "market": "us_equity",
+                    "order": [
+                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
+                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
+                    ],
+                },
+            ],
+        },
     )
 
     assert response.status_code == 200

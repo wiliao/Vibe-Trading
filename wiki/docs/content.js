@@ -42,8 +42,8 @@ export const DOCS_STRUCTURE = [
             body: `
               <ul>
                 <li>Natural-language CLI and web workflows.</li>
-                <li>Seven backtest engines across equities, crypto, futures, forex, composites, and options portfolios.</li>
-                <li>Market data routing across Tushare, OKX, yfinance, AKShare, CCXT, and Futu.</li>
+                <li>Backtest engines for US and Canada equities, composite portfolios, and options portfolios.</li>
+                <li>Market data routing across Yahoo, yfinance, Stooq, Sina, Eastmoney, and optional key-based feeds (Finnhub, Alpha Vantage, Tiingo, FMP).</li>
                 <li>Trade Journal and Shadow Account workflows for behavior diagnostics.</li>
                 <li>Swarm presets for committee-style research reviews.</li>
                 <li>MCP tools for Claude Desktop, OpenClaw, Cursor, and other MCP clients.</li>
@@ -71,7 +71,7 @@ vibe-trading</code></pre>
             id: "first-run",
             title: "First run",
             body: `
-              <pre><code>vibe-trading run -p "Backtest a BTC-USDT 20/50 moving-average strategy for 2024, summarize return and drawdown, then export the report"</code></pre>
+              <pre><code>vibe-trading run -p "Backtest an AAPL 20/50 moving-average strategy for 2024, summarize return and drawdown, then export the report"</code></pre>
             `
           },
           {
@@ -96,7 +96,7 @@ vibe-trading</code></pre>
             body: `
               <pre><code>LANGCHAIN_PROVIDER=deepseek
 LANGCHAIN_MODEL_NAME=deepseek-v4-pro
-TUSHARE_TOKEN=your-token
+FINNHUB_API_KEY=your-key
 TIMEOUT_SECONDS=2400</code></pre>
               <p>Run <code>vibe-trading init</code> to bootstrap the local configuration interactively.</p>
             `
@@ -105,7 +105,7 @@ TIMEOUT_SECONDS=2400</code></pre>
             id: "keys",
             title: "Keys and data sources",
             body: `
-              <p>Many HK, US, crypto, document, journal, and static analysis workflows work without paid market-data keys. A-share fundamental enrichment and some provider-specific workflows need their matching credentials.</p>
+              <p>Many workflows — US and Canada equity research, document reading, journal analysis, and static analysis — work without paid market-data keys. Optional key-based providers (Finnhub, Alpha Vantage, Tiingo, FMP) and some provider-specific workflows need their matching credentials.</p>
               <p>For non-local API or web deployments, configure <code>API_AUTH_KEY</code> and send requests with <code>Authorization: Bearer &lt;key&gt;</code>.</p>
             `
           },
@@ -156,14 +156,14 @@ TIMEOUT_SECONDS=2400</code></pre>
         id: "core-concepts/backtesting",
         title: "Backtesting",
         description: "Market coverage, engines, metrics, and validation tools.",
-        lead: "Vibe-Trading backtests daily and minute strategies across multiple asset classes, then keeps outputs auditable with metrics and run cards.",
+        lead: "Vibe-Trading backtests daily and minute strategies across US and Canada equities, indexes, and options portfolios, then keeps outputs auditable with metrics and run cards.",
         sections: [
           {
             id: "engines",
             title: "Engines",
             body: `
               <ul>
-                <li>China A-share, global equity, crypto, China futures, global futures, forex, and composite engines.</li>
+                <li>US equity, Canada equity, and composite engines.</li>
                 <li>Options portfolio engine for option strategy research.</li>
                 <li>Minute intervals including 1m, 5m, 15m, 30m, 1H, 4H, and 1D where supported by the data source.</li>
               </ul>
@@ -180,7 +180,7 @@ TIMEOUT_SECONDS=2400</code></pre>
             id: "example",
             title: "Example",
             body: `
-              <pre><code>vibe-trading run -p "Backtest an equal-weight SPY and BTC-USDT momentum rotation strategy for 2024 with benchmark comparison"</code></pre>
+              <pre><code>vibe-trading run -p "Backtest an equal-weight SPY and QQQ momentum rotation strategy for 2024 with benchmark comparison"</code></pre>
             `
           }
         ]
@@ -195,9 +195,9 @@ TIMEOUT_SECONDS=2400</code></pre>
             id: "presets",
             title: "Presets",
             body: `
-              <p>Vibe-Trading includes 30 presets such as investment committee, quant strategy desk, crypto trading desk, macro rates and FX desk, and risk committee.</p>
+              <p>Vibe-Trading includes 25 presets such as investment committee, quant strategy desk, equity research team, macro strategy forum, and risk committee.</p>
               <pre><code>vibe-trading --swarm-presets
-vibe-trading --swarm-run investment_committee '{"topic":"BTC outlook"}'</code></pre>
+vibe-trading --swarm-run investment_committee '{"topic":"AAPL outlook"}'</code></pre>
             `
           },
           {
@@ -226,10 +226,10 @@ vibe-trading --swarm-run investment_committee '{"topic":"BTC outlook"}'</code></
             title: "Providers",
             body: `
               <ul>
-                <li>Tushare for China market and fundamental workflows when configured.</li>
-                <li>OKX and CCXT for crypto symbols such as <code>BTC-USDT</code>.</li>
-                <li>yfinance for global equities and common benchmarks.</li>
-                <li>AKShare and Futu for additional China, Hong Kong, and market-specific coverage.</li>
+                <li>Yahoo and yfinance for US and Canada equity OHLCV and common benchmarks.</li>
+                <li>Stooq, Sina, and Eastmoney as keyless fallback coverage.</li>
+                <li>Finnhub, Alpha Vantage, Tiingo, and FMP as optional key-based US equity feeds.</li>
+                <li><code>local</code> for CSV, Parquet, or DuckDB datasets you maintain yourself.</li>
               </ul>
             `
           },
@@ -237,7 +237,7 @@ vibe-trading --swarm-run investment_committee '{"topic":"BTC outlook"}'</code></
             id: "symbols",
             title: "Symbol conventions",
             body: `
-              <p>Crypto pairs use uppercase hyphen format, for example <code>BTC-USDT</code>. Mixed-market research should prefer automatic source routing where possible.</p>
+              <p>US tickers are plain symbols (<code>AAPL</code>) or carry a <code>.US</code> suffix; Canadian listings use <code>.TO</code> or <code>.V</code> (<code>SHOP.TO</code>). Index symbols use a caret prefix (<code>^GSPC</code>). Cross-listing research should prefer automatic source routing where possible.</p>
             `
           }
         ]
@@ -291,8 +291,8 @@ vibe-trading run -p "Analyze my trading behavior, extract my shadow strategy, an
             body: `
               <ul>
                 <li>Dividend analysis and yield-trap checks.</li>
-                <li>A-share pre-ST risk screening.</li>
-                <li>vn.py export and Pine Script export workflows.</li>
+                <li>SEC EDGAR filing and earnings-revision screening.</li>
+                <li>US ETF flow and options payoff analysis.</li>
                 <li>Factor research, macro analysis, and technical patterns.</li>
               </ul>
             `

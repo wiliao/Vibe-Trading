@@ -14,7 +14,7 @@ Usage::
 
     cfg = EnvConfig()          # reads os.environ, applies defaults
     cfg.llm.timeout_seconds    # 120
-    cfg.data.tushare_token     # ""
+    cfg.data.finnhub_api_key   # ""
 """
 
 from __future__ import annotations
@@ -201,14 +201,12 @@ class DataConfig(_EnvBase):
     ``src/tools/fred_macro_tool.py``.
     """
 
-    tushare_token: str = Field(alias="TUSHARE_TOKEN", default="")
     futu_host: str = Field(alias="FUTU_HOST", default="127.0.0.1")
     futu_port: int = Field(alias="FUTU_PORT", default=11111)
     finnhub_api_key: str = Field(alias="FINNHUB_API_KEY", default="")
     alphavantage_api_key: str = Field(alias="ALPHAVANTAGE_API_KEY", default="")
     tiingo_api_key: str = Field(alias="TIINGO_API_KEY", default="")
     fmp_api_key: str = Field(alias="FMP_API_KEY", default="")
-    gildata_token: str = Field(alias="GILDATA_TOKEN", default="")
     fred_api_key: str = Field(alias="FRED_API_KEY", default="")
     vibe_trading_sec_ua: str = Field(alias="VIBE_TRADING_SEC_UA", default="")
     # 13F scan bounds. No gt=0 constraint: a non-positive override must fall

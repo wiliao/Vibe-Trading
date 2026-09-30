@@ -112,9 +112,6 @@ TARGET_FILES=(
   agent/src/goal/store.py
   agent/src/session/models.py
   agent/src/swarm/worker.py
-  agent/src/tools/lockup_expiry_tool.py
-  agent/src/trading/connectors/dhan/sdk.py
-  agent/src/trading/connectors/shoonya/sdk.py
 )
 D_HITS=$(grep -Hn -E 'datetime\.utcnow\(|datetime\.now\(' "${TARGET_FILES[@]}" 2>/dev/null \
     | grep -v "$SELF" \

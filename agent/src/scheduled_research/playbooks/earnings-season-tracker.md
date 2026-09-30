@@ -1,7 +1,7 @@
 ---
 name: Earnings Season Tracker
 description: Upcoming earnings dates for held and watched names, plus what changed in expectations and in the last reported quarter.
-markets: [us, cn, hk, global]
+markets: [us, ca, global]
 suggested_schedule: "0 7 * * 1-5"
 suggested_timezone: America/New_York
 data_capabilities:

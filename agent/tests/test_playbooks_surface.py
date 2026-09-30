@@ -35,11 +35,11 @@ from src.scheduled_research.playbooks import get_playbook, list_playbooks
 from src.scheduled_research.store import ScheduledResearchJobStore
 
 BUNDLED_SLUGS = {
-    "a-share-money-flow",
     "earnings-season-tracker",
     "institutional-holdings-diff",
     "portfolio-checkup",
     "premarket-brief",
+    "us-ca-money-flow",
 }
 
 # A template with declared variables and a timezone-carrying cron cadence, so

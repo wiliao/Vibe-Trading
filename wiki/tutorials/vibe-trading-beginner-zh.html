@@ -17,7 +17,7 @@
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vibe-Trading 中文入门教程 | Vibe-Trading Wiki</title>
-  <meta name="description" content="面向非金融专业读者的 Vibe-Trading 中文入门教程：理解因子、策略、回测、多市场数据源、券商连接器与 Shadow Account。">
+  <meta name="description" content="面向非金融专业读者的 Vibe-Trading 中文入门教程：理解因子、策略、回测、美股与加股数据源、券商连接器与 Shadow Account。">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Vibe-Trading Wiki">
@@ -332,7 +332,7 @@
       <h1>从金融术语到项目使用：读懂 Vibe-Trading</h1>
       <p class="lede">这份教程写给没有金融专业背景、交易经验也不多的读者。它不教你“稳赚策略”，而是帮助你理解 Vibe-Trading 里的因子、策略、回测、数据源、券商连接器和 Shadow Account 分别是什么，以及如何按安全顺序把它用起来。</p>
       <div class="meta-list" aria-label="Guide scope">
-        <span>多市场</span>
+        <span>美股 / 加股</span>
         <span>数据源</span>
         <span>因子 / Alpha</span>
         <span>回测</span>
@@ -367,7 +367,7 @@
         </div>
         <div class="flow-step">
           <span>02 Data</span>
-          <p>loader 拉取股票、加密、期货、外汇等市场数据。</p>
+          <p>loader 拉取美股、加股和指数等市场数据。</p>
         </div>
         <div class="flow-step">
           <span>03 Signal</span>
@@ -390,11 +390,11 @@
         </article>
         <article class="module-card">
           <h3>因子层：factor / alpha</h3>
-          <p><code>agent/src/factors/</code> 内置 456 个 alpha。因子是给股票打分的数值信号，不是下单规则，也不是收益保证。</p>
+          <p><code>agent/src/factors/</code> 内置 271 个 alpha。因子是给股票打分的数值信号，不是下单规则，也不是收益保证。</p>
         </article>
         <article class="module-card">
           <h3>回测层：backtest</h3>
-          <p><code>agent/backtest/</code> 根据 <code>config.json</code> 和 <code>code/signal_engine.py</code> 运行模拟交易。股票、加密、期货、外汇和组合资产有不同引擎。</p>
+          <p><code>agent/backtest/</code> 根据 <code>config.json</code> 和 <code>code/signal_engine.py</code> 运行模拟交易。美股、加股、指数和组合资产由不同引擎处理。</p>
         </article>
         <article class="module-card">
           <h3>券商层：connector</h3>
@@ -426,7 +426,7 @@
         <tbody>
           <tr>
             <td>标的 / symbol</td>
-            <td>你研究或交易的对象，比如 <code>AAPL</code>、<code>BTC-USDT</code>、<code>600519.SH</code>。</td>
+            <td>你研究或交易的对象，比如 <code>AAPL</code>、<code>SHOP.TO</code>、<code>^GSPC</code>。</td>
             <td>回测配置里的 <code>codes</code>，券商工具里的 <code>symbol</code>。</td>
           </tr>
           <tr>
@@ -506,7 +506,7 @@
           </tr>
           <tr>
             <td>benchmark</td>
-            <td>对照组，例如沪深 300、恒生指数、SPY。策略不是只看赚钱，还要看有没有跑赢参照物。</td>
+            <td>对照组，例如 SPY、S&amp;P/TSX 综合指数、QQQ。策略不是只看赚钱，还要看有没有跑赢参照物。</td>
             <td>回测报告和 benchmark comparison。</td>
           </tr>
           <tr>
@@ -531,7 +531,7 @@
         <p>重要：因子不是策略。因子只回答“哪个标的分数更高”。策略还要回答“买多少、什么时候买、什么时候卖、交易成本多少、是否允许集中持仓、是否能成交”。</p>
       </div>
 
-      <p>当前仓库的 Alpha Zoo 有 456 个 alpha，分成四类：</p>
+      <p>当前仓库的 Alpha Zoo 有 271 个 alpha，分成四类：</p>
       <table class="term-grid">
         <thead>
           <tr>
@@ -543,7 +543,7 @@
         <tbody>
           <tr>
             <td><code>academic</code></td>
-            <td>10</td>
+            <td>12</td>
             <td>学术风格因子，例如动量、反转、52 周高点、非流动性等，适合入门理解。</td>
           </tr>
           <tr>
@@ -555,6 +555,11 @@
             <td><code>qlib158</code></td>
             <td>154</td>
             <td>Qlib Alpha158 特征，常作为机器学习模型的输入特征。</td>
+          </tr>
+          <tr>
+            <td><code>fundamental</code></td>
+            <td>4</td>
+            <td>基本面因子，使用财报和估值字段，需要基本面数据覆盖。</td>
           </tr>
         </tbody>
       </table>
@@ -569,7 +574,7 @@
         <li><strong>value / quality</strong>：估值或质量风格，通常更偏中长期。</li>
       </ul>
 
-      <p>先用 CLI 浏览，而不是直接读 456 个源码文件：</p>
+      <p>先用 CLI 浏览，而不是直接读 271 个源码文件：</p>
       <pre><code>vibe-trading alpha list --zoo academic
 vibe-trading alpha show academic_mkt_rf
 vibe-trading alpha bench --zoo academic --universe sp500 --period 2020-2025 --top 10</code></pre>
@@ -604,7 +609,7 @@ vibe-trading alpha bench --zoo academic --universe sp500 --period 2020-2025 --to
       <p>如果 agent 生成了 run dir，最终会调用 <code>backtest</code> 工具。这个工具会校验 <code>config.json</code> 和 <code>code/signal_engine.py</code>，再运行 <code>agent/backtest/runner.py</code>。</p>
 
       <h3>为什么市场引擎很重要</h3>
-      <p>不同市场不是同一套交易规则。项目里股票、加密、期货、外汇和组合资产会走不同 engine；某些股票市场需要处理 T+1、涨跌停、一手股数、佣金、印花税、结算费和滑点，另一些市场可能支持 T+0、做空或小数股。</p>
+      <p>不同市场不是同一套交易规则。项目里美股、加股、指数和组合资产会走不同 engine；美股和加股需要处理交易时段、结算周期、佣金、滑点、做空和碎股（fractional shares）等规则，研究加拿大标的时还要考虑 CAD/USD 汇率换算。</p>
 
       <p>这意味着你不能只看“信号准不准”，还要看它落到真实市场规则后能不能成交、成本有多高、仓位会不会过度集中。很多看起来很漂亮的短线策略，一加入滑点和费用就会失效。</p>
     </section>
@@ -628,7 +633,7 @@ vibe-trading alpha bench --zoo academic --universe sp500 --period 2020-2025 --to
         </article>
         <article class="route-card">
           <h3>组合市场</h3>
-          <p>CompositeEngine 可以做跨市场组合研究。比如同一个策略里同时持有股票、加密和期货时，不同市场由不同 engine 处理。</p>
+          <p>CompositeEngine 可以做跨市场组合研究。比如同一个策略里同时持有美股和加股时，两个市场由不同 engine 处理，再汇入同一个资金池。</p>
         </article>
       </div>
     </section>
@@ -676,7 +681,7 @@ vibe-trading connector check</code></pre>
       <h2>8. Shadow Account</h2>
       <p>Shadow Account 是“复盘你自己”的功能。它不是从网上找一个通用策略，而是读取你的交易流水，配对买入和卖出，找出你赚钱交易里反复出现的规则，再回测一个规则版的 shadow strategy。</p>
 
-      <p>当前交易流水解析支持若干常见券商导出格式和 generic CSV。它会输出持仓天数、胜率、盈亏比、回撤、处置效应、过度交易、追涨、锚定等行为诊断。随后 Shadow Account 会提取 3 到 5 条 if-then 规则，生成策略代码，跑多市场回测，最后渲染 HTML/PDF 报告。</p>
+      <p>当前交易流水解析支持若干常见券商导出格式和 generic CSV。它会输出持仓天数、胜率、盈亏比、回撤、处置效应、过度交易、追涨、锚定等行为诊断。随后 Shadow Account 会提取 3 到 5 条 if-then 规则，生成策略代码，跑美股 / 加股回测，最后渲染 HTML/PDF 报告。</p>
 
       <pre><code>vibe-trading --upload trades_export.csv
 vibe-trading run -p "Analyze my trading behavior, extract my shadow strategy, and compare it with my actual trades."</code></pre>
@@ -711,7 +716,7 @@ vibe-trading connector list</code></pre>
 
       <ul>
         <li><strong>入门文档。</strong> 把因子、策略、回测、数据源、券商连接器这些概念写得更适合普通投资者。</li>
-        <li><strong>可复现实例。</strong> 增加多市场教学 run，包含数据源、参数、回测指标和风险提示，但不要写成投资建议。</li>
+        <li><strong>可复现实例。</strong> 增加美股 / 加股教学 run，包含数据源、参数、回测指标和风险提示，但不要写成投资建议。</li>
         <li><strong>交易记录导入。</strong> 如果某个券商的官方 API 或导出文件能拿到成交、订单、持仓，就把它归一化到 <code>TradeRecord</code>，接入 Trade Journal 和 Shadow Account。</li>
         <li><strong>连接器文档。</strong> 把 paper/live/read-only/trade profile 的差异讲清楚，避免用户误以为所有连接器都可以直接实盘下单。</li>
         <li><strong>安全测试。</strong> 给 connector guard、live mandate、paper-only 限制、路径 sandbox、上传文件解析补回归测试。</li>

@@ -83,6 +83,10 @@ _ZOO_DISPLAY: dict[str, dict[str, str]] = {
         "name": "Academic Anomalies",
         "tagline": "Curated alphas from the academic asset-pricing literature.",
     },
+    "fundamental": {
+        "name": "Fundamental Factors",
+        "tagline": "Statement-based factors: earnings yield, ROE, gross profitability, asset growth.",
+    },
 }
 
 
