@@ -17,7 +17,6 @@ import pytest
 from backtest.engines.base import (
     BaseEngine,
     _align,
-    _detect_market_for_align,
     _ffill_1d,
     _ffill_2d,
 )
@@ -104,10 +103,8 @@ def _align_pandas_reference(
     for c in codes:
         close[c] = data_map[c]["close"].reindex(dates)
 
-    # ffill with limit to avoid masking long suspensions
-    ffill_limit = (
-        10 if len({_detect_market_for_align(c) for c in codes}) > 1 else 5
-    )
+    # ffill with limit to avoid masking long suspensions (single-market book)
+    ffill_limit = 5
     close = close.ffill(limit=ffill_limit)
 
     # Drop symbols that are entirely NaN
@@ -397,8 +394,13 @@ class TestAlignConsistency:
         assert "BAD" not in close_df.columns
         assert "BAD" not in pos_df.columns
 
-    def test_multi_market_ffill_limit(self) -> None:
-        """Cross-market scenario uses ffill_limit=10."""
+    def test_single_market_ffill_limit(self) -> None:
+        """A US/CA/index book uses the single-market ffill_limit of 5.
+
+        The old cross-market limit of 10 existed for removed-market holiday
+        gaps (Chinese New Year); a book spanning us_equity and ca_equity is
+        still one bucket, so the shorter limit applies to both.
+        """
         n_bars = 30
         dates = pd.bdate_range("2025-01-01", periods=n_bars)
         # Equity symbol
@@ -406,21 +408,21 @@ class TestAlignConsistency:
         close_equity[0] = 50.0
         close_equity[20] = 55.0
         df_equity = pd.DataFrame({"close": close_equity, "open": close_equity.copy()}, index=dates)
-        # FX symbol (the surviving second market; triggers ffill_limit=10)
-        close_fx = np.linspace(1000, 1100, n_bars)
-        df_fx = pd.DataFrame({"close": close_fx, "open": close_fx.copy()}, index=dates)
+        # Canada symbol (same market bucket; no cross-market limit applies)
+        close_ca = np.linspace(10, 11, n_bars)
+        df_ca = pd.DataFrame({"close": close_ca, "open": close_ca.copy()}, index=dates)
 
         sig = pd.Series(0.0, index=dates)
-        data_map = {"AAPL.US": df_equity, "EUR/USD": df_fx}
-        signal_map = {"AAPL.US": sig, "EUR/USD": sig}
+        data_map = {"AAPL.US": df_equity, "TD.TO": df_ca}
+        signal_map = {"AAPL.US": sig, "TD.TO": sig}
 
-        _, close_df, _, _, _ = _align(data_map, signal_map, ["AAPL.US", "EUR/USD"])
+        _, close_df, _, _, _ = _align(data_map, signal_map, ["AAPL.US", "TD.TO"])
 
-        # With ffill_limit=10, bars 1-10 should be ffilled from bar 0
-        for i in range(1, 11):
+        # With ffill_limit=5, bars 1-5 should be ffilled from bar 0
+        for i in range(1, 6):
             assert close_df.at[dates[i], "AAPL.US"] == pytest.approx(50.0)
-        # Bar 11 should be NaN (exceeded limit=10)
-        assert np.isnan(close_df.at[dates[11], "AAPL.US"])
+        # Bar 6 should be NaN (exceeded limit=5)
+        assert np.isnan(close_df.at[dates[6], "AAPL.US"])
 
 
 # ---------------------------------------------------------------------------
@@ -589,27 +591,10 @@ class TestFfillHelpers:
         assert arr[3] == 3.0
 
 
-# ---------------------------------------------------------------------------
-# TestDetectMarket: verify market detection helper
-# ---------------------------------------------------------------------------
-
-
-class TestDetectMarket:
-    """Verify _detect_market_for_align classification."""
-
-    def test_equity_codes(self) -> None:
-        assert _detect_market_for_align("000001.SZ") == "equity"
-        assert _detect_market_for_align("600519.SH") == "equity"
-
-    def test_crypto_pairs_are_no_longer_a_market(self) -> None:
-        # Crypto was removed with the US/CA refactor, so the cross-market split
-        # is equity vs forex only; a stablecoin pair falls into the default.
-        assert _detect_market_for_align("BTC-USDT") == "equity"
-        assert _detect_market_for_align("ETH-USDT") == "equity"
-
-    def test_forex_codes(self) -> None:
-        assert _detect_market_for_align("EUR/USD") == "forex"
-        assert _detect_market_for_align("EURUSD.FX") == "forex"
+# ``TestDetectMarket`` covered ``_detect_market_for_align``, a lightweight
+# FX/equity split kept only for the ffill-limit decision. Forex and metals are
+# removed markets and a US/CA/index book is one market bucket, so the helper
+# and its tests were deleted with the cross-market ffill limit.
 
 
 # ---------------------------------------------------------------------------

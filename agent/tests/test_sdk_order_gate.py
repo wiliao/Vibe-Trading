@@ -752,13 +752,14 @@ def test_gate_blocks_oversized_order(monkeypatch) -> None:
 
 
 def test_gate_blocks_disallowed_asset_class(monkeypatch) -> None:
-    # Mandate allows only US equity; a non-US-bucket order must be denied structurally.
+    # Mandate allows only US equity; an order in the crypto bucket (the one
+    # surviving non-US bucket) must be denied structurally.
     _patch_gate(monkeypatch, mandate=_mandate(assets=(AssetClass.US_EQUITY,)))
     conn = _FakeConnector()
     out = gate.execute_live_order(
-        broker="tiger", connector_module=conn, config=object(),
-        intent=_intent(asset=AssetClass.CN_EQUITY),
-        place_kwargs={"symbol": "600519.SH", "side": "buy", "notional": 500.0},
+        broker="robinhood", connector_module=conn, config=object(),
+        intent=_intent(asset=AssetClass.CRYPTO),
+        place_kwargs={"symbol": "BTC-USD", "side": "buy", "notional": 500.0},
     )
     assert out["status"] == "blocked" and out["decision"] == "deny"
     assert conn.placed == []

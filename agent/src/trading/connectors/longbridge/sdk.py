@@ -501,7 +501,7 @@ def place_order(
 
     Args:
         config: Resolved :class:`LongbridgeConfig`. Must be a paper profile.
-        symbol: Longbridge symbol, e.g. ``700.HK`` or ``AAPL.US`` (passed
+        symbol: Longbridge symbol, e.g. ``AAPL.US`` or ``TD.TO`` (passed
             through uppercased).
         side: ``buy`` or ``sell`` (case-insensitive).
         quantity: Order size in shares. Longbridge requires an explicit share

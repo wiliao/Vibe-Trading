@@ -73,8 +73,10 @@ def map_symbol(symbol: str) -> str:
 
     Returns:
         The Yahoo ticker: ``.US`` suffix stripped and class shares hyphenated
-        (``BRK.B.US`` -> ``BRK-B``); Canada ``.TO``/``.V`` suffixes, plus all
-        other symbols, pass through unchanged.
+        (``BRK.B.US`` -> ``BRK-B``); ``.TO``/``.V`` and ``^``-prefixed symbols
+        pass through unchanged. Any other spelling is passed through verbatim
+        rather than rewritten — a removed market's suffix is not folded onto a
+        surviving one, so Yahoo simply reports no data for it.
     """
     cleaned = symbol.strip()
     upper = cleaned.upper()
@@ -82,10 +84,6 @@ def map_symbol(symbol: str) -> str:
         # US class shares are hyphenated on Yahoo (BRK-B): the dot form
         # returns an empty chart (live-verified), so map BRK.B.US -> BRK-B.
         return cleaned[: -len(".US")].replace(".", "-")
-    if upper.endswith(".HK"):
-        base = cleaned[: -len(".HK")]
-        digits = base.lstrip("0") or "0"
-        return f"{digits.zfill(4)}.HK"
     return cleaned
 
 
@@ -178,8 +176,8 @@ def get_chart(
         ``{trade_date, open, high, low, close, volume}`` dicts (``trade_date``
         is the bar's epoch-second timestamp) — empty when Yahoo reports no
         data — and ``currency`` is the quote currency declared by the chart
-        meta (e.g. ``"USD"``, ``"GBP"``, ``"EUR"``, or the pence marker
-        ``"GBp"`` LSE names quote in). Rows-only callers unpack the tuple.
+        meta (e.g. ``"USD"`` for a US listing, ``"CAD"`` for a Canadian one).
+        Rows-only callers unpack the tuple.
 
     Raises:
         requests.RequestException: On a network/HTTP failure.
@@ -207,16 +205,12 @@ def get_chart(
     return _parse_chart(payload, yahoo_symbol)
 
 
-_GBP_PENCE_CURRENCY = "GBp"
-
-
 def _parse_chart(payload: Any, yahoo_symbol: str) -> Tuple[List[Dict[str, Any]], str]:
     """Convert a v8 chart payload into ascending OHLCV row dicts.
 
     Returns:
         ``(rows, currency)``: rows as in :func:`get_chart`, plus the quote
-        currency declared in the chart meta (for example ``"GBp"``, ``"GBP"``,
-        or ``"USD"`` for different LSE lines).
+        currency declared in the chart meta (for example ``"USD"`` or ``"CAD"``).
     """
     chart = (payload or {}).get("chart") or {}
     error = chart.get("error")

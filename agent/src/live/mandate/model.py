@@ -32,14 +32,26 @@ class InstrumentType(str, Enum):
 
 
 class AssetClass(str, Enum):
-    """Universe-level asset class buckets the user may permit."""
+    """Universe-level asset class buckets the user may permit.
+
+    Trimmed to the buckets a surviving live path can actually produce:
+
+    * ``US_EQUITY`` / ``US_ETF`` — the US loader chain
+      (``enforcement._ASSET_CLASS_MARKET``).
+    * ``CRYPTO`` — the Robinhood order extractor classifies
+      ``place_equity_order`` kwargs whose ``instrument_type`` is ``crypto`` /
+      ``cryptocurrency`` as ``InstrumentType.CRYPTO``, which the gate buckets
+      here. Robinhood is a surviving broker.
+
+    The removed-market buckets (A-share, Korea, Vietnam, Argentina, UK,
+    forex, …) have no surviving producer or loader chain: their connectors and
+    loader markets are gone from this build. Canada is market-data + backtest
+    only (decision D3), so there is deliberately no ``CA_EQUITY`` bucket.
+    """
 
     US_EQUITY = "us_equity"
     US_ETF = "us_etf"
-    CN_EQUITY = "cn_equity"
-    IN_EQUITY = "in_equity"
     CRYPTO = "crypto"
-    FOREX = "forex"
 
 
 @dataclass(frozen=True)

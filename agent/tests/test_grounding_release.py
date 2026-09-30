@@ -452,17 +452,17 @@ def test_redacted_release_adds_provenance_the_cut_draft_still_lacks(tmp_path: Pa
     assert "yahoo" in released and "1.10" not in released
 
 
-def test_redacted_release_never_cuts_ticker_digits(tmp_path: Path) -> None:
+def test_redacted_release_never_cuts_the_ticker(tmp_path: Path) -> None:
     """A clause attributing figures to an unhandled symbol loses its figures, not the ticker."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 同业 000001.SZ 收盘价 12.3 元。"
+    draft = HDR + " 同业 ZZZZ.US 收盘价 12.3 元。"
     validation = ledger.validate_final_answer(draft)
     assert "unsourced_symbol_figures" in _codes(validation)
 
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "000001.SZ" in released
+    assert "ZZZZ.US" in released
     assert "12.3" not in released
 
 
@@ -1185,21 +1185,21 @@ def test_a_declared_ref_is_what_separates_an_indicator_from_a_close(
 
 def _two_symbol_ledger(tmp_path: Path) -> GroundingLedger:
     """Prices for two symbols, an indicator for one of them only."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="对比 562500.SH 和 600519.SH")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="对比 AAPL.US 和 MSFT.US")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["562500.SH", "600519.SH"]},
+        arguments={"codes": ["AAPL.US", "MSFT.US"]},
         result=json.dumps(
             {
-                "562500.SH": [
+                "AAPL.US": [
                     {"trade_date": "2026-06-24", "open": 1.137, "high": 1.180, "low": 1.110, "close": 1.171}
                 ],
-                "600519.SH": [
+                "MSFT.US": [
                     {"trade_date": "2026-06-24", "open": 1400.0, "high": 1425.0, "low": 1395.0, "close": 1420.0}
                 ],
                 "_provenance": {
-                    "562500.SH": {"source": "yahoo", "currency_conversion": "none"},
-                    "600519.SH": {"source": "yahoo", "currency_conversion": "none"},
+                    "AAPL.US": {"source": "yahoo", "currency_conversion": "none"},
+                    "MSFT.US": {"source": "yahoo", "currency_conversion": "none"},
                 },
             }
         ),
@@ -1208,8 +1208,8 @@ def _two_symbol_ledger(tmp_path: Path) -> GroundingLedger:
     )
     ledger.ingest_tool_result(
         tool_name="technical_indicators",
-        arguments={"symbol": "562500.SH"},
-        result=json.dumps({"ok": True, "symbol": "562500.SH", "indicators": {"sma_20": 1.150}}),
+        arguments={"symbol": "AAPL.US"},
+        result=json.dumps({"ok": True, "symbol": "AAPL.US", "indicators": {"sma_20": 1.150}}),
         call_id="indicators",
         success=True,
     )
@@ -1219,21 +1219,21 @@ def _two_symbol_ledger(tmp_path: Path) -> GroundingLedger:
 def test_one_symbols_indicator_does_not_ground_an_unattributed_claim(tmp_path: Path) -> None:
     """The cross-symbol union is for observed quotes; an indicator is symbol-bound.
 
-    ``technical_indicators`` returns a level for one symbol, so 562500's SMA
+    ``technical_indicators`` returns a level for one symbol, so AAPL's SMA
     must not ground a figure on a line that names two instruments and
     attributes it to neither.
     """
-    header = "562500.SH 与 600519.SH（Yahoo，CNY）对比。"
+    header = "AAPL.US 与 MSFT.US（Yahoo，USD）对比。"
 
     unattributed_indicator = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "布林下轨 1.150 元为支撑位。"
+        header + "布林下轨 1.150 美元为支撑位。"
     )
     # Both halves of the rule the union was argued for stay intact.
     unattributed_ohlc = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "现价 1420 元。"
+        header + "现价 1420 美元。"
     )
     attributed_indicator = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "562500.SH 布林下轨 1.150 元为支撑位。"
+        header + "AAPL.US 布林下轨 1.150 美元为支撑位。"
     )
 
     assert "numeric_claim_conflict" in _codes(unattributed_indicator)
@@ -1682,7 +1682,7 @@ def test_a_derivation_anchored_to_another_symbol_grounds_nothing(tmp_path: Path)
     In a comparison run the expensive instrument's close is arithmetically
     fine and attached to the wrong symbol.
     """
-    header = "562500.SH 与 600519.SH（Yahoo，CNY）对比。"
+    header = "AAPL.US 与 MSFT.US（Yahoo，USD）对比。"
     block = _block(
         "1.171 | observed | close | prices",
         "1420 | observed | close | prices",
@@ -1693,7 +1693,7 @@ def test_a_derivation_anchored_to_another_symbol_grounds_nothing(tmp_path: Path)
         header + "买入价 1377.4。" + block
     )
     attributed = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "600519.SH 买入价 1377.4。" + block
+        header + "MSFT.US 买入价 1377.4。" + block
     )
 
     assert "numeric_claim_conflict" in _codes(unattributed)
@@ -1915,7 +1915,7 @@ def test_overlapping_issue_spans_are_cut_once(tmp_path: Path) -> None:
     the released table is a fragment-duplicated mess with an inflated count.
     """
     ledger = _ledger(tmp_path)
-    draft = HDR + "\n\n| 指标 | 数值 |\n|---|---|\n| 最大回撤 | 12%，同业 000001.SZ 5.0 |\n"
+    draft = HDR + "\n\n| 指标 | 数值 |\n|---|---|\n| 最大回撤 | 12%，同业 ZZZZ.US 5.0 |\n"
     validation = ledger.validate_final_answer(draft)
     # The row's own figures are flagged once each, and the unsourced-symbol
     # finding covers the same line a second time.
@@ -1924,7 +1924,7 @@ def test_overlapping_issue_spans_are_cut_once(tmp_path: Path) -> None:
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "| 最大回撤 | （略※），同业 000001.SZ（略※） |" in released
+    assert "| 最大回撤 | （略※），同业 ZZZZ.US（略※） |" in released
     assert "※ 略去 2 处" in released
 
 

@@ -650,12 +650,10 @@ def _search_eastmoney(query: str) -> tuple[List[Dict[str, Any]], str]:
         )
     except Exception as exc:  # noqa: BLE001 - one source failing is non-fatal
         # Deliberately debug-level, not warning: Eastmoney has no coverage for
-        # many queries the fan-out legitimately tries (Canadian names, crypto,
-        # futures) and returns a non-JSON body for them. That is expected and
-        # benign — the status string below still flows to the tool result so
-        # nothing is hidden, it just no longer spams the terminal. Failures on
-        # queries Eastmoney SHOULD cover (A-share/HK) are still visible by
-        # checking the tool result's sources map or with debug logging on.
+        # many queries the fan-out legitimately tries (Canadian names, crypto)
+        # and returns a non-JSON body for them. That is expected and benign —
+        # the status string below still flows to the tool result so nothing is
+        # hidden, it just no longer spams the terminal.
         logger.debug("eastmoney suggest failed for %r: %s", query, exc)
         return [], f"eastmoney search failed: {exc}"
 
@@ -719,8 +717,6 @@ def _eastmoney_candidate(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def _format_symbol(code: str, suffix: str) -> Optional[str]:
     """Render a bare code + suffix into the project symbol convention.
 
-    HK codes are zero-padded to five digits to match the loader/secid scheme.
-
     Args:
         code: Bare instrument code (e.g. ``"AAPL"``, ``"BRK.B"``).
         suffix: Exchange suffix, e.g. ``"US"``, ``"TO"``, ``"V"``.
@@ -732,8 +728,6 @@ def _format_symbol(code: str, suffix: str) -> Optional[str]:
     code = code.strip().upper()
     if not code:
         return None
-    if suffix == "HK":
-        return f"{code.zfill(5)}.HK"
     return f"{code}.{suffix}"
 
 
@@ -821,16 +815,6 @@ def _from_yahoo_symbol(raw_symbol: str, quote: Dict[str, Any]) -> tuple[str, str
         ``(symbol, market)`` in the project convention.
     """
     upper = raw_symbol.upper()
-    if upper.endswith(".HK"):
-        base = raw_symbol[: -len(".HK")].lstrip("0") or "0"
-        return f"{base.zfill(5)}.HK", "hk"
-    # Yahoo quotes Shanghai as ``.SS`` where this project (and Eastmoney) use
-    # ``.SH``. Emitting both spellings published one listing as two rival
-    # candidates, which the identity gate could not choose between, so every
-    # Shanghai query dead-ended as ambiguous. Folding here also lets the two
-    # sources merge and corroborate each other via ``also_from``.
-    if upper.endswith(".SS"):
-        return f"{upper[: -len('.SS')]}.SH", "cn"
     suffix = upper.rsplit(".", 1)[-1] if "." in upper else ""
     if suffix in _MARKET_BY_SUFFIX:
         return upper, _MARKET_BY_SUFFIX[suffix]
@@ -847,7 +831,7 @@ def _from_yahoo_symbol(raw_symbol: str, quote: Dict[str, Any]) -> tuple[str, str
         return raw_symbol, "index"
     if quote_type == "EQUITY" and "." not in raw_symbol and "-" not in raw_symbol:
         return f"{upper}.US", "us"
-    # Crypto, indices, FX, ETFs on non-HK exchanges: keep Yahoo's native symbol.
+    # Crypto, indices, FX and off-venue listings: keep Yahoo's native symbol.
     return raw_symbol, "global"
 
 

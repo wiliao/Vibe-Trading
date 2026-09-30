@@ -42,7 +42,7 @@ def _reject_mixed_currency(codes: List[str]) -> None:
 
     The shared capital pool holds a single scalar of cash and sums position
     values into a single equity curve. With codes from two currency zones that
-    curve adds CNY to USD to KRW as if the units matched, and every metric
+    curve adds CAD to USD as if the units matched, and every metric
     derived from it — return, Sharpe, drawdown — is meaningless. There is no FX
     translation layer yet, so this fails closed rather than reporting a number
     that looks fine.

@@ -69,10 +69,6 @@ _CURRENCY_ALIASES = {
     "CAD": ("cad", "c$", "ca$", "加元", "加拿大元"),
 }
 
-# "元" counts as a foreign-currency unit only when another currency's character
-# precedes it (美元/加元), so a bare "元" is never read as a quote currency.
-_OTHER_CURRENCY_PREFIXES = "美加"
-
 #: Relative band a value must fall in to count as matching evidence.
 _TOLERANCE = 0.005
 
@@ -1777,19 +1773,15 @@ class _PolicyMixin:
 
     @staticmethod
     def _currency_is_surfaced(currency: str, content: str) -> bool:
-        """Return whether a quote currency or an unambiguous alias is visible."""
+        """Return whether a quote currency or an unambiguous alias is visible.
+
+        Only the surviving settlement currencies have aliases (USD/CAD); any
+        other code must be written out literally, so a removed market's bare
+        ``元`` no longer counts as naming a quote currency.
+        """
         folded = content.casefold()
-        code = currency.upper()
-        tokens = _CURRENCY_ALIASES.get(code, (currency.casefold(),))
-        if any(token.casefold() in folded for token in tokens):
-            return True
-        if code != "CNY":
-            return False
-        return any(
-            char == "元"
-            and (index == 0 or content[index - 1] not in _OTHER_CURRENCY_PREFIXES)
-            for index, char in enumerate(content)
-        )
+        tokens = _CURRENCY_ALIASES.get(currency.upper(), (currency.casefold(),))
+        return any(token.casefold() in folded for token in tokens)
 
     @staticmethod
     def _dedupe_issues(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -362,17 +362,17 @@ def test_bare_ticker_stays_blocked_when_it_names_more_than_one_identity(
     """Uniqueness is the whole guarantee, so a shared base must not resolve."""
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="对比 600519.SH 与 600519.SZ 的价格",
+        user_message="对比 BLDP.TO 与 BLDP.US 的价格",
     )
 
     authorization = ledger.authorize_tool_call(
         "get_market_data",
-        {"codes": ["600519"]},
+        {"codes": ["BLDP"]},
         batch_authorized_symbols=ledger.authorized_symbols,
         call_id="prices",
     )
 
-    assert ledger.authorized_symbols == {"600519.SH", "600519.SZ"}
+    assert ledger.authorized_symbols == {"BLDP.TO", "BLDP.US"}
     assert authorization.allowed is False
     assert authorization.error_code == "identity_mismatch"
 
@@ -380,10 +380,6 @@ def test_bare_ticker_stays_blocked_when_it_names_more_than_one_identity(
 @pytest.mark.parametrize(
     ("locked", "requested"),
     [
-        ("600519.SH", "600519.SS"),
-        ("600519.SH", "sh600519"),
-        ("00700.HK", "700.HK"),
-        ("00700.HK", "0700.HK"),
         ("BTC-USDT", "BTC/USDT"),
         # Joined crypto pairs (no separator) are the same identity as the
         # dashed/slashed spelling. Without this normalization, a ``BTCUSDT``
@@ -619,58 +615,39 @@ def test_single_clean_not_found_source_is_not_enough_for_private_routing(
     assert json.loads(messages[-1]["content"])["error_code"] == "identity_required"
 
 
-def test_explicit_symbol_and_resolver_suffix_alias_are_one_identity(
-    tmp_path: Path,
-) -> None:
-    """``.SS`` and ``.SH`` name the same Shanghai listing, not a contradiction.
-
-    Reading them as rivals is what made every Shanghai query unusable: the two
-    sources publish one listing under both spellings, so no tie-break existed.
-    """
-    ledger = GroundingLedger(
-        run_dir=tmp_path,
-        user_message="请分析 562500.SS 并给出买入价",
-    )
-    ledger.ingest_tool_result(
-        tool_name="search_symbol",
-        arguments={"query": "机器人ETF"},
-        result=_resolver_payload("562500.SH"),
-        call_id="resolver-alias",
-        success=True,
-    )
-
-    authorization = ledger.authorize_tool_call(
-        "get_market_data",
-        {"codes": ["562500.SS"]},
-        batch_authorized_symbols=ledger.authorized_symbols,
-        batch_identity_status=ledger.identity_status,
-        call_id="prices",
-    )
-
-    assert ledger.identity_status == "locked"
-    assert ledger.authorized_symbols == {"562500.SH"}
-    assert authorization.allowed is True
+# ``test_explicit_symbol_and_resolver_suffix_alias_are_one_identity`` covered
+# folding a removed market's two provider spellings (``562500.SS``/``.SH``)
+# onto one identity. Removed markets are no longer scanned or folded, so no
+# surviving pair of spellings exercises it.
 
 
 @pytest.mark.parametrize(
     ("symbol", "expected_type"),
     [
-        # Regression: existing crypto / US equity behavior unchanged.
-        ("BTC-USDT", "crypto"),
+        # A provider-declared type is still honoured for a connector-plugin
+        # instrument; a bare shape infers nothing beyond index/list.
+        ("BTC-USDT", "listed_security"),
         ("GLD", "listed_security"),
         ("AAPL.US", "listed_security"),
+        ("^GSPC", "index"),
     ],
 )
-def test_runtime_registry_classifies_crypto_and_us_shapes_consistently(
+def test_runtime_registry_classifies_us_and_index_shapes_consistently(
     symbol, expected_type
 ) -> None:
-    """A dashed crypto pair and a US venue still normalize their declared type.
+    """A surviving US/CA/index shape normalizes to its declared type.
 
-    Spot metals, FX and futures were removed from this build, so
-    ``_infer_venue`` no longer classifies them; the surviving symbol shapes are
-    pinned here so that removal cannot silently take the US arm with it.
+    Crypto, forex and futures are removed markets, so their notations no
+    longer earn a type from their shape: a ``BTC-USDT`` is typed only when a
+    resolver declares it. The US and index arms are pinned here so that
+    removal cannot silently take them with it.
     """
     assert _infer_instrument_type(symbol) == expected_type
+
+
+def test_a_declared_crypto_type_is_still_honoured() -> None:
+    """The surviving resolver may return a connector-plugin crypto pair."""
+    assert _infer_instrument_type("BTC-USDT", "cryptocurrency") == "crypto"
 
 
 def test_venue_inference_covers_only_the_surviving_markets() -> None:
@@ -685,22 +662,22 @@ def test_venue_inference_covers_only_the_surviving_markets() -> None:
 def test_resolver_answering_a_different_venue_is_still_conflicting(
     tmp_path: Path,
 ) -> None:
-    """Folding a suffix alias must not fold a genuinely different exchange."""
+    """A genuinely different exchange is a conflict, not a spelling alias."""
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="请分析 600519.SH 并给出买入价",
+        user_message="请分析 BLDP.TO 并给出买入价",
     )
     ledger.ingest_tool_result(
         tool_name="search_symbol",
-        arguments={"query": "600519.SH"},
-        result=_resolver_payload("600519.SZ", query="600519.SH"),
+        arguments={"query": "BLDP.TO"},
+        result=_resolver_payload("BLDP.US", query="BLDP.TO"),
         call_id="resolver-venue",
         success=True,
     )
 
     authorization = ledger.authorize_tool_call(
         "get_market_data",
-        {"codes": ["600519.SZ"]},
+        {"codes": ["BLDP.US"]},
         batch_authorized_symbols=ledger.authorized_symbols,
         batch_identity_status=ledger.identity_status,
         call_id="prices",
@@ -1808,64 +1785,49 @@ def test_validation_summary_with_counts_and_line_cites_passes_end_to_end(
     assert result.valid is True, result.issues
 
 
-def _shanghai_shortlist() -> str:
-    """One Shanghai listing as the two sources actually publish it."""
+def _venue_spelling_shortlist() -> str:
+    """One US listing as two connectors actually publish it."""
     return _resolver_payload(
         candidates=[
             {
-                "symbol": "600519.SH",
-                "name": "贵州茅台",
-                "market": "cn",
-                "type": "沪A",
+                "symbol": "AAPL.US",
+                "name": "Apple Inc",
+                "market": "us",
+                "type": "EQUITY",
                 "source": "eastmoney",
             },
             {
-                "symbol": "600519.SS",
-                "name": "Kweichow Moutai Co Ltd",
-                "market": "cn",
+                "symbol": "US.AAPL",
+                "name": "Apple Inc",
+                "market": "us",
                 "type": "EQUITY",
                 "source": "yahoo",
             },
         ],
-        query="600519",
+        query="AAPL",
     )
 
 
-def test_shanghai_ticker_resolves_to_one_locked_identity(tmp_path: Path) -> None:
-    """Eastmoney's .SH and Yahoo's .SS describe one listing, so one lock."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="600519 现价多少")
+def test_venue_prefixed_spelling_resolves_to_one_locked_identity(tmp_path: Path) -> None:
+    """The connector's ``US.AAPL`` and the project's ``AAPL.US`` are one listing."""
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="AAPL 现价多少")
     ledger.ingest_tool_result(
         tool_name="search_symbol",
-        arguments={"query": "600519"},
-        result=_shanghai_shortlist(),
+        arguments={"query": "AAPL"},
+        result=_venue_spelling_shortlist(),
         call_id="resolve",
         success=True,
     )
 
     assert ledger.identity_status == "locked"
-    assert ledger.authorized_symbols == {"600519.SH"}
+    assert ledger.authorized_symbols == {"AAPL.US"}
 
 
-def test_shanghai_lock_depends_on_symbol_canonicalization(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Mutation guard: drop canonicalization and Shanghai dead-ends again."""
-    monkeypatch.setattr(
-        "src.agent.grounding.identity._normalize_symbol",
-        lambda value: str(value or "").strip().upper(),
-    )
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="600519 现价多少")
-    ledger.ingest_tool_result(
-        tool_name="search_symbol",
-        arguments={"query": "600519"},
-        result=_shanghai_shortlist(),
-        call_id="resolve",
-        success=True,
-    )
-
-    assert ledger.identity_status == "ambiguous"
-    assert ledger.authorized_symbols == set()
+# ``test_shanghai_lock_depends_on_symbol_canonicalization`` was the mutation
+# guard for folding one removed market's two provider spellings (``.SS`` onto
+# ``.SH``). The only surviving spelling fold is the ``US.`` venue prefix, and
+# ``_choose_candidate`` resolves that from its base either way, so the guard has
+# no surviving analogue to mutate.
 
 
 def test_zero_candidates_with_a_skipped_source_are_not_found(tmp_path: Path) -> None:
@@ -1939,12 +1901,12 @@ def test_a_conflict_outranks_a_lock_from_another_query(tmp_path: Path) -> None:
     """A contradiction is a fact about the data, so a lock cannot mask it."""
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="对比 600519.SH 和 AAPL.US 的现价",
+        user_message="对比 BLDP.TO 和 AAPL.US 的现价",
     )
     ledger.ingest_tool_result(
         tool_name="search_symbol",
-        arguments={"query": "600519.SH"},
-        result=_resolver_payload("600519.SZ", query="600519.SH"),
+        arguments={"query": "BLDP.TO"},
+        result=_resolver_payload("BLDP.US", query="BLDP.TO"),
         call_id="venue-swap",
         success=True,
     )
@@ -2099,8 +2061,8 @@ def test_an_unevidenced_price_is_still_rejected_without_any_tool_call(
 @pytest.mark.parametrize(
     ("draft", "paren_width"),
     [
-        ("同期五粮液（000858.SZ）收 168.50 元。", "full-width"),
-        ("同期五粮液(000858.SZ)收 168.50 元。", "half-width"),
+        ("同期同业（ZZZZ.US）收 168.50 元。", "full-width"),
+        ("同期同业(ZZZZ.US)收 168.50 元。", "half-width"),
     ],
 )
 def test_fullwidth_parentheses_do_not_split_symbol_from_figure(
@@ -2118,19 +2080,19 @@ def test_fullwidth_parentheses_do_not_split_symbol_from_figure(
     """
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="What is Kweichow Moutai (600519.SH) trading at this week?",
+        user_message="What is Apple (AAPL.US) trading at this week?",
     )
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={
-            "codes": ["600519.SH"],
+            "codes": ["AAPL.US"],
             "start_date": "2026-08-24",
             "end_date": "2026-08-28",
             "source": "baostock",
         },
         result=json.dumps(
             {
-                "600519.SH": [
+                "AAPL.US": [
                     {
                         "trade_date": "2026-08-28T00:00:00",
                         "open": 1289.0,
@@ -2141,7 +2103,7 @@ def test_fullwidth_parentheses_do_not_split_symbol_from_figure(
                     }
                 ],
                 "_provenance": {
-                    "600519.SH": {
+                    "AAPL.US": {
                         "source": "baostock",
                         "fallback_used": False,
                         "currency_conversion": "none",
@@ -2162,8 +2124,8 @@ def test_fullwidth_parentheses_do_not_split_symbol_from_figure(
 
     assert issues, f"{paren_width} parentheses must fire unsourced_symbol_figures"
     # Pin the offending symbol, not just "some issue fired": the gate must
-    # blame the unsourced 000858.SZ, not the sourced 600519.SH.
-    assert [issue["symbol"] for issue in issues] == ["000858.SZ"]
+    # blame the unsourced ZZZZ.US, not the sourced AAPL.US.
+    assert [issue["symbol"] for issue in issues] == ["ZZZZ.US"]
 
 
 def test_unsourced_symbol_without_a_figure_stays_silent(tmp_path: Path) -> None:
@@ -2177,19 +2139,19 @@ def test_unsourced_symbol_without_a_figure_stays_silent(tmp_path: Path) -> None:
     """
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="What is Kweichow Moutai (600519.SH) trading at this week?",
+        user_message="What is Apple (AAPL.US) trading at this week?",
     )
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={
-            "codes": ["600519.SH"],
+            "codes": ["AAPL.US"],
             "start_date": "2026-08-24",
             "end_date": "2026-08-28",
             "source": "baostock",
         },
         result=json.dumps(
             {
-                "600519.SH": [
+                "AAPL.US": [
                     {
                         "trade_date": "2026-08-28T00:00:00",
                         "open": 1289.0,
@@ -2200,7 +2162,7 @@ def test_unsourced_symbol_without_a_figure_stays_silent(tmp_path: Path) -> None:
                     }
                 ],
                 "_provenance": {
-                    "600519.SH": {
+                    "AAPL.US": {
                         "source": "baostock",
                         "fallback_used": False,
                         "currency_conversion": "none",
@@ -2216,7 +2178,7 @@ def test_unsourced_symbol_without_a_figure_stays_silent(tmp_path: Path) -> None:
     issues = [
         issue
         for issue in ledger.validate_final_answer(
-            "同期五粮液（000858.SZ）是知名白酒企业。"
+            "同期同业（ZZZZ.US）是知名企业。"
         ).issues
         if issue.get("code") == "unsourced_symbol_figures"
     ]
@@ -3363,23 +3325,10 @@ def test_scan_symbols_detects_venue_prefixed_symbols(
     assert _scan_symbols(text) == expected
 
 
-def test_crypto_pair_tables_match_the_resolver() -> None:
-    """The grounding copies of the crypto pair tables must not drift.
-
-    ``src.tools.symbol_search_tool`` is the resolver; it imports this module,
-    so the tables are duplicated rather than shared. A venue inferred here
-    that disagrees with the identity the resolver locks is a contradictory
-    identity, which outranks every later lock and blocks all market tools —
-    so the duplication needs a guard, not a comment.
-    """
-    from src.agent.grounding import identity as g
-    from src.tools import symbol_search_tool as ss
-
-    assert set(g._CRYPTO_USD_BASES) == set(ss._CRYPTO_USD_BASES)
-    # ``USD`` is the one quote the resolver accepts that is ambiguous (spot
-    # gold and forex are quoted in it too); grounding decides it by the base
-    # whitelist instead, so it is the only permitted difference.
-    assert set(g._CRYPTO_QUOTE_ASSETS) | {"USD"} == set(ss._CRYPTO_QUOTE_ASSETS)
+# ``test_crypto_pair_tables_match_the_resolver`` guarded the duplicated crypto
+# pair tables (``_CRYPTO_QUOTE_ASSETS`` / ``_CRYPTO_USD_BASES``) between this
+# module and the resolver. Grounding no longer types a symbol from its shape,
+# so the tables were deleted here and the guard has nothing to compare.
 
 
 def _declared_currency_ledger(tmp_path: Path, symbol: str, quote_currency: str | None):

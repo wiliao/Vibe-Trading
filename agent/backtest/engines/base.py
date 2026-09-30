@@ -12,7 +12,6 @@ import importlib
 import json
 import logging
 import math
-import re as _re
 import sys
 from abc import ABC, abstractmethod
 from collections import Counter
@@ -103,33 +102,6 @@ def _run_card_data_sources(config: Dict[str, Any], loader: Any) -> List[str]:
 
     source = config.get("source")
     return [str(source)] if source else []
-
-
-# ─── Market detection (lightweight, for signal alignment only) ───
-
-# Forex / metals in their explicit Yahoo notations, plus the bare-6-char
-# whitelist for XAUUSD / XAGUSD / XPTUSD / XPDUSD and G10 currencies. Mirrors
-# ``backtest.engines._market_hooks._MARKET_PATTERNS`` so the ffill-limit
-# decision (``10`` for cross-market vs ``5`` for single-market) reflects the
-# same market classification the engine composite would assign.
-_FX_RE = _re.compile(
-    r"^[A-Z]{3}/[A-Z]{3}$"
-    r"|^[A-Z]{6}\.FX$"
-    r"|^[A-Z]{6}=X$"
-    r"|^(?:XAU|XAG|XPT|XPD|EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD)[A-Z]{3}$",
-    _re.I,
-)
-
-
-def _detect_market_for_align(code: str) -> str:
-    """Lightweight market detection for ffill_limit calculation.
-
-    Crypto was removed with the US/CA refactor, so the only cross-market split
-    left is equity vs forex/metals.
-    """
-    if _FX_RE.match(code):
-        return "forex"
-    return "equity"
 
 
 # ─── Forward-fill helpers (numpy, avoid pandas overhead) ───
@@ -276,9 +248,10 @@ def _align(
     # Use int64 view for O(log n) searchsorted lookups
     dates_i8 = dates.values.view("i8")
 
-    # ffill with limit to avoid masking long suspensions (e.g. 3-week halt)
-    # Cross-market needs larger limit (Chinese New Year can be 9-10 bars)
-    ffill_limit = 10 if len({_detect_market_for_align(c) for c in codes}) > 1 else 5
+    # ffill with limit to avoid masking long suspensions (e.g. 3-week halt).
+    # A US/CA/index book holds one market bucket, so the single-market limit
+    # applies; the old cross-market 10 existed for removed-market holiday gaps.
+    ffill_limit = 5
 
     # Build close matrix via numpy direct fill + searchsorted index mapping
     close_arr = np.full((n_dates, n_codes), np.nan)

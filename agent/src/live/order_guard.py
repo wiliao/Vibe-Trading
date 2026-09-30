@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -284,8 +283,8 @@ class LiveOrderGuardTool(MCPRemoteTool):
             quantity=intent.quantity,
             instrument_type=intent.instrument_type,
             # asset_class must survive the rebuild: check_mandate prefers an
-            # explicit one over the instrument-type default (enforcement.py:524),
-            # so dropping it buckets an HK/A-share order as us_equity and lets it
+            # explicit one over the instrument-type default (enforcement.py:521),
+            # so dropping it buckets a crypto order as us_equity and lets it
             # past a mandate that permits only us_equity.
             asset_class=intent.asset_class,
             limit_price=intent.limit_price,

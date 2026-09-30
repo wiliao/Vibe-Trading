@@ -7,15 +7,12 @@ reuse. This module is provider-internal plumbing shared by the Eastmoney-backed
 loaders; it only knows Eastmoney's ``secid`` addressing scheme and the
 ``push2his`` kline JSON layout, not any loader's DataFrame conventions.
 
-Eastmoney addresses every instrument by a ``secid`` of the form ``<market>.<code>``:
-
-* A-shares — Shanghai (``.SH``, plus ``.BJ`` Beijing exchange) use market ``1``
-  for SH and ``0`` for SZ/BJ.
-* Hong Kong (``.HK``) uses market ``116`` with the numeric code zero-padded to
-  five digits.
-* US (``.US``) markets (NASDAQ ``105`` / NYSE ``106`` / AMEX ``107``) are not
-  derivable from the ticker alone, so the market prefix is discovered once via
-  Eastmoney's search/suggest endpoint and cached for the life of the process.
+Eastmoney addresses every instrument by a ``secid`` of the form ``<market>.<code>``.
+Only the US market is still routed: US (``.US``) markets (NASDAQ ``105`` / NYSE
+``106`` / AMEX ``107``) are not derivable from the ticker alone, so the market
+prefix is discovered once via Eastmoney's search/suggest endpoint and cached for
+the life of the process. The non-US secid branches were removed with the US/CA
+refactor.
 """
 
 from __future__ import annotations

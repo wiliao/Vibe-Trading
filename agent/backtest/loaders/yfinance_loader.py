@@ -65,11 +65,8 @@ def _to_yfinance_symbol(code: str) -> str:
         # US class shares are hyphenated on Yahoo/yfinance (BRK-B): the dot
         # form returns empty data (live-verified), so map BRK.B.US -> BRK-B.
         return upper[:-3].replace(".", "-")
-    if upper.endswith(".HK"):
-        digits = upper[:-3]
-        width = max(4, len(digits))
-        return f"{digits.zfill(width)}.HK"
-    # Canada TSX/TSXV (TD.TO, PNG.V) and other suffixes yfinance carries as-is.
+    # Canada TSX/TSXV (TD.TO, PNG.V) and index symbols carry through as-is.
+    # A removed market's suffix is not rewritten onto a surviving venue.
     return upper
 
 
@@ -95,9 +92,9 @@ def _declared_currency(symbol: str) -> Optional[str]:
     """Return Yahoo's declared currency for ``symbol``, or ``None`` when absent.
 
     ``yf.Ticker(...).history_metadata`` carries the exchange's declared quote
-    currency. Absence (or any probe failure) MUST NOT be treated as GBp. The
-    LSE loader contract rejects a missing or non-GBP currency rather than
-    allowing a USD line into static GBP accounting.
+    currency. The TSX lists a few lines in a second currency (``DLR-U.TO`` in
+    USD), so the Canadian pool reads the declared currency rather than assuming
+    CAD; absence is never treated as a value.
     """
     try:
         meta = yf.Ticker(symbol).history_metadata
@@ -277,8 +274,7 @@ class DataLoader:
         """Fetch OHLCV history keyed by the original project symbols.
 
         Args:
-            codes: Project symbols such as ``AAPL.US``, ``700.HK``, and
-                ``TD.TO``.
+            codes: Project symbols such as ``AAPL.US`` and ``TD.TO``.
             start_date: Start date in ``YYYY-MM-DD`` format.
             end_date: End date in ``YYYY-MM-DD`` format.
             fields: Ignored for yfinance; included for interface compatibility.
@@ -341,11 +337,11 @@ class DataLoader:
                     logger.warning("yfinance returned no usable data for %s", symbol)
                     continue
 
-                # LSE is one static GBP pool and BYMA one ARS pool, while those
-                # venues each list lines in other currencies. The suffix
-                # identifies the venue, never the currency, so read the declared
-                # one (a metadata request, made only for these venues) and
-                # reject a line outside the pool's unit.
+                # The TSX is one static CAD pool but lists a few lines in a
+                # second currency. The suffix identifies the venue, never the
+                # currency, so read the declared one (a metadata request, made
+                # only for these venues) and reject a line outside the pool's
+                # unit.
                 if declared_currency_required(symbol):
                     declared = _declared_currency(symbol)
                     normalized = normalize_declared_quote_currency(

@@ -268,8 +268,6 @@ def _shapes(text: str) -> dict[str, str]:
         "2026/09/09 的收盘",                    # slash date
         "2026年9月9日 的收盘",                  # localized date
         "回顾 2024 年的行情",                    # bare year
-        "159516.SZ 的走势",                     # symbol digits
-        "HK.00700 的走势",                      # prefixed symbol digits
         "1. 第一条结论",                         # ordered-list marker
         "### 6. 关键价位",                      # numbered heading
         "The 2026-09-09 close",                 # ISO date, English prose
@@ -286,7 +284,12 @@ def _shapes(text: str) -> dict[str, str]:
     ],
 )
 def test_structural_shapes_need_no_declaration(text: str) -> None:
-    """§3: a date, a year, a symbol's digits and an ordinal are structure."""
+    """§3: a date, a year and an ordinal are structure.
+
+    A numeric-code symbol's digits used to be a fourth case, but the removed
+    markets were the only symbols with a standalone numeric base, so no
+    surviving US/CA/index symbol exercises it.
+    """
     assert set(_shapes(text).values()) == {"exempt"}, text
 
 

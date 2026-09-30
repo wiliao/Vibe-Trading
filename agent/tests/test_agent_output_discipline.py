@@ -236,17 +236,17 @@ class TestPrincipleThreeBlocksFiguresOnUnhandledSymbols:
 
     def test_a_figure_on_an_unhandled_ticker_is_rejected(self, tmp_path: Path) -> None:
         result = _ledger(tmp_path).validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n600519.SH 收盘 1680.0。"
+            f"{_GROUNDED_ANSWER}\nZZZZ.US 收盘 1680.0。"
         )
 
         assert result.valid is False
         codes = [issue["code"] for issue in result.issues]
         assert "unsourced_symbol_figures" in codes
-        assert any(issue.get("symbol") == "600519.SH" for issue in result.issues)
+        assert any(issue.get("symbol") == "ZZZZ.US" for issue in result.issues)
 
     def test_a_table_row_counts_as_attaching_a_figure(self, tmp_path: Path) -> None:
         result = _ledger(tmp_path).validate_final_answer(
-            "| 代码 | 收盘 |\n|---|---|\n| 600519.SH | 1680.0 |"
+            "| 代码 | 收盘 |\n|---|---|\n| ZZZZ.US | 1680.0 |"
         )
 
         assert result.valid is False
@@ -269,11 +269,11 @@ class TestPrincipleThreeBlocksFiguresOnUnhandledSymbols:
 
     def test_the_correction_names_the_way_out(self, tmp_path: Path) -> None:
         ledger = _ledger(tmp_path)
-        validation = ledger.validate_final_answer(f"{_GROUNDED_ANSWER}\n600519.SH 收盘 1680.0。")
+        validation = ledger.validate_final_answer(f"{_GROUNDED_ANSWER}\nZZZZ.US 收盘 1680.0。")
 
         prompt = ledger.correction_prompt(validation)
 
-        assert "600519.SH" in prompt
+        assert "ZZZZ.US" in prompt
         assert "not retrieved" in prompt
 
 
@@ -286,7 +286,7 @@ class TestTheGateDoesNotKillCorrectAnswers:
     def test_naming_a_peer_without_a_figure_is_allowed(self, tmp_path: Path) -> None:
         """Prose may reference an index or a peer; only figures need provenance."""
         result = _ledger(tmp_path).validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n同类可对照 600519.SH 与 000300.SH。"
+            f"{_GROUNDED_ANSWER}\n同类可对照 ZZZZ.US 与 ^GSPC。"
         )
 
         assert result.valid is True, result.issues
@@ -299,12 +299,12 @@ class TestTheGateDoesNotKillCorrectAnswers:
         naming every subject by hand. The model declares the role instead.
         """
         cited = _ledger(tmp_path).validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n据券商研报，600519.SH 年内涨约 12%。"
+            f"{_GROUNDED_ANSWER}\n据券商研报，ZZZZ.US 年内涨约 12%。"
             "\n\n```figures\n212.5 | observed | close | q1\n"
             "12% | cited | 券商研报 2026-08\n```"
         )
         undeclared = _ledger(tmp_path).validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n600519.SH 年内涨约 12%。"
+            f"{_GROUNDED_ANSWER}\nZZZZ.US 年内涨约 12%。"
         )
 
         assert cited.valid is True, cited.issues
@@ -315,7 +315,7 @@ class TestTheGateDoesNotKillCorrectAnswers:
 
     def test_a_calendar_date_on_an_unhandled_ticker_is_allowed(self, tmp_path: Path) -> None:
         result = _ledger(tmp_path).validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n600519.SH 将于 2026-08-10 披露中报。"
+            f"{_GROUNDED_ANSWER}\nZZZZ.US 将于 2026-08-10 披露中报。"
         )
 
         assert result.valid is True, result.issues
@@ -325,14 +325,14 @@ class TestTheGateDoesNotKillCorrectAnswers:
         ledger = _ledger(tmp_path)
         ledger.ingest_tool_result(
             tool_name="write_file",
-            arguments={"path": "config.json", "content": '{"codes": ["600519.SH"]}'},
+            arguments={"path": "config.json", "content": '{"codes": ["ZZZZ.US"]}'},
             result=json.dumps({"status": "ok"}),
             call_id="cfg",
             success=True,
         )
 
         result = ledger.validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n600519.SH 权重 30.0。"
+            f"{_GROUNDED_ANSWER}\nZZZZ.US 权重 30.0。"
             "\n\n```figures\n212.5 | observed | close | q1\n"
             "30.0 | count | 组合权重（%）\n```"
         )
@@ -340,10 +340,10 @@ class TestTheGateDoesNotKillCorrectAnswers:
         assert result.valid is True, result.issues
 
     def test_a_symbol_the_user_supplied_is_allowed(self, tmp_path: Path) -> None:
-        ledger = _ledger(tmp_path, message="比较 AAPL.US 和 600519.SH")
+        ledger = _ledger(tmp_path, message="比较 AAPL.US 和 ZZZZ.US")
 
         result = ledger.validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n600519.SH 权重 30.0。"
+            f"{_GROUNDED_ANSWER}\nZZZZ.US 权重 30.0。"
             "\n\n```figures\n212.5 | observed | close | q1\n"
             "30.0 | count | 组合权重（%）\n```"
         )
@@ -419,8 +419,8 @@ class TestTheGateDoesNotKillCorrectAnswers:
                     "data": {
                         "query": "白酒龙头",
                         "candidates": [
-                            {"symbol": "600519.SH", "name": "贵州茅台", "source": "eastmoney"},
-                            {"symbol": "000858.SZ", "name": "五粮液", "source": "eastmoney"},
+                            {"symbol": "ZZZZ.US", "name": "Zeta Corp", "source": "eastmoney"},
+                            {"symbol": "YYYY.US", "name": "Yankee Corp", "source": "eastmoney"},
                         ],
                         "sources": {"eastmoney": "ok", "yahoo": "ok"},
                     },
@@ -432,7 +432,7 @@ class TestTheGateDoesNotKillCorrectAnswers:
         )
 
         result = ledger.validate_final_answer(
-            f"{_GROUNDED_ANSWER}\n候选 600519.SH 权重 30.0。"
+            f"{_GROUNDED_ANSWER}\n候选 ZZZZ.US 权重 30.0。"
             "\n\n```figures\n212.5 | observed | close | q1\n"
             "30.0 | count | 组合权重（%）\n```"
         )
@@ -463,10 +463,10 @@ class TestTheGateDoesNotKillCorrectAnswers:
         ends in fabricated quotes, so the strictness is kept and the model is
         handed one round trip to source the figure or call it not retrieved.
         """
-        ledger = GroundingLedger(run_dir=tmp_path, user_message="A股宽基指数有哪些")
+        ledger = GroundingLedger(run_dir=tmp_path, user_message="美股宽基指数有哪些")
 
         result = ledger.validate_final_answer(
-            "000300.SH 覆盖 300.0 只成分股。"
+            "^GSPC 覆盖 500.0 只成分股。"
         )
 
         assert result.valid is False

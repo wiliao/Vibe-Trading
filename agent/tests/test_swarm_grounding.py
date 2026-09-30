@@ -28,16 +28,21 @@ from src.swarm.worker import build_worker_prompt
 def test_extract_suffixed_symbols() -> None:
     user_vars = {
         "target": "NVDA.US",
-        "secondary": "Compare with 700.HK and 600519.SH",
-        "shenzhen": "000001.SZ for liquidity",
-        "beijing": "Listed on 430090.BJ recently",
         "canada": "Compare TD.TO with TSX Venture name PNG.V",
     }
     found = grounding.extract_symbols_from_user_vars(user_vars)
-    assert set(found) == {
-        "NVDA.US", "700.HK", "600519.SH", "000001.SZ", "430090.BJ",
-        "TD.TO", "PNG.V",
+    assert set(found) == {"NVDA.US", "TD.TO", "PNG.V"}
+
+
+def test_extract_ignores_removed_market_suffixes() -> None:
+    # A removed market's suffix (``.HK``/``.SH``/``.SZ``/``.BJ``) is not a
+    # project symbol, so the swarm never grounds it.
+    user_vars = {
+        "secondary": "Compare with 700.HK and 600519.SH",
+        "shenzhen": "000001.SZ for liquidity",
+        "beijing": "Listed on 430090.BJ recently",
     }
+    assert grounding.extract_symbols_from_user_vars(user_vars) == []
 
 
 def test_extract_canadian_class_symbol() -> None:
@@ -102,8 +107,8 @@ def test_extract_bare_scan_does_not_split_suffixed_symbols() -> None:
 def test_extract_explicit_symbols_rank_before_bare_promotions() -> None:
     # Explicit suffixed symbols must win the max-symbols cap, so they sort
     # first even when a bare ticker appears earlier in the text.
-    user_vars = {"goal": "MSTR leverage versus 600519.SH stability"}
-    assert grounding.extract_symbols_from_user_vars(user_vars) == ["600519.SH", "MSTR.US"]
+    user_vars = {"goal": "MSTR leverage versus SHOP.TO stability"}
+    assert grounding.extract_symbols_from_user_vars(user_vars) == ["SHOP.TO", "MSTR.US"]
 
 
 def test_extract_ignores_lowercase_and_single_letter_tokens() -> None:

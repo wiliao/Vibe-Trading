@@ -606,7 +606,7 @@ def get_earnings_calendar(
     end_date: str = "",
     **overrides: Any,
 ) -> dict[str, Any]:
-    """Upcoming earnings calendar for ``market`` (US / HK)."""
+    """Upcoming earnings calendar for ``market`` (US)."""
     profile = profile_by_id(profile_id)
     if profile.transport != "broker_sdk":
         return _unsupported(profile, "earnings_calendar.read")

@@ -182,7 +182,7 @@ def _fetch_price_series(
     for code in codes:
         market = infer_market(code)
         # Loaders key instruments by the canonical exchange-suffixed symbol
-        # (AAPL.US / 600000.SH); a bare ticker fetches nothing. Fetch under the
+        # (AAPL.US / TD.TO); a bare ticker fetches nothing. Fetch under the
         # normalized symbol but keep the user's original code as the label.
         symbol = _normalize_symbol(code, market)
 

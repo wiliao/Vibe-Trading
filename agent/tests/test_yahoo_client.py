@@ -63,12 +63,12 @@ class TestMapSymbol:
         assert yahoo_client.map_symbol("BRK.A.US") == "BRK-A"
         assert yahoo_client.map_symbol("BF.B.US") == "BF-B"
 
-    def test_hk_normalized_to_four_digits(self):
-        assert yahoo_client.map_symbol("00700.HK") == "0700.HK"
-        assert yahoo_client.map_symbol("09988.HK") == "9988.HK"
-
-    def test_hk_already_four_digits_unchanged(self):
-        assert yahoo_client.map_symbol("0700.HK") == "0700.HK"
+    def test_removed_market_suffixes_pass_through_verbatim(self):
+        # A removed market's suffix is never folded onto a surviving venue;
+        # Yahoo simply reports no data for it.
+        assert yahoo_client.map_symbol("00700.HK") == "00700.HK"
+        assert yahoo_client.map_symbol("600519.SH") == "600519.SH"
+        assert yahoo_client.map_symbol("VOD.L") == "VOD.L"
 
     def test_passthrough_for_other_symbols(self):
         assert yahoo_client.map_symbol("BTC-USD") == "BTC-USD"
@@ -351,9 +351,9 @@ class TestGetOptions:
 
         monkeypatch.setattr(yahoo_client, "throttled_get", fake_get)
 
-        result = yahoo_client.get_options("00700.HK", expiration=1700000000)
+        result = yahoo_client.get_options("AAPL.US", expiration=1700000000)
 
-        assert captured["url"].endswith("/0700.HK")
+        assert captured["url"].endswith("/AAPL")
         assert captured["params"] == {"crumb": "the-crumb", "date": 1700000000}
         assert captured["headers"]["Cookie"] == "A1=token"
         assert result == {"expirationDates": [1, 2]}

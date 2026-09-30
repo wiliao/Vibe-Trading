@@ -1,11 +1,14 @@
-"""Forex/CFD mandate vocabulary + lot-aware gate sizing hook (MT5 groundwork).
+"""Forex/CFD mandate vocabulary + lot-aware gate sizing hook.
 
-Covers the three Part-1 surfaces of the MT5/Exness integration:
+Covers the two surviving Part-1 surfaces of the (now deleted) MT5/Exness
+integration:
 
-* ``InstrumentType.FOREX`` / ``InstrumentType.CFD`` and ``AssetClass.FOREX``
-  exist, parse from mandate JSON under schema v1, and route through
-  ``check_mandate`` exactly like CRYPTO (forex) / OPTION (cfd).
-* ``instrument_asset_class`` maps FOREX to its bucket and CFD to ``None``.
+* ``InstrumentType.FOREX`` / ``InstrumentType.CFD`` exist, parse from mandate
+  JSON under schema v1, and route through ``check_mandate`` exactly like
+  OPTION/CRYPTO. Neither has a universe bucket any more: with MT5 gone no
+  surviving order path produces ``InstrumentType.FOREX``, so ``AssetClass``
+  carries no ``FOREX`` member and ``instrument_asset_class`` maps both to
+  ``None``.
 * The SDK order gate's notional normalization honors an optional, authoritative
   ``quantity_notional_usd`` connector hook (lot-sized quantities must never be
   priced as ``quantity x quote``), while the hook-less legacy path is unchanged.
@@ -22,7 +25,6 @@ import pytest
 import src.live.sdk_order_gate as sdk_order_gate
 from src.live.enforcement import (
     BREACH_KIND_INSTRUMENT,
-    BREACH_KIND_UNIVERSE,
     OrderIntent,
     check_mandate,
     instrument_asset_class,
@@ -50,7 +52,6 @@ def _mandate(
     *,
     instruments: tuple[InstrumentType, ...],
     asset_classes: tuple[AssetClass, ...],
-    min_market_cap_usd: float | None = None,
     **caps_overrides: Any,
 ) -> Mandate:
     created = datetime.now(timezone.utc)
@@ -68,7 +69,7 @@ def _mandate(
         hard_caps=HardCaps(**caps),
         universe=UniverseConstraint(
             asset_classes=asset_classes,
-            min_market_cap_usd=min_market_cap_usd,
+            min_market_cap_usd=None,
             min_avg_daily_volume_usd=None,
             exclude_symbols=(),
         ),
@@ -134,9 +135,15 @@ class TestVocabulary:
         assert InstrumentType.FOREX.value == "forex"
         assert InstrumentType.CFD.value == "cfd"
 
-    def test_asset_class_gains_forex(self) -> None:
-        assert hasattr(AssetClass, "FOREX"), "AssetClass.FOREX missing"
-        assert AssetClass.FOREX.value == "forex"
+    def test_asset_class_has_no_removed_market_buckets(self) -> None:
+        # MT5 is gone, so no surviving path produces InstrumentType.FOREX and
+        # the forex bucket was removed with the rest of the removed markets.
+        assert not hasattr(AssetClass, "FOREX"), "AssetClass.FOREX should be gone"
+        assert {bucket.value for bucket in AssetClass} == {
+            "us_equity",
+            "us_etf",
+            "crypto",
+        }
 
     def test_schema_version_unchanged(self) -> None:
         # Enum vocabulary growth is not a structural schema change: old
@@ -144,11 +151,14 @@ class TestVocabulary:
         assert MANDATE_SCHEMA_VERSION == 1
 
     def test_instrument_asset_class_mapping(self) -> None:
-        assert instrument_asset_class(InstrumentType.FOREX) is AssetClass.FOREX
-        # CFD follows the OPTION precedent: no universe bucket, gated purely
-        # by allowed_instruments.
+        # FOREX now follows the CFD/OPTION precedent: no universe bucket, so it
+        # is gated purely by allowed_instruments.
+        assert instrument_asset_class(InstrumentType.FOREX) is None
         assert instrument_asset_class(InstrumentType.CFD) is None
         assert instrument_asset_class(InstrumentType.OPTION) is None
+        # The crypto bucket is the one surviving non-US bucket (Robinhood can
+        # classify a place_equity_order as crypto).
+        assert instrument_asset_class(InstrumentType.CRYPTO) is AssetClass.CRYPTO
 
 
 # --------------------------------------------------------------------------- #
@@ -157,12 +167,20 @@ class TestVocabulary:
 
 
 class TestStoreRoundTrip:
-    def test_parses_forex_and_cfd_values(self) -> None:
-        raw = _raw_mandate_json(["equity", "forex", "cfd"], ["us_equity", "forex"])
+    def test_parses_forex_and_cfd_instruments(self) -> None:
+        raw = _raw_mandate_json(["equity", "forex", "cfd"], ["us_equity"])
         mandate = _parse_mandate(raw)
         assert InstrumentType.FOREX in mandate.hard_caps.allowed_instruments
         assert InstrumentType.CFD in mandate.hard_caps.allowed_instruments
-        assert AssetClass.FOREX in mandate.universe.asset_classes
+        assert mandate.universe.asset_classes == (AssetClass.US_EQUITY,)
+
+    def test_removed_forex_asset_class_fails_closed(self) -> None:
+        # A mandate written for the deleted MT5 path still lists "forex" in
+        # asset_classes; the store must refuse it (load_mandate turns the
+        # ValueError into None) rather than silently bucketing it.
+        raw = _raw_mandate_json(["equity", "forex"], ["us_equity", "forex"])
+        with pytest.raises(ValueError):
+            _parse_mandate(raw)
 
     def test_legacy_mandate_still_parses(self) -> None:
         raw = _raw_mandate_json(["equity", "etf"], ["us_equity", "us_etf"])
@@ -184,13 +202,16 @@ class TestCheckMandateForex:
             notional_usd=notional,
             quantity=None,
             instrument_type=InstrumentType.FOREX,
-            asset_class=AssetClass.FOREX,
+            # No universe bucket survives for forex after the MT5 removal.
+            asset_class=None,
         )
 
-    def test_forex_allowed_when_mandate_permits(self) -> None:
+    def test_forex_allowed_when_instrument_is_permitted(self) -> None:
+        # FOREX follows the CFD/OPTION precedent: with no universe bucket the
+        # asset_classes list does not constrain it — allowed_instruments does.
         mandate = _mandate(
             instruments=(InstrumentType.FOREX,),
-            asset_classes=(AssetClass.FOREX,),
+            asset_classes=(AssetClass.US_EQUITY,),
         )
         assert _check(mandate, self._forex_intent()) is None
 
@@ -203,30 +224,6 @@ class TestCheckMandateForex:
         assert breach is not None
         assert breach.kind == BREACH_KIND_INSTRUMENT
         assert breach.limit == "allowed_instruments"
-
-    def test_forex_denied_when_asset_class_not_permitted(self) -> None:
-        # Instrument allowed but the forex universe bucket is not.
-        mandate = _mandate(
-            instruments=(InstrumentType.FOREX,),
-            asset_classes=(AssetClass.US_EQUITY,),
-        )
-        breach = _check(mandate, self._forex_intent())
-        assert breach is not None
-        assert breach.kind == BREACH_KIND_UNIVERSE
-        assert breach.limit == "asset_classes"
-
-    def test_forex_market_cap_floor_fails_closed(self) -> None:
-        # No loader market is wired for AssetClass.FOREX, so a market-cap
-        # floor must deny (fail-closed), never wave through.
-        mandate = _mandate(
-            instruments=(InstrumentType.FOREX,),
-            asset_classes=(AssetClass.FOREX,),
-            min_market_cap_usd=1e9,
-        )
-        breach = _check(mandate, self._forex_intent())
-        assert breach is not None
-        assert breach.kind == BREACH_KIND_UNIVERSE
-        assert breach.limit == "min_market_cap_usd"
 
 
 class TestCheckMandateCfd:
@@ -243,7 +240,7 @@ class TestCheckMandateCfd:
     def test_cfd_requires_explicit_instrument_allowance(self) -> None:
         mandate = _mandate(
             instruments=(InstrumentType.FOREX,),
-            asset_classes=(AssetClass.FOREX,),
+            asset_classes=(AssetClass.US_EQUITY,),
         )
         breach = _check(mandate, self._cfd_intent())
         assert breach is not None

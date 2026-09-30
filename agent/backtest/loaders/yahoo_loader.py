@@ -48,22 +48,20 @@ _INTERVAL_MAP = {
 def _is_supported(code: str) -> bool:
     """Return whether *code* is a symbol this loader handles.
 
-    Covers US/HK/India/Korea/Canada/Vietnam/UK equities plus Yahoo's own
-    futures (``GC=F``), forex (``EURUSD=X``) and index (``^SPX``) symbol
-    conventions, which the public chart endpoint serves verbatim (the code is
-    used as-is in the request URL, no conversion) (#718). Supported UK ``.L``
-    lines must declare GBP or GBp; GBp is normalized to GBP at fetch time
-    (#1206).
+    Covers the surviving US (``.US``) and Canadian (``.TO`` / ``.V``) equity
+    suffixes plus Yahoo's index convention (``^SPX``), which the public chart
+    endpoint serves verbatim (the code is used as-is in the request URL, no
+    conversion) (#718). A ``local:`` routing prefix is stripped before the
+    shape check so ``local:AAPL.US`` is still served. A removed market's
+    suffix is not supported and must not be fetched.
     """
-    upper = code.strip().upper()
+    upper = code.strip()
+    if upper[:6].lower() == "local:":
+        upper = upper[6:].strip()
+    upper = upper.upper()
     if upper.startswith("^"):
         return True
-    return upper.endswith(
-        (
-            ".US", ".HK", ".NS", ".BO", ".KS", ".KQ", ".TO", ".V", ".VN", ".BA",
-            ".L", "=F", "=X",
-        )
-    )
+    return upper.endswith((".US", ".TO", ".V"))
 
 
 def _to_yahoo_interval(interval: str) -> str:

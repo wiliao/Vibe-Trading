@@ -61,22 +61,22 @@ class TestSymbolGating:
         assert _is_supported("AAPL.US") is True
         assert _is_supported("aapl.us") is True
 
-    def test_accepts_hk(self):
-        assert _is_supported("00700.HK") is True
-        assert _is_supported("00700.hk") is True
-
-    def test_accepts_india(self):
-        assert _is_supported("RELIANCE.NS") is True
-        assert _is_supported("reliance.ns") is True
-        assert _is_supported("500325.BO") is True
-
     def test_accepts_canada(self):
         assert _is_supported("TD.TO") is True
         assert _is_supported("PNG.V") is True
         assert _is_supported("bbd-b.to") is True
 
+    def test_accepts_local_prefix_and_index(self):
+        assert _is_supported("local:AAPL.US") is True
+        assert _is_supported("^GSPC") is True
+
     def test_rejects_others(self):
         assert _is_supported("601398.SH") is False
+        assert _is_supported("00700.HK") is False
+        assert _is_supported("RELIANCE.NS") is False
+        assert _is_supported("VOD.L") is False
+        assert _is_supported("GGAL.BA") is False
+        assert _is_supported("EURUSD=X") is False
         assert _is_supported("BTC-USDT") is False
         assert _is_supported("") is False
 
@@ -254,10 +254,10 @@ class TestFetch:
         rows = [_row("2024-01-02", 10, 11, 9, 10.5, 1000)]
         with patch(
             "backtest.loaders.yahoo_loader.yahoo_client.get_chart",
-            return_value=(rows, "ARS"),
+            return_value=(rows, "CAD"),
         ):
-            out = DataLoader().fetch(["GGAL.BA"], "2024-01-01", "2024-01-31")
-        assert out["GGAL.BA"].attrs["quote_currency"] == "ARS"
+            out = DataLoader().fetch(["DLR.TO"], "2024-01-01", "2024-01-31")
+        assert out["DLR.TO"].attrs["quote_currency"] == "CAD"
 
     def test_fetch_leaves_missing_quote_currency_absent(self):
         rows = [_row("2024-01-02", 10, 11, 9, 10.5, 1000)]
@@ -268,90 +268,39 @@ class TestFetch:
             out = DataLoader().fetch(["AAPL.US"], "2024-01-01", "2024-01-31")
         assert "quote_currency" not in out["AAPL.US"].attrs
 
-    def test_fetch_india_symbol(self):
-        rows = [
-            _row("2024-01-02", 10, 11, 9, 10.5, 1000),
-            _row("2024-01-03", 10.5, 12, 10, 11.5, 2000),
-        ]
-        with patch(
-            "backtest.loaders.yahoo_loader.yahoo_client.get_chart",
-            return_value=(rows, "INR"),
-        ) as mock_chart:
-            out = DataLoader().fetch(["RELIANCE.NS"], "2024-01-01", "2024-01-31")
-        assert "RELIANCE.NS" in out
-        assert len(out["RELIANCE.NS"]) == 2
-        # NSE symbol passes through to the client verbatim (Yahoo keeps .NS).
-        assert mock_chart.call_args.args[0] == "RELIANCE.NS"
-
-    def test_non_us_hk_india_symbol_skipped(self):
+    def test_removed_market_symbols_are_skipped(self):
         with patch(
             "backtest.loaders.yahoo_loader.yahoo_client.get_chart"
         ) as mock_chart:
-            out = DataLoader().fetch(["601398.SH"], "2024-01-01", "2024-01-31")
+            out = DataLoader().fetch(
+                ["601398.SH", "00700.HK", "VOD.L", "RELIANCE.NS"],
+                "2024-01-01",
+                "2024-01-31",
+            )
         assert out == {}
         mock_chart.assert_not_called()
 
-    def test_gbp_pence_meta_scales_ohlc_to_gbp(self):
-        # LSE prices arrive in pence ("GBp") from Yahoo's chart meta; the
-        # loader must normalize ÷100 so 117p becomes £1.17.
-        rows = [
-            _row("2024-01-02", 117, 118, 116, 117.5, 1000),
-        ]
-        with patch(
-            "backtest.loaders.yahoo_loader.yahoo_client.get_chart",
-            return_value=(rows, "GBp"),
-        ) as mock_chart:
-            out = DataLoader().fetch(["VOD.L"], "2024-01-01", "2024-01-31")
-        assert "VOD.L" in out
-        frame = out["VOD.L"]
-        assert frame["open"].iloc[0] == 1.17
-        assert frame["high"].iloc[0] == 1.18
-        assert frame["low"].iloc[0] == 1.16
-        assert frame["close"].iloc[0] == 1.175
-        # Volume is untouched.
-        assert frame["volume"].iloc[0] == 1000
-        assert frame.attrs == {
-            "quote_currency": "GBP",
-            "currency_conversion": "GBp→GBP (÷100)",
-        }
-        assert mock_chart.call_args.args[0] == "VOD.L"
-
-    def test_gbp_quoted_lse_line_passes_unscaled(self):
-        rows = [_row("2024-01-02", 107.0, 108.0, 106.0, 107.8, 1000)]
-        with patch(
-            "backtest.loaders.yahoo_loader.yahoo_client.get_chart",
-            return_value=(rows, "GBP"),
-        ):
-            out = DataLoader().fetch(["VUSA.L"], "2024-01-01", "2024-01-31")
-
-        frame = out["VUSA.L"]
-        assert frame["close"].iloc[0] == 107.8
-        assert frame.attrs == {
-            "quote_currency": "GBP",
-            "currency_conversion": "none",
-        }
-
-    def test_usd_quoted_lse_line_is_omitted(self):
+    def test_usd_quoted_tsx_line_is_omitted(self):
         rows = [_row("2024-01-02", 146.0, 147.0, 145.0, 146.4, 1000)]
         with patch(
             "backtest.loaders.yahoo_loader.yahoo_client.get_chart",
             return_value=(rows, "USD"),
         ):
-            out = DataLoader().fetch(["VUSD.L"], "2024-01-01", "2024-01-31")
+            out = DataLoader().fetch(["DLR-U.TO"], "2024-01-01", "2024-01-31")
 
         assert out == {}
 
-    def test_lse_line_with_missing_currency_is_omitted(self):
+    def test_tsx_line_with_missing_currency_is_omitted(self):
         rows = [_row("2024-01-02", 117.0, 118.0, 116.0, 117.5, 1000)]
         with patch(
             "backtest.loaders.yahoo_loader.yahoo_client.get_chart",
             return_value=(rows, ""),
         ):
-            out = DataLoader().fetch(["VOD.L"], "2024-01-01", "2024-01-31")
+            out = DataLoader().fetch(["DLR.TO"], "2024-01-01", "2024-01-31")
 
         assert out == {}
 
-    def test_non_gbp_currency_meta_left_untouched(self):
+    def test_non_cad_currency_meta_left_untouched(self):
         rows = [
             _row("2024-01-02", 10, 11, 9, 10.5, 1000),
         ]
@@ -362,10 +311,8 @@ class TestFetch:
             out = DataLoader().fetch(["AAPL.US"], "2024-01-01", "2024-01-31")
         assert out["AAPL.US"]["close"].iloc[0] == 10.5
 
-    def test_uk_symbols_are_supported(self):
-        assert _is_supported("VOD.L")
-        assert _is_supported("BARC.L")
-        # Irish ISE is out of scope; .IL must not be claimed.
+    def test_removed_market_suffixes_are_not_claimed(self):
+        # Irish ISE and A-share suffixes are out of scope and must not be claimed.
         assert not _is_supported("DCC.IL")
         assert not _is_supported("601398.SH")
         good_rows = [_row("2024-01-02", 10, 11, 9, 10.5, 1000)]
@@ -415,17 +362,15 @@ class TestLoaderMetadata:
 @pytest.mark.parametrize(
     ("symbol", "declared", "admitted"),
     [
-        ("GGAL.BA", "ARS", True),
-        ("GGALD.BA", "USD", False),  # BYMA's dollar line for Galicia
-        ("GGALD.BA", "", False),
         ("DLR.TO", "CAD", True),
         ("DLR-U.TO", "USD", False),  # the TSX's US-dollar unit of the same fund
+        ("DLR.TO", "", False),
     ],
 )
 def test_fetch_admits_a_line_only_in_its_markets_currency(
     symbol: str, declared: str, admitted: bool
 ) -> None:
-    """ar_equity is one ARS pool and ca_equity one CAD pool; both venues list USD lines."""
+    """ca_equity is one CAD pool, and the venue lists a USD line beside it."""
     rows = [_row("2024-01-02", 4.1, 4.3, 4.0, 4.2, 1000)]
     with patch(
         "backtest.loaders.yahoo_loader.yahoo_client.get_chart",

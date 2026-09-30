@@ -36,7 +36,8 @@ _DAILY_FIELDS = "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65"
 _MINUTE_FIELDS = "f51,f52,f53,f54,f55,f56"
 
 # Bucket labels in the order Eastmoney emits them after the leading timestamp:
-# main (主力净额), small, medium, large, super-large net inflow in CNY.
+# main (主力净额), small, medium, large, super-large net inflow in the listing's
+# quote currency (USD for the surviving ``.US`` routing).
 _BUCKETS = ("main", "small", "medium", "large", "super_large")
 
 # Defensive caps so a payload can never blow up the LLM context.
@@ -62,7 +63,8 @@ def _parse_flow_row(raw: str) -> dict[str, Any] | None:
 
     Daily rows lead with a ``YYYY-MM-DD`` date; minute rows lead with a
     ``YYYY-MM-DD HH:MM`` timestamp. Either way the next five columns are the
-    main / small / medium / large / super-large net inflow values in CNY.
+    main / small / medium / large / super-large net inflow values in the
+    listing's quote currency (USD for ``.US``).
 
     Args:
         raw: One row string from ``data.klines``.
@@ -145,7 +147,8 @@ class FundFlowTool(BaseTool):
     description = (
         "PER-STOCK order-level net inflow for a GIVEN symbol: for each requested "
         "ticker, the main / super-large / large / medium / small-order net inflow "
-        "(in CNY), as daily history or the current session's per-minute line. Use "
+        "(in USD for the US listings this build routes), as daily history or the "
+        "current session's per-minute line. Use "
         "this for one or more named stocks to gauge whether large/main-force money "
         "is flowing into or out of that specific symbol. NOT market-wide aggregate "
         "flow. Markets: US (.US). Example: "

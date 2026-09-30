@@ -25,20 +25,12 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# The supported LSE contract settles in GBP. Yahoo may declare an individual
-# ``.L`` line in pence (``GBp``), pounds (``GBP``), another currency, or no
-# currency at all. Loaders must normalize declared pence to pounds and reject
-# every non-GBP/unknown line before the static GBP market accounting sees it.
-_GBP_PENCE_CURRENCY = "GBp"
-_PRICE_COLUMNS = ("open", "high", "low", "close")
-_LSE_SYMBOL_PATTERN = re.compile(r"^[A-Z0-9&.\-]+\.L$", re.I)
 # Venues that list lines in a second currency, whose market is one static
-# pool in the first. BYMA quotes GGAL.BA in ARS and GGALD.BA in USD (the
-# trailing D is not a rule: YPFD.BA is a peso line); the TSX quotes DLR.TO in
-# CAD and DLR-U.TO in USD. Yahoo declares each, and every priced source in
-# these markets' chains is Yahoo or yfinance, so the declared currency decides.
+# pool in the first. The TSX quotes DLR.TO in CAD and DLR-U.TO in USD. Yahoo
+# declares each, and every priced source in the chain is Yahoo or yfinance, so
+# the declared currency decides. (The removed markets' second-currency pools
+# are gone with their markets.)
 _SINGLE_CURRENCY_VENUES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"^[A-Z0-9&.\-]+\.BA$", re.I), "ARS"),
     (re.compile(r"^[A-Z0-9&.\-]+\.(?:TO|V)$", re.I), "CAD"),
 )
 
@@ -49,46 +41,13 @@ def _venue_currency(code: str) -> str | None:
     return next((cur for pattern, cur in _SINGLE_CURRENCY_VENUES if pattern.match(code)), None)
 
 
-def is_lse_symbol(code: str) -> bool:
-    """Return whether a project symbol uses the supported LSE ``.L`` form.
-
-    The suffix identifies the venue, not the quote currency. Every caller must
-    still inspect source metadata through :func:`normalize_lse_quote_currency`
-    before emitting bars.
-    """
-    return bool(_LSE_SYMBOL_PATTERN.match(str(code).strip()))
-
-
-def scale_pence_to_currency(
-    frame: pd.DataFrame, currency: str
-) -> tuple[pd.DataFrame, str]:
-    """Convert GBp-quoted OHLC prices to GBP (÷100) when the source says GBp.
-
-    Args:
-        frame: OHLCV frame with float price columns.
-        currency: Quote currency declared by the source (e.g. ``"GBp"`` for
-            LSE pence-quoted names; ``"USD"``/``"EUR"``/``"GBP"`` pass
-            through).
-
-    Returns:
-        ``(frame, applied)``: the (possibly scaled) frame, and the conversion
-        applied — ``"GBp→GBP (÷100)"`` when scaled, else ``"none"``.
-    """
-    if currency != _GBP_PENCE_CURRENCY or frame is None or frame.empty:
-        return frame, "none"
-    scaled = frame.copy()
-    for column in _PRICE_COLUMNS:
-        scaled[column] = scaled[column] / 100.0
-    return scaled, "GBp→GBP (÷100)"
-
-
 def declared_currency_required(code: str) -> bool:
     """Return whether ``code``'s suffix names a venue that quotes in several currencies.
 
     A loader must read the source's declared currency for such a symbol and
     pass it to :func:`normalize_declared_quote_currency` before emitting bars.
     """
-    return is_lse_symbol(code) or _venue_currency(code) is not None
+    return _venue_currency(code) is not None
 
 
 def normalize_declared_quote_currency(
@@ -103,15 +62,12 @@ def normalize_declared_quote_currency(
 
     Returns:
         The frame with ``attrs["quote_currency"]`` set whenever a currency was
-        declared (GBP for an LSE line after pence scaling).
+        declared.
 
     Raises:
-        ValueError: If an LSE line is not declared GBP/GBp, or a BYMA / TSX
-            line is not declared in its market's currency -- each would enter a
-            single-currency pool in the wrong unit.
+        ValueError: If a TSX / TSX Venture line is not declared in CAD -- it
+            would enter the single-currency Canadian pool in the wrong unit.
     """
-    if is_lse_symbol(code):
-        return normalize_lse_quote_currency(frame, currency)
     declared = currency.strip() if isinstance(currency, str) else ""
     required = _venue_currency(code)
     if required is not None and declared != required:
@@ -122,43 +78,6 @@ def normalize_declared_quote_currency(
     if declared:
         frame.attrs["quote_currency"] = declared
     return frame
-
-
-def normalize_lse_quote_currency(
-    frame: pd.DataFrame, currency: str | None
-) -> pd.DataFrame:
-    """Normalize a declared LSE quote into the engine's GBP-only contract.
-
-    Args:
-        frame: Normalized OHLCV frame.
-        currency: Quote currency declared by the source.
-
-    Returns:
-        A frame quoted in GBP with per-symbol conversion provenance attached.
-
-    Raises:
-        ValueError: If the source declares USD/another currency or omits the
-            currency. Passing such bars into the GBP-only accounting contract
-            would silently mix currencies.
-    """
-    declared = currency.strip() if isinstance(currency, str) else ""
-    normalized = frame.copy()
-    if declared in {_GBP_PENCE_CURRENCY, "p"}:
-        normalized, conversion = scale_pence_to_currency(
-            normalized, _GBP_PENCE_CURRENCY
-        )
-    elif declared == "GBP":
-        conversion = "none"
-    else:
-        label = declared or "missing"
-        raise ValueError(
-            "LSE quote currency must be declared as GBP or GBp; "
-            f"got {label!r}"
-        )
-
-    normalized.attrs["quote_currency"] = "GBP"
-    normalized.attrs["currency_conversion"] = conversion
-    return normalized
 
 
 class NoAvailableSourceError(Exception):

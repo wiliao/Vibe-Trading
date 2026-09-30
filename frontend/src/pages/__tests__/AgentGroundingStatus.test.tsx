@@ -167,7 +167,7 @@ describe("Agent grounding status line", () => {
         attempt_id: "attempt-1",
         tool: "get_market_data",
         call_id: "call-recovery",
-        arguments: { codes: ["159516.SZ"] },
+        arguments: { codes: ["AAPL.US"] },
       });
     });
     expect(screen.queryByText(STATUS_TEXT)).not.toBeInTheDocument();

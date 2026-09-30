@@ -18,6 +18,19 @@ Open `http://localhost:8088/home/` for the landing page and these wiki sections:
 
 Direct docs URLs such as `/docs/latest/getting-started/vibe-trading-overview` are handled by Cloudflare Pages via `_redirects`. The simple Python preview server does not apply those rewrite rules, so use `/docs/` as the local entry point.
 
+## Known asset TODOs
+
+- `assets/feature-cross-market-data-backtesting.png` — **stale bitmap, needs
+  re-authoring.** It still depicts five cross-market source panels (Hong Kong,
+  US, crypto, commodities, forex), but the US + Canada scope change removed every
+  one of those panels except US (Canada is in scope but was never depicted). The
+  surrounding copy in `home/index.html` already says "US and Canada equity market
+  data", so the illustration and the text disagree. Replace it with a US + Canada
+  illustration (or at least a US-only one) that matches the reduced scope. The
+  same note lives next to the `<img>` in `home/index.html` as a `TODO(assets)`
+  HTML comment; this entry is the durable copy so the replacement is tracked
+  outside a single HTML comment.
+
 ## Cloudflare Pages
 
 - Project root: `wiki`

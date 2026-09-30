@@ -1,5 +1,5 @@
 {
-  "description": "US/CA-only refactor deny-list (docs/refactor-plan.md Phase 10): removed markets, data sources, and symbols that must not reappear in shipped code. Matched case-insensitively as substrings, scoped to agent/src, agent/backtest, and frontend/src. Intentional mentions belong in `allow` below, each with a non-empty reason; an allow entry suppresses exactly the listed tokens for the matching path (repo-relative path or fnmatch glob). agent/tests/test_us_ca_scope_gate.py enforces both the deny-list and the allowlist's honesty (every entry must carry a reason and must still suppress a real hit).",
+  "description": "US/CA-only refactor deny-list (docs/refactor-plan.md Phase 10): removed markets, data sources, and symbols that must not reappear in shipped code. Matched case-insensitively as substrings, scoped to agent/src, agent/backtest, and frontend/src. Intentional mentions belong in `allow` below, each with a non-empty reason; an allow entry suppresses exactly the listed tokens for the matching path (repo-relative path or fnmatch glob). agent/tests/test_us_ca_scope_gate.py enforces both the deny-list and the allowlist's honesty (every entry must carry a reason and must still suppress a real hit). Phase 11 token-spelling note: the matcher is a case-insensitive SUBSTRING search, so short exchange suffixes and currency codes cannot be added bare. Measured collisions in the scan roots at Phase 11: nse 2131 hits (response/sense/expense), bse 1088, hose 533 (those/whose/chose), lse 4987 (false/else/pulse), .BO 127 (\".bold\"/\".bootstrap\"/\".body\"), .BA 473 (\".back\"/\".base\"), .SS 25 (\".ssl\"/\".sse\"), .SH 398 (\".sh\"/\".sha256\"), .L 2665, ARS 2794 (years/args), and HKD/CNY/GBP/INR/JPY/KRW/VND all collide with the surviving multi-currency portfolio/FX tables (portfolio/service.py, portfolio/iso4217.py, market_data.py). Those bare forms are therefore omitted. Exchange suffixes are an exception: in code a suffix can only be a string literal (a comment cannot route a market), so the suffix tokens below carry their CLOSING double quote - '.SS\"' matches \".SS\" in a suffix table, endswith(\".SS\") and f\"{code}.SS\", but never '.ssl'/'.sse'. '.SH\"' is the one suffix that still collides (file-extension lists like \".sh\") and '.HK\"' still matches surviving portfolio HK-journal handling, so both are omitted and the exact symbols stay as guards. crypto/forex/futures stay untokened for the same reason: crypto is a surviving Robinhood instrument class and MARKET_SPECS market, while forex/futures appear in generic prose and surviving symbol classification. Longer multi-word venue names (hong kong, shanghai, shenzhen, buenos aires) plus kospi/kosdaq are specific enough to include; their surviving prose mentions are allowlisted below.",
   "case_insensitive": true,
   "deny": [
     "a_share",
@@ -10,6 +10,12 @@
     "ar_equity",
     "uk_equity",
     "csi300",
+    "kospi",
+    "kosdaq",
+    "hong kong",
+    "shanghai",
+    "shenzhen",
+    "buenos aires",
     "tushare",
     "akshare",
     "pykrx",
@@ -33,7 +39,17 @@
     "005930.KS",
     "VIC.VN",
     "-USDT",
-    "BTCUSDT"
+    "BTCUSDT",
+    ".SS\"",
+    ".NS\"",
+    ".BO\"",
+    ".KS\"",
+    ".KQ\"",
+    ".BA\"",
+    ".VN\"",
+    ".SZ\"",
+    ".BJ\"",
+    ".L\""
   ],
   "allow": [
     {
@@ -105,6 +121,16 @@
       "path": "agent/src/trading/service.py",
       "tokens": ["binance", "mt5"],
       "reason": "Same reason: these branches dispatch user-defined local connector plugins by connector id; no built-in binance/mt5 connector ships any more."
+    },
+    {
+      "path": "agent/src/tools/research_papers_tool.py",
+      "tokens": ["hong kong", "shanghai", "shenzhen"],
+      "reason": "This tool tags the *topic* of a research paper, not a tradable market. The refactor plan (Phase 5 table) kept its regional tags and only asked to drop the JP/KR/IN ones, so the China/HK venue names in _MARKET_TERMS are intentional classification vocabulary."
+    },
+    {
+      "path": "agent/src/skills/geopolitical-risk/SKILL.md",
+      "tokens": ["shanghai"],
+      "reason": "Documents the SCFI Shanghai Containerized Freight Index, a macro freight-rate indicator used by geopolitical analysis - not a tradable market or a removed data route."
     }
   ]
 }

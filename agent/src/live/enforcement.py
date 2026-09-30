@@ -57,15 +57,12 @@ class UniverseDataUnavailable(Exception):
 _ASSET_CLASS_MARKET: dict[AssetClass, str] = {
     AssetClass.US_EQUITY: "us_equity",
     AssetClass.US_ETF: "us_equity",
-    # The A-share / Hong Kong / India / crypto loader chains are gone from this
-    # build (US + Canada only), so those asset classes have no loader market
-    # wired here: a market-cap or liquidity floor set on such a mandate fails
-    # closed (deny) rather than waving through — intentional. If a chain is ever
-    # re-added, add the row here in the same commit.
-    # FOREX likewise has no loader market wired: market-cap/liquidity floors do
-    # not apply to currency pairs, so any floor set on a forex mandate fails
-    # closed, and quantity pricing comes from the connector's own sizing hook
-    # (see ``src.live.sdk_order_gate._implied_notional``), not the loaders.
+    # The removed-market loader chains are gone from this build (US + Canada
+    # only), and crypto prices come from the connector, not these loaders, so
+    # no bucket other than US equity/ETF has a loader market wired here: a
+    # market-cap or liquidity floor set on such a mandate fails closed (deny)
+    # rather than waving through — intentional. If a chain is ever re-added,
+    # add the row here in the same commit.
 }
 
 #: Breach ``kind`` values. ``universe``/``instrument`` are structural (DENY);
@@ -77,12 +74,12 @@ BREACH_KIND_QUANTITATIVE = "quantitative"
 #: InstrumentType → the AssetClass bucket it belongs to. OPTION and CFD have no
 #: universe-level asset-class bucket (the user permits asset classes, not
 #: option chains or CFD catalogs), so both are gated purely by
-#: ``allowed_instruments``.
+#: ``allowed_instruments``. FOREX joins them: with the removed broker connectors
+#: gone, no surviving order path produces ``InstrumentType.FOREX``.
 _INSTRUMENT_ASSET_CLASS: dict[InstrumentType, AssetClass] = {
     InstrumentType.EQUITY: AssetClass.US_EQUITY,
     InstrumentType.ETF: AssetClass.US_ETF,
     InstrumentType.CRYPTO: AssetClass.CRYPTO,
-    InstrumentType.FOREX: AssetClass.FOREX,
 }
 
 
@@ -114,11 +111,10 @@ class OrderIntent:
         quantity: Share/contract/coin quantity when notional is not given.
         instrument_type: Mapped :class:`~src.live.mandate.model.InstrumentType`.
         asset_class: Explicit universe :class:`~src.live.mandate.model.AssetClass`
-            when the caller can determine the market (multi-market connectors:
-            an ``EQUITY`` may be US, HK or A-share). When ``None`` the gate falls
-            back to the instrument-type default (US-centric), preserving the
-            single-market behavior. Carrying it explicitly is what lets the
-            mandate gate distinguish e.g. an HK equity from a US equity.
+            when the caller can determine the market. When ``None`` the gate
+            falls back to the instrument-type default (US-centric), preserving
+            the single-market behavior. Carrying it explicitly is what lets the
+            mandate gate bucket a crypto order apart from a US equity.
     """
 
     symbol: str
@@ -514,10 +510,10 @@ def check_mandate(
             detail=f"{intent.instrument_type.value} not in allowed_instruments",
         )
 
-    # 3. Asset-class allowance (universe bucket). OPTION has no bucket and is
-    #    governed by allowed_instruments alone. An explicit intent.asset_class
-    #    (multi-market connectors: US/HK/CN equities) wins over the instrument
-    #    default so the gate buckets HK/A-share correctly.
+    # 3. Asset-class allowance (universe bucket). OPTION/CFD/FOREX have no
+    #    bucket and are governed by allowed_instruments alone. An explicit
+    #    intent.asset_class (e.g. the crypto bucket) wins over the instrument
+    #    default so the gate buckets it correctly.
     asset_class = intent.asset_class or _INSTRUMENT_ASSET_CLASS.get(intent.instrument_type)
     if asset_class is not None and asset_class not in universe.asset_classes:
         return _breach(

@@ -22,10 +22,10 @@ from src.agent.grounding.policies import _note_tokens
 
 pytestmark = pytest.mark.unit
 
-A = "159516.SZ"
-B = "600519.SH"
-C = "510300.SH"
-D = "600000.SH"
+A = "AAPL.US"
+B = "MSFT.US"
+C = "SPY.US"
+D = "QQQ.US"
 
 _A_ROWS = [
     {
@@ -82,15 +82,15 @@ INDICATORS_A = (
 FACTOR_A = ("factor_analysis", {"symbol": A}, {"status": "ok", "sharpe": 0.888, "win_rate": 0.573}, "fa")
 PROFILE_US = (
     "get_stock_profile",
-    {"ticker": "AAPL.US"},
+    {"ticker": "NVDA.US"},
     {"ok": True, "data": {"sections": {"key_stats": {"forwardPE": 22.920343}}}},
     "profile_us",
 )
 
-HDR = f"{A}（akshare，CNY）最新收盘 0.666 元。"
+HDR = f"{A}（akshare，USD）最新收盘 0.666 美元。"
 ROW = "0.666 | observed | close 2026-09-09 | c1"
-TWO = f"{A} 与 {B}（akshare，CNY）对比。\n"
-HDR_B = f"{B}（akshare，CNY）最新收盘 1410.00 元。"
+TWO = f"{A} 与 {B}（akshare，USD）对比。\n"
+HDR_B = f"{B}（akshare，USD）最新收盘 1410.00 美元。"
 ROW_B = "1410.00 | observed | close 2026-09-09 | c2"
 
 
@@ -123,8 +123,8 @@ def _reasons(result: Any) -> list[str]:
 @pytest.mark.parametrize(
     ("prose", "row"),
     [
-        ("最新收盘价 9.99 元。", "9.99 | count | n"),  # decimal and currency
-        ("成本 820 元。", "820 | count | n"),  # integer with a currency mark
+        ("最新收盘价 9.99 美元。", "9.99 | count | n"),  # decimal and currency
+        ("成本 820 美元。", "820 | count | n"),  # integer with a currency mark
         ("entry at $12.5 today.", "12.5 | count | n"),  # currency symbol before
     ],
 )
@@ -169,7 +169,7 @@ def test_a_plain_integer_is_a_count(tmp_path: Path) -> None:
 def test_a_measurement_declared_count_is_checked_not_refused(tmp_path: Path) -> None:
     """It is checked as the observation it is, so a real print still passes."""
     result = _ledger(tmp_path, MARKET_A).validate_final_answer(
-        HDR + " 最高 0.681 元。" + _block(ROW, "0.681 | count | n")
+        HDR + " 最高 0.681 美元。" + _block(ROW, "0.681 | count | n")
     )
 
     assert result.valid is True, result.issues
@@ -185,14 +185,14 @@ def test_a_source_only_the_note_names_is_no_citation(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A)
     row = "9.99 | cited | 新浪财经"
 
-    invisible = ledger.validate_final_answer(HDR + "\n最新收盘价 9.99 元。" + _block(ROW, row))
+    invisible = ledger.validate_final_answer(HDR + "\n最新收盘价 9.99 美元。" + _block(ROW, row))
     on_another_line = ledger.validate_final_answer(
-        HDR + "\n新浪财经另有报道。\n单位净值 9.99 元。" + _block(ROW, row)
+        HDR + "\n新浪财经另有报道。\n单位净值 9.99 美元。" + _block(ROW, row)
     )
     digits_only = ledger.validate_final_answer(
-        HDR + "\n2024 年报单位净值 9.99 元。" + _block(ROW, "9.99 | cited | 2024")
+        HDR + "\n2024 年报单位净值 9.99 美元。" + _block(ROW, "9.99 | cited | 2024")
     )
-    visible = ledger.validate_final_answer(HDR + "\n新浪财经报道其单位净值 9.99 元。" + _block(ROW, row))
+    visible = ledger.validate_final_answer(HDR + "\n新浪财经报道其单位净值 9.99 美元。" + _block(ROW, row))
     visible_english = ledger.validate_final_answer(
         HDR + "\nFama-French (2024) report a Sharpe of 1.8."
         + _block(ROW, "1.8 | cited | FAMA-FRENCH 2024 table 3")
@@ -219,10 +219,10 @@ def test_a_note_token_is_a_cjk_pair_or_a_four_letter_word() -> None:
 @pytest.mark.parametrize(
     ("prose", "row"),
     [
-        ("第一档 0.888 元。", "0.888 | derived | 0.666 + 0.222 | c1"),
-        ("第一档 9.99 元。", "9.99 | derived | 9.99 + 0.666 − 0.666 | c1"),
-        ("第一档 0.888 元。", "0.888 | derived | (0.666 + 0.222) × 1 | c1"),
-        ("第一档 0.866 元。", "0.866 | derived | 0.1 × 2 + 0.666 | c1"),
+        ("第一档 0.888 美元。", "0.888 | derived | 0.666 + 0.222 | c1"),
+        ("第一档 9.99 美元。", "9.99 | derived | 9.99 + 0.666 − 0.666 | c1"),
+        ("第一档 0.888 美元。", "0.888 | derived | (0.666 + 0.222) × 1 | c1"),
+        ("第一档 0.866 美元。", "0.866 | derived | 0.1 × 2 + 0.666 | c1"),
     ],
 )
 def test_an_added_operand_must_be_observed(tmp_path: Path, prose: str, row: str) -> None:
@@ -234,10 +234,10 @@ def test_an_added_operand_must_be_observed(tmp_path: Path, prose: str, row: str)
 @pytest.mark.parametrize(
     ("prose", "row"),
     [
-        ("第一档 0.646 元。", "0.646 | derived | 0.666 × 0.97 | c1"),
-        ("第一档 0.646 元。", "0.646 | derived | 0.666 × (1 − 0.03) | c1"),
+        ("第一档 0.646 美元。", "0.646 | derived | 0.666 × 0.97 | c1"),
+        ("第一档 0.646 美元。", "0.646 | derived | 0.666 × (1 − 0.03) | c1"),
         ("较高点回撤 36.8%。", "36.8% | derived | (0.666 − 1.053) / 1.053 | c1"),
-        ("中枢 0.860 元。", "0.860 | derived | (0.666 + 1.053) / 2 | c1"),
+        ("中枢 0.860 美元。", "0.860 | derived | (0.666 + 1.053) / 2 | c1"),
     ],
 )
 def test_observed_sums_and_free_multipliers_still_derive(tmp_path: Path, prose: str, row: str) -> None:
@@ -250,7 +250,7 @@ def test_observed_sums_and_free_multipliers_still_derive(tmp_path: Path, prose: 
     ("prose", "row"),
     [
         # Far from any print of 1, so only the structure can admit these.
-        ("第一档 1358.00 元。", "1358.00 | derived | 1400 × (1 − 0.03) | c2"),
+        ("第一档 1358.00 美元。", "1358.00 | derived | 1400 × (1 − 0.03) | c2"),
         ("较高点 -7.3%。", "-7.3% | derived | 1390 / 1500 − 1 | c2"),
     ],
 )
@@ -266,8 +266,8 @@ def test_a_derived_result_is_compared_at_the_prose_precision(tmp_path: Path) -> 
     """A declaration written coarser than the prose cannot widen the band."""
     ledger = _ledger(tmp_path, MARKET_A)
 
-    coarse = ledger.validate_final_answer(HDR + " 目标价 1.00 元。" + _block(ROW, "1 | derived | 0.666 × 0.9 | c1"))
-    exact = ledger.validate_final_answer(HDR + " 目标价 0.60 元。" + _block(ROW, "0.6 | derived | 0.666 × 0.9 | c1"))
+    coarse = ledger.validate_final_answer(HDR + " 目标价 1.00 美元。" + _block(ROW, "1 | derived | 0.666 × 0.9 | c1"))
+    exact = ledger.validate_final_answer(HDR + " 目标价 0.60 美元。" + _block(ROW, "0.6 | derived | 0.666 × 0.9 | c1"))
 
     assert _reasons(coarse) == ["derivation_result_mismatch"]
     assert exact.valid is True, exact.issues
@@ -338,9 +338,9 @@ def test_a_price_column_cell_is_not_grounded_by_a_metric(tmp_path: Path) -> None
 def test_a_proposed_level_needs_an_instrument_when_the_run_holds_several(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A, MARKET_B, message=f"对比 {A} 和 {B}")
 
-    unattributed = ledger.validate_final_answer(TWO + "建议买入价 800.00 元。" + _block("800.00 | proposed | entry"))
-    in_prose = ledger.validate_final_answer(TWO + f"{B} 建议买入价 1400.00 元。" + _block("1400.00 | proposed | entry"))
-    in_note = ledger.validate_final_answer(TWO + "建议买入价 1400.00 元。" + _block(f"1400.00 | proposed | {B} entry"))
+    unattributed = ledger.validate_final_answer(TWO + "建议买入价 800.00 美元。" + _block("800.00 | proposed | entry"))
+    in_prose = ledger.validate_final_answer(TWO + f"{B} 建议买入价 1400.00 美元。" + _block("1400.00 | proposed | entry"))
+    in_note = ledger.validate_final_answer(TWO + "建议买入价 1400.00 美元。" + _block(f"1400.00 | proposed | {B} entry"))
 
     assert _reasons(unattributed) == ["no_symbol"]
     assert in_prose.valid is True, in_prose.issues
@@ -366,7 +366,7 @@ def test_the_same_percent_declared_derived_passes(tmp_path: Path) -> None:
 @pytest.mark.parametrize(("level", "inside"), [("0.567", True), ("1.053", True), ("0.566", False), ("1.054", False)])
 def test_the_observed_range_includes_its_extremes(tmp_path: Path, level: str, inside: bool) -> None:
     result = _ledger(tmp_path, MARKET_A).validate_final_answer(
-        HDR + f" 建议买入价 {level} 元。" + _block(ROW, f"{level} | proposed | entry")
+        HDR + f" 建议买入价 {level} 美元。" + _block(ROW, f"{level} | proposed | entry")
     )
 
     assert result.valid is inside, result.issues
@@ -381,8 +381,8 @@ def test_a_ref_is_filtered_to_the_figures_own_symbol(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A, MARKET_C)
     row = "3.912 | observed | close | c3"
 
-    borrowed = ledger.validate_final_answer(f"{A}（akshare，CNY）最新收盘 3.912 元。" + _block(row))
-    own = ledger.validate_final_answer(f"{C}（akshare，CNY）最新收盘 3.912 元。" + _block(row))
+    borrowed = ledger.validate_final_answer(f"{A}（akshare，USD）最新收盘 3.912 美元。" + _block(row))
+    own = ledger.validate_final_answer(f"{C}（akshare，USD）最新收盘 3.912 美元。" + _block(row))
 
     assert _reasons(borrowed) == ["not_in_referenced_call"]
     assert own.valid is True, own.issues
@@ -390,7 +390,7 @@ def test_a_ref_is_filtered_to_the_figures_own_symbol(tmp_path: Path) -> None:
 
 def test_a_percent_is_never_grounded_by_a_price(tmp_path: Path) -> None:
     by_close = _ledger(tmp_path, MARKET_D, message=f"分析 {D}").validate_final_answer(
-        f"{D}（akshare，CNY）本周上涨 18%。" + _block("18% | observed | weekly | cd")
+        f"{D}（akshare，USD）本周上涨 18%。" + _block("18% | observed | weekly | cd")
     )
     by_scaled_low = _ledger(tmp_path, MARKET_A).validate_final_answer(
         HDR + " 胜率 56.7%。" + _block(ROW, "56.7% | observed | win_rate | c1")
@@ -407,10 +407,10 @@ def test_a_percent_is_never_grounded_by_a_price(tmp_path: Path) -> None:
 def test_a_currency_figure_is_grounded_only_by_a_price_kind_value(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A, INDICATORS_A)
 
-    rsi_as_price = ledger.validate_final_answer(HDR + " 现价 55.2 元。" + _block(ROW, "55.2 | observed | price | ind"))
-    sma_level = ledger.validate_final_answer(HDR + " SMA20 位于 0.700 元。" + _block(ROW, "0.700 | observed | sma_20 | ind"))
-    # Money is never a percent of a print: 66.6 元 is not the close 0.666.
-    hundredfold = ledger.validate_final_answer(HDR + " 现价 66.6 元。" + _block(ROW, "66.6 | observed | close | c1"))
+    rsi_as_price = ledger.validate_final_answer(HDR + " 现价 55.2 美元。" + _block(ROW, "55.2 | observed | price | ind"))
+    sma_level = ledger.validate_final_answer(HDR + " SMA20 位于 0.700 美元。" + _block(ROW, "0.700 | observed | sma_20 | ind"))
+    # Money is never a percent of a print: 66.6 美元 is not the close 0.666.
+    hundredfold = ledger.validate_final_answer(HDR + " 现价 66.6 美元。" + _block(ROW, "66.6 | observed | close | c1"))
 
     assert _reasons(rsi_as_price) == ["not_in_referenced_call"]
     assert _reasons(hundredfold) == ["not_in_referenced_call"]
@@ -442,7 +442,7 @@ def test_an_explicit_symbol_may_be_resolved_from_non_price_evidence(
     ledger = _ledger(tmp_path, MARKET_A, PROFILE_US)
     result = ledger.validate_final_answer(
         HDR
-        + "\nAAPL.US forward P/E is 22.920343."
+        + "\nNVDA.US forward P/E is 22.920343."
         + _block(ROW, f"22.920343 | observed | forward P/E | {ref}")
     )
 
@@ -469,7 +469,7 @@ def test_non_price_symbol_resolution_keeps_other_symbols_evidence_isolated(
 
 def test_a_symbol_the_declaration_names_outranks_the_prose(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A, MARKET_B, message=f"对比 {A} 和 {B}")
-    prose = TWO + "最新收盘 1410.00 元。"
+    prose = TWO + "最新收盘 1410.00 美元。"
 
     right = ledger.validate_final_answer(prose + _block(f"1410.00 | observed | close | {B}"))
     wrong = ledger.validate_final_answer(prose + _block(f"1410.00 | observed | close | {A}"))
@@ -484,8 +484,8 @@ def test_a_symbol_the_declaration_names_outranks_the_prose(tmp_path: Path) -> No
 
 
 def test_a_currency_figure_is_not_grounded_by_volume_or_a_metric(tmp_path: Path) -> None:
-    by_volume = _ledger(tmp_path, MARKET_A).validate_final_answer(f"{A}（akshare，CNY）最新收盘 234567.0 元。")
-    by_sharpe = _ledger(tmp_path, MARKET_A, FACTOR_A).validate_final_answer(f"{A}（akshare，CNY）最新收盘 0.888 元。")
+    by_volume = _ledger(tmp_path, MARKET_A).validate_final_answer(f"{A}（akshare，USD）最新收盘 234567.0 美元。")
+    by_sharpe = _ledger(tmp_path, MARKET_A, FACTOR_A).validate_final_answer(f"{A}（akshare，USD）最新收盘 0.888 美元。")
 
     assert _reasons(by_volume) == ["value_mismatch"]
     assert _reasons(by_sharpe) == ["value_mismatch"]
@@ -495,7 +495,7 @@ def test_a_currency_figure_is_grounded_by_a_price_or_an_amount(tmp_path: Path) -
     ledger = _ledger(tmp_path, MARKET_A)
 
     price = ledger.validate_final_answer(HDR)
-    amount = ledger.validate_final_answer(HDR + " 成交额 1234567.0 元。")
+    amount = ledger.validate_final_answer(HDR + " 成交额 1234567.0 美元。")
     plain_volume = ledger.validate_final_answer(HDR + " 成交量 234567.0。")
 
     assert price.valid is True, price.issues
@@ -512,8 +512,8 @@ def test_a_currency_figure_is_grounded_by_a_price_or_an_amount(tmp_path: Path) -
 def test_an_undeclared_observed_value_is_not_refused(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A)
 
-    observed = ledger.validate_final_answer(HDR + " 最高 0.681 元。" + _block(ROW))
-    invented = ledger.validate_final_answer(HDR + " 目标 0.900 元。" + _block(ROW))
+    observed = ledger.validate_final_answer(HDR + " 最高 0.681 美元。" + _block(ROW))
+    invented = ledger.validate_final_answer(HDR + " 目标 0.900 美元。" + _block(ROW))
 
     assert observed.valid is True, observed.issues
     assert [issue["code"] for issue in invented.issues] == ["figure_undeclared"]
@@ -851,7 +851,7 @@ def test_another_symbols_field_does_not_make_a_ref_ambiguous(tmp_path: Path) -> 
     """Two instruments' bars both carry ``close``; the figure's own symbol
     decides before any count of calls (#1444 review, P9)."""
     result = _ledger(tmp_path, MARKET_A, MARKET_B).validate_final_answer(
-        TWO + f"{A} 最新收盘 0.666 元。" + _block("0.666 | observed | close | close")
+        TWO + f"{A} 最新收盘 0.666 美元。" + _block("0.666 | observed | close | close")
     )
     assert result.valid is True, result.issues
 
@@ -904,7 +904,7 @@ def _nearest(result: Any, value: str) -> list[float]:
 def test_a_rejected_figure_is_pointed_at_its_own_symbols_closes(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A, MARKET_B, message=f"对比 {A} 和 {B}")
 
-    validation = ledger.validate_final_answer(TWO + f"{A} 最新收盘 0.900 元。")
+    validation = ledger.validate_final_answer(TWO + f"{A} 最新收盘 0.900 美元。")
     line = next(row for row in ledger.correction_prompt(validation).splitlines() if row.startswith("- 0.900"))
 
     assert _nearest(validation, "0.900") == [1.04, 0.666]
@@ -914,7 +914,7 @@ def test_a_rejected_figure_is_pointed_at_its_own_symbols_closes(tmp_path: Path) 
 def test_a_rejected_figure_of_no_instrument_is_pointed_at_nothing(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, MARKET_A, MARKET_B, message=f"对比 {A} 和 {B}")
 
-    validation = ledger.validate_final_answer(TWO + "最新收盘 0.900 元。")
+    validation = ledger.validate_final_answer(TWO + "最新收盘 0.900 美元。")
 
     assert _nearest(validation, "0.900") == []
 
@@ -923,7 +923,7 @@ def test_a_rejected_ref_figure_is_pointed_at_the_referenced_closes(tmp_path: Pat
     ledger = _ledger(tmp_path, MARKET_A, MARKET_C)
 
     validation = ledger.validate_final_answer(
-        f"{A}（akshare，CNY）最新收盘 0.900 元。" + _block("0.900 | observed | close | c1")
+        f"{A}（akshare，USD）最新收盘 0.900 美元。" + _block("0.900 | observed | close | c1")
     )
 
     assert _nearest(validation, "0.900") == [1.04, 0.666]
@@ -947,14 +947,14 @@ def test_a_rejected_table_cell_is_pointed_at_its_own_column(tmp_path: Path) -> N
 
 
 def test_a_declaration_may_not_move_a_figure_to_another_instrument(tmp_path: Path) -> None:
-    """"159516.SZ 最新收盘 3.912 元" is wrong even if 3.912 is 510300.SH's close."""
-    block = _block("3.912 | observed | 510300.SH close | c3")
+    """"AAPL.US 最新收盘 3.912 美元" is wrong even if 3.912 is SPY.US's close."""
+    block = _block("3.912 | observed | SPY.US close | c3")
 
     moved = _ledger(tmp_path / "moved", MARKET_A, MARKET_C).validate_final_answer(
-        "159516.SZ（akshare，CNY）最新收盘 3.912 元。" + block
+        "AAPL.US（akshare，USD）最新收盘 3.912 美元。" + block
     )
     kept = _ledger(tmp_path / "kept", MARKET_A, MARKET_C).validate_final_answer(
-        "510300.SH（akshare，CNY）最新收盘 3.912 元。" + block
+        "SPY.US（akshare，USD）最新收盘 3.912 美元。" + block
     )
 
     assert moved.valid is False
@@ -965,8 +965,8 @@ def test_a_declaration_may_not_move_a_figure_to_another_instrument(tmp_path: Pat
 @pytest.mark.parametrize(
     ("markets", "prose", "row"),
     [
-        ((MARKET_A, INDICATORS_A), " 第一档 1.104 元。", "1.104 | derived | 55.2 × 0.02 | ind"),
-        ((MARKET_A,), " 目标价 2.346 元。", "2.346 | derived | 234567 / 100000 | c1"),
+        ((MARKET_A, INDICATORS_A), " 第一档 1.104 美元。", "1.104 | derived | 55.2 × 0.02 | ind"),
+        ((MARKET_A,), " 目标价 2.346 美元。", "2.346 | derived | 234567 / 100000 | c1"),
     ],
 )
 def test_a_money_figure_is_derived_from_money(
@@ -981,7 +981,7 @@ def test_a_money_figure_is_derived_from_money(
 @pytest.mark.parametrize(
     ("prose", "row"),
     [
-        (" 第一档 0.646 元。", "0.646 | derived | 0.666 × 0.97 | c1"),
+        (" 第一档 0.646 美元。", "0.646 | derived | 0.666 × 0.97 | c1"),
         (" 较高点回撤 37%。", "37% | derived | (1.053 − 0.666) / 1.053 | c1"),
     ],
 )
@@ -1065,8 +1065,8 @@ def test_short_tail_risk_names_count_only_as_the_whole_leaf(leaf: str, kind: str
 
 
 def test_an_integer_price_of_an_instrument_quoted_in_the_thousands_is_checked(tmp_path: Path) -> None:
-    """"最新收盘 1520" was unchecked for 600519.SH; "200 日均线" and a 0.6-yuan ETF's "20 日" stay so."""
-    head = "600519.SH（akshare，CNY）"
+    """"最新收盘 1520" was unchecked for MSFT.US; "200 日均线" and a 0.6-yuan ETF's "20 日" stay so."""
+    head = "MSFT.US（akshare，USD）"
 
     def verdict(name: str, markets: tuple[Any, ...], text: str, message: str):
         return _ledger(tmp_path / name, *markets, message=message).validate_final_answer(text)
@@ -1088,7 +1088,7 @@ def test_a_count_inside_the_price_range_needs_a_derivation(tmp_path: Path) -> No
         HDR + " 最新收盘 0.888。" + _block(ROW, "0.888 | count | n")
     )
     factor = _ledger(tmp_path / "factor", MARKET_A).validate_final_answer(
-        HDR + " 第一档 0.646 元，折扣系数 0.97。"
+        HDR + " 第一档 0.646 美元，折扣系数 0.97。"
         + _block(ROW, "0.646 | derived | 0.666 × 0.97 | c1", "0.97 | count | 系数")
     )
     weight = _ledger(tmp_path / "weight", MARKET_A).validate_final_answer(
@@ -1144,8 +1144,8 @@ def test_the_spanish_var_report_from_1418_grounds_once_its_confidence_is_declare
 
 
 def test_a_worded_cell_still_checks_an_integer_price_in_the_thousands(tmp_path: Path) -> None:
-    """#1471 reads "1520 (limit)" as prose, and prose checks an integer price of 600519.SH."""
-    head = "600519.SH（akshare，CNY）\n\n| 项目 | 说明 |\n|---|---|\n"
+    """#1471 reads "1520 (limit)" as prose, and prose checks an integer price of MSFT.US."""
+    head = "MSFT.US（akshare，USD）\n\n| 项目 | 说明 |\n|---|---|\n"
 
     invented = _ledger(tmp_path / "bad", MARKET_B, message=f"分析 {B}").validate_final_answer(
         head + "| 入场 | 1520 (limit) |\n"

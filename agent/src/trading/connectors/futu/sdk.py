@@ -375,7 +375,7 @@ def get_open_orders(config: FutuConfig | None = None, *, include_executions: boo
 
 
 def get_quote(symbol: str, *, config: FutuConfig | None = None, **_: Any) -> dict[str, Any]:
-    """Fetch a market-snapshot quote for ``symbol`` (e.g. ``HK.00700``)."""
+    """Fetch a market-snapshot quote for ``symbol`` (e.g. ``US.AAPL``)."""
     cfg = config or load_config()
     quote_ctx = _quote_ctx(cfg)
     try:
@@ -458,7 +458,7 @@ def get_rehab(
     """Fetch dividend / split / rights-issue adjustment factors for ``symbol``.
 
     Args:
-        symbol: Futu instrument code, e.g. ``HK.00700`` / ``US.AAPL``.
+        symbol: Futu instrument code, e.g. ``US.AAPL``.
         config: Effective connector config; loaded from disk when omitted.
 
     Returns:
@@ -491,7 +491,7 @@ def get_capital_flow(
     """Fetch historical capital flow for ``symbol``.
 
     Args:
-        symbol: Futu instrument code, e.g. ``HK.00700``.
+        symbol: Futu instrument code, e.g. ``US.AAPL``.
         period_type: ``INTRADAY`` / ``DAY`` / ``WEEK`` / ``MONTH``.
         config: Effective connector config; loaded from disk when omitted.
 
@@ -559,7 +559,7 @@ def get_history_deals(
             360 days).
         end: End date string ``YYYY-MM-DD`` (inclusive). Pass empty string for
             "today".
-        code: Optional Futu instrument code filter, e.g. ``HK.00700``. Empty
+        code: Optional Futu instrument code filter, e.g. ``US.AAPL``. Empty
             string returns fills across all symbols.
         config: Effective connector config; loaded from disk when omitted.
 
@@ -640,7 +640,7 @@ def get_financials(
     """Fetch financial statements (income / balance / cash flow / key ratios) for ``symbol``.
 
     Args:
-        symbol: Futu instrument code, e.g. ``HK.00700`` / ``US.AAPL``.
+        symbol: Futu instrument code, e.g. ``US.AAPL``.
         statement_type: ``INCOME`` / ``BALANCE`` / ``CASH_FLOW``. Maps to
             Futu's integer statement_type codes (1/2/3). Default ``INCOME``.
         num: Maximum number of statements to return.
@@ -773,7 +773,7 @@ def place_order(
 
     Args:
         config: Effective connector config; loaded from disk when omitted.
-        symbol: Futu instrument code, e.g. ``HK.00700`` / ``US.AAPL`` (passed
+        symbol: Futu instrument code, e.g. ``US.AAPL`` (passed
             through uppercased).
         side: ``buy`` or ``sell``.
         quantity: Share quantity (required; coerced to ``int``).

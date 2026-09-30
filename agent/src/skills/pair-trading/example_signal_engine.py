@@ -6,7 +6,6 @@
 
 from typing import Dict
 
-import numpy as np
 import pandas as pd
 
 
@@ -23,7 +22,7 @@ class SignalEngine:
 
     Example:
         >>> engine = SignalEngine(lookback=60, entry_z=2.0)
-        >>> signals = engine.generate({"601318.SH": df1, "601628.SH": df2})
+        >>> signals = engine.generate({"AAPL.US": df1, "MSFT.US": df2})
     """
 
     def __init__(

@@ -898,11 +898,12 @@ def _refusal(broker, *, decision, reason, reauth, breach=None, record=None) -> d
 def _normalize_notional(intent: OrderIntent, connector_module: Any, config: Any) -> OrderIntent | None:
     """Stamp a single authoritative ``notional_usd`` (quantity → priced).
 
-    Currency note: the connector quote is the broker's native currency (HKD for
-    HK, CNH for A-share). The mandate caps are USD; treating a local-currency
-    figure as USD OVER-states USD exposure for HKD/CNH (≈7-8x), so the caps bind
-    CONSERVATIVELY (over-deny, never under-deny). FX normalization is a follow-up
-    before HK/CN are promoted past the structural asset-class gate.
+    Currency note: the connector quote is the broker's native currency, which
+    for a Canadian listing is CAD. The mandate caps are USD; treating a CAD
+    figure as USD OVER-states USD exposure (≈1.35x at recent rates), so the caps
+    bind CONSERVATIVELY (over-deny, never under-deny). FX normalization is a
+    follow-up before a non-USD quote is promoted past the structural
+    asset-class gate.
     """
     if intent.quantity is None:
         return intent

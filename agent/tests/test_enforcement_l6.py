@@ -314,6 +314,38 @@ def test_last_price_usd_fail_closed_on_loader_unavailable(monkeypatch: pytest.Mo
     assert enforcement.last_price_usd("AAPL", AssetClass.US_EQUITY) is None
 
 
+def test_us_equity_resolves_to_us_equity_loader() -> None:
+    """The surviving live chain still resolves its asset class to a loader.
+
+    This is the one assertion salvaged from ``test_india_mandate.py`` when the
+    removed-market buckets were trimmed: the former ``india_equity`` chain was
+    deleted with the India data layer, so the ``_resolve_loader`` asset-class
+    wiring is exercised through ``US_EQUITY`` — the only bucket with live loader
+    sources now.
+    """
+    loader = enforcement._resolve_loader(AssetClass.US_EQUITY)
+    assert "us_equity" in loader.markets
+
+
+def test_asset_class_tables_cover_only_surviving_buckets() -> None:
+    """Only the US chain is wired; a crypto order has no loader but is bucketed.
+
+    Guards the Phase 11 trim: the removed-market asset classes must not come
+    back into the loader-market table, and the instrument→bucket table must keep
+    the crypto row (the Robinhood extractor can emit ``InstrumentType.CRYPTO``,
+    so dropping the row would skip the ``asset_classes`` check entirely).
+    """
+    assert set(enforcement._ASSET_CLASS_MARKET) == {
+        AssetClass.US_EQUITY,
+        AssetClass.US_ETF,
+    }
+    assert set(enforcement._INSTRUMENT_ASSET_CLASS) == {
+        InstrumentType.EQUITY,
+        InstrumentType.ETF,
+        InstrumentType.CRYPTO,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Normalization must not drop security-relevant intent fields                  #
 # --------------------------------------------------------------------------- #
@@ -323,24 +355,24 @@ def test_normalization_preserves_asset_class(live_runtime: Path) -> None:
     """``_normalize_intent_notional`` rebuilds the intent; asset_class must survive.
 
     ``check_mandate`` prefers an explicit ``intent.asset_class`` over the
-    instrument-type default (enforcement.py:524) precisely so a multi-market
-    connector's non-US order buckets correctly. If the rebuild drops it, that
+    instrument-type default (enforcement.py:521) precisely so a non-default
+    bucket such as crypto is gated correctly. If the rebuild drops it, that
     order falls back to the EQUITY default (us_equity) and passes a mandate
     that permits only us_equity — a fail-open on the universe check.
     """
     _write_mandate(live_runtime, max_order_notional_usd=10_000.0)
     guard = _guard(_BrokerQuoteAdapter(price=100.0))
     intent = enforcement.OrderIntent(
-        symbol="600519.SH",
+        symbol="BTC-USD",
         side="buy",
         notional_usd=None,
         quantity=10.0,
-        instrument_type=InstrumentType.EQUITY,
-        asset_class=AssetClass.CN_EQUITY,
+        instrument_type=InstrumentType.CRYPTO,
+        asset_class=AssetClass.CRYPTO,
     )
     normalized = guard._normalize_intent_notional(intent)
     assert normalized is not None
-    assert normalized.asset_class is AssetClass.CN_EQUITY
+    assert normalized.asset_class is AssetClass.CRYPTO
     # And the notional reconciliation it exists for still happened.
     assert normalized.notional_usd == pytest.approx(1000.0)
 

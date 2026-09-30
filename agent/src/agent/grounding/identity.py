@@ -8,7 +8,10 @@ which tool call may use it.
 Venue and currency inference cover the surviving settlement markets only —
 US equities (``.US``) and Canadian equities (``.TO`` / ``.V``). A symbol for a
 market this build no longer routes infers no venue and no currency, so the gate
-fails closed instead of lending it a plausible-looking identity.
+fails closed instead of lending it a plausible-looking identity. The canonical
+symbol scan recognizes the same US/CA/index shapes (plus the crypto and FX
+pair spellings the surviving resolver still serves through user connector
+plugins); a removed market's equity suffix is not scanned as a symbol at all.
 """
 
 from __future__ import annotations
@@ -70,43 +73,21 @@ _MAX_TRACKED_SYMBOLS = 5_000
 # list is the unambiguous stablecoin set (``USDT`` / ``USDC`` / ``BUSD`` /
 # ``TUSD``) — ``USD`` is excluded because too many non-crypto strings end
 # in those three letters and over-matching would lock the wrong identity.
+#
+# Pair folding is a spelling question, not an identity one. These shapes are no
+# longer read by ``_infer_instrument_type`` — crypto, forex and futures are
+# removed markets, so only a provider-declared type is honoured — but the
+# spellings still fold because ``search_symbol`` keeps serving connector-plugin
+# crypto pairs, and a query and a resolver answer must agree on one canonical
+# spelling or the gate reports a contradiction.
 _JOINED_CRYPTO_QUOTE_SUFFIXES = ("USDT", "USDC", "BUSD", "TUSD")
-
-
-# A dashed / slashed pair is crypto when its quote leg is unambiguously a
-# crypto quote asset, or when a USD quote sits on one of these bases. These
-# sets are read only by ``_infer_instrument_type`` (a symbol shape typed by the
-# provider contract), not by venue inference, which covers the surviving US /
-# Canada markets only. Both sets MUST agree with ``_CRYPTO_QUOTE_ASSETS`` /
-# ``_CRYPTO_USD_BASES`` in ``src.tools.symbol_search_tool`` — that module is
-# the resolver, and a type inferred here that disagrees with the identity it
-# locks is a contradictory identity, which outranks every later lock and blocks
-# all market tools. The tool imports this module, so the sets are duplicated
-# rather than imported; ``test_crypto_pair_tables_match_the_resolver`` fails if
-# they drift. ``USD`` is the one quote the resolver accepts that is NOT
-# unambiguous, so it is excluded here and decided by the base whitelist below
-# instead.
-_CRYPTO_QUOTE_ASSETS = frozenset(
-    {"USDT", "USDC", "BUSD", "TUSD", "FDUSD", "BTC", "ETH", "BNB"}
-)
-
-
-_CRYPTO_USD_BASES = frozenset(
-    {
-        "BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "DOGE", "TRX", "DOT",
-        "MATIC", "AVAX", "LINK", "LTC", "BCH", "ETC", "XLM", "ATOM",
-        "FIL", "APT", "NEAR", "ALGO", "SAND", "MANA", "AXS", "XAUT",
-        "PAXG",
-    }
-)
 
 
 # Spot precious metals quoted in USD collide with the TUSD suffix: XPTUSD is
 # XPT + USD (platinum), but stripping "TUSD" leaves the alpha base "XP" and
-# folds it to XP-TUSD — a crypto pair that does not exist, and the same class
-# of misresolution the USD exclusion above exists to prevent. XAU/XAG/XPD do
-# not collide today; they are listed together because they are the same kind
-# of symbol and a future suffix would collide with them the same way.
+# folds it to XP-TUSD — a crypto pair that does not exist. XAU/XAG/XPD do not
+# collide today; they are listed together because they are the same kind of
+# symbol and a future suffix would collide with them the same way.
 _METAL_USD_PAIR_RE = re.compile(r"^(?:XAU|XAG|XPT|XPD)USD$", re.IGNORECASE)
 
 
@@ -118,22 +99,15 @@ _JOINED_CRYPTO_RE = re.compile(
 
 _CANONICAL_SYMBOL_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"\d{3,6}\.(?:SH|SZ|BJ|SS|HK|KS|KQ)|"
-    # Futu writes the venue as a PREFIX (HK.00700 / SH.600519 / US.AAPL). The
-    # suffix branch above cannot see it, so a user who pasted a connector code
-    # got no identity lock at all and every market tool answered
-    # identity_required. Handled for the whole prefix set, not just HK: the
-    # connector emits all four, and one venue's fix leaves the same hole open
-    # in the next.
-    r"(?:HK|SH|SZ|BJ|SS)\.\d{3,6}|"
     # Case-SENSITIVE (the connector writes it uppercase): a case-folded
     # match turns any "…/us.reuters/…" host inside a source URL into the
     # symbol REUTERS.US and fails the answer for an unsourced figure.
     r"(?-i:US\.[A-Z][A-Z0-9&-]{0,19})|"
     # Every equity suffix the market-data layer routes (backtest.engines.
     # _market_hooks._MARKET_PATTERNS); test_market_identity_parity keeps the
-    # two in step, because .L / .VN / .BA each landed there without landing here.
-    r"[A-Z][A-Z0-9&.-]{0,19}\.(?:US|NS|BO|FX|TO|V|BA|L|VN)|"
+    # two in step. A removed market's equity suffix is deliberately absent:
+    # it is no longer a project symbol.
+    r"[A-Z][A-Z0-9&.-]{0,19}\.(?:US|TO|V)|"
     r"[A-Z0-9]{2,15}(?:-|/)(?:USDT|USDC|USD|BTC|ETH)|"
     r"[A-Z]{2,15}(?:" + "|".join(_JOINED_CRYPTO_QUOTE_SUFFIXES) + r")|"
     r"\^[A-Z0-9&.\-]{1,20}|"
@@ -148,18 +122,16 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-# Provider spellings that denote one instrument. The Shanghai-family exchange
-# prefix (``sh600519``) is folded onto the suffix spelling, and a crypto pair
-# may be written with a slash. Every one of these is a spelling, not an
-# identity: the canonical spelling is what the identity state machine compares.
-# Removed markets no longer get a venue or a currency here, so this block is
-# spelling normalisation only.
-_EXCHANGE_PREFIXED_RE = re.compile(r"^(SH|SZ|BJ)(\d{6})$")
-
-
-# The dotted form of the same idea, as the connector spells it (``US.AAPL``).
-# Only the surviving US venue is rewritten; the removed markets' prefixes
-# (``HK`` / ``SH`` / ``SZ`` / ``BJ`` / ``SS``) are no longer recognized here.
+# Provider spellings that denote one instrument. A crypto pair may be written
+# with a slash. Every one of these is a spelling, not an identity: the canonical
+# spelling is what the identity state machine compares. Removed markets no
+# longer get a venue or a currency here, so this block is spelling
+# normalisation only.
+#
+# The dotted form of the connector's US listing (``US.AAPL``). Only the
+# surviving US venue is rewritten; a removed market's venue prefix is no longer
+# recognized, and its undotted exchange-prefixed form is left untouched rather
+# than folded.
 _VENUE_PREFIXES = frozenset({"US"})
 
 
@@ -173,12 +145,13 @@ def _normalize_symbol(value: Any) -> str:
         value: Any provider- or model-supplied symbol spelling.
 
     Returns:
-        The canonical spelling — uppercased, with Shanghai's ``.SS`` alias
-        folded onto ``.SH``, an exchange prefix rewritten as a suffix, a Hong
-        Kong code zero-padded, and a crypto pair hyphenated. A joined crypto
-        pair with no separator is rewritten as the dashed form so every
-        downstream check sees one identity. Text that
-        is not a symbol is returned uppercased and otherwise untouched.
+        The canonical spelling — uppercased, with the connector's ``US.`` venue
+        prefix rewritten as the ``.US`` suffix and a crypto pair hyphenated. A
+        joined crypto pair with no separator is rewritten as the dashed form so
+        every downstream check sees one identity. Text that is not a symbol is
+        returned uppercased and otherwise untouched: a removed market's suffix
+        is preserved verbatim (no ``<code>.<venue>`` fold onto a surviving
+        suffix) so it can never compare equal to a surviving identity.
     """
     # A fiat/fiat pair is one FX instrument regardless of spelling: ``GBP/USD``
     # and ``GBPUSD`` are both ``GBPUSD=X``. Checked BEFORE the slash is
@@ -193,9 +166,6 @@ def _normalize_symbol(value: Any) -> str:
     if not symbol:
         return ""
 
-    prefixed = _EXCHANGE_PREFIXED_RE.match(symbol)
-    if prefixed:
-        return f"{prefixed.group(2)}.{prefixed.group(1)}"
     base, dot, suffix = symbol.rpartition(".")
     if not dot:
         # No separator at all: rewrite a joined crypto pair
@@ -213,13 +183,10 @@ def _normalize_symbol(value: Any) -> str:
     # Venue-prefixed US listing (connector format: US.AAPL): rewrite to the
     # canonical suffix spelling so identity matching agrees with the
     # market-data chain (AAPL.US) that get_market_data uses. Prefixes for the
-    # removed markets are not rewritten — no venue is inferred for them.
+    # removed markets are not rewritten — no venue is inferred for them, and
+    # folding one into a suffix would invent an identity the build cannot price.
     if base in _VENUE_PREFIXES and suffix and _US_TICKER_RE.fullmatch(suffix):
         return f"{suffix}.US"
-    if suffix == "SS":
-        suffix = "SH"
-    if suffix == "HK" and base.isdigit():
-        base = base.zfill(5)
     return f"{base}.{suffix}"
 
 
@@ -275,7 +242,15 @@ def _infer_currency(symbol: str) -> str | None:
 
 
 def _infer_instrument_type(symbol: str, candidate_type: Any = None) -> str:
-    """Normalize provider types into the identity contract."""
+    """Normalize provider types into the identity contract.
+
+    Only a provider-declared type is trusted. A bare symbol shape infers
+    nothing beyond an index (``^``) and a listed security: crypto, forex and
+    futures are removed markets, so their notations no longer earn an
+    instrument type from their spelling. The surviving resolver may still
+    *return* such an instrument through a user connector plugin, and its
+    declared type is honoured here.
+    """
     raw = str(candidate_type or "").strip().casefold()
     if raw == "cfd":
         return "cfd"
@@ -292,38 +267,6 @@ def _infer_instrument_type(symbol: str, candidate_type: Any = None) -> str:
     if "index" in raw:
         return "index"
     upper = _normalize_symbol(symbol)
-    if upper.endswith("=F"):
-        return "future"
-    if upper.endswith(".FX"):
-        return "forex"
-    # Yahoo's continuous-front-month futures notation (GC=F, CL=F, ...).
-    # Mirrors the engine ``_MARKET_PATTERNS`` and the correlation helper.
-    if re.match(r"^[A-Z]{2,5}=F$", upper):
-        return "future"
-    # Yahoo's forex notation (XAUUSD=X, EURUSD=X).
-    if re.match(r"^[A-Z]{6}=X$", upper):
-        return "forex"
-    # Bare 6-character precious-metal / FX symbols (whitelist).
-    if re.match(
-        r"^(?:XAU|XAG|XPT|XPD|EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD)[A-Z]{3}$",
-        upper,
-    ):
-        return "forex"
-    # Dashed / slashed symbols: crypto only when the quote leg is a
-    # stablecoin OR the base is in the USD-whitelist. The whitelist
-    # mirrors ``_canonical_crypto_pair`` in
-    # ``src.tools.symbol_search_tool``. ``XAU-USD`` / ``EUR-USD`` /
-    # ``GBP-USD`` are NOT crypto and resolve as ``forex`` (the per-pair
-    # engine classifier decides the final market downstream).
-    if "-" in upper or "/" in upper:
-        base, _, quote = (
-            upper.partition("-") if "-" in upper else upper.partition("/")
-        )
-        if quote in _CRYPTO_QUOTE_ASSETS:
-            return "crypto"
-        if quote == "USD" and base in _CRYPTO_USD_BASES:
-            return "crypto"
-        return "forex"
     if upper.startswith("^"):
         return "index"
     return "listed_security"
@@ -526,10 +469,11 @@ class _IdentityMixin:
     ) -> str | None:
         """Map a consumer argument to one unique locked canonical symbol.
 
-        Both sides are canonicalized first, so a provider alias (``600519.SS``),
-        an exchange prefix (``sh600519``), an unpadded Hong Kong code
-        (``700.HK``) or a slashed pair (``BTC/USDT``) addresses the instrument
-        it names rather than being read as a silent venue rewrite.
+        Both sides are canonicalized first, so a provider alias (``US.AAPL``)
+        or a slashed pair addresses the instrument it names rather than being
+        read as a silent venue rewrite. A removed market's suffix is never
+        folded onto a surviving one, so it can only ever match an identity
+        locked under that exact spelling.
 
         A bare code carries no venue, so it is accepted only when exactly one
         locked identity has it as its base. That uniqueness — not a list of
@@ -718,10 +662,9 @@ class _IdentityMixin:
 
         # A query that already spells a canonical symbol is asserting one, so a
         # resolver answering with a different instrument contradicts it rather
-        # than refining it. This generalizes the ``.SS``/``.SH`` alias check it
-        # replaces: that one fired on one exchange's two spellings and stayed
-        # silent on an actual cross-exchange swap, which is the case that
-        # matters.
+        # than refining it. One spelling is never silently folded onto another:
+        # different spellings of one identity are already canonicalized by
+        # ``_normalize_symbol``, so anything left here is a real second venue.
         asserted = _scan_symbols(query)
         if asserted and symbol not in asserted:
             conflicting = list(candidates)
@@ -801,8 +744,8 @@ class _IdentityMixin:
 
         Candidates are collapsed onto their canonical symbol first. Two rows
         that differ only by a provider's suffix convention describe one listing,
-        and counting them as rival candidates is what left every Shanghai query
-        with two "exact" matches and therefore no choice at all.
+        and counting them as rival candidates would leave a query with two
+        "exact" matches and therefore no choice at all.
         """
         by_symbol: dict[str, dict[str, Any]] = {}
         for candidate in candidates:

@@ -213,9 +213,9 @@ Decide which workflow to use based on the request:
   you chose, never a price or an amount. Plain integers, dates and security
   codes need no line. Example (zh):
   ```figures
-  0.666 | observed | 159516.SZ 收盘 2026-09-09 | 159516.SZ
-  0.646 | derived  | 0.666 × 0.97 | 159516.SZ
-  37%   | derived  | (1.053 − 0.666) / 1.053 | 159516.SZ
+  0.666 | observed | AAPL.US 收盘 2026-09-09 | AAPL.US
+  0.646 | derived  | 0.666 × 0.97 | AAPL.US
+  37%   | derived  | (1.053 − 0.666) / 1.053 | AAPL.US
   0.62  | proposed | 买入参考，位于观测区间 0.567–1.053 内
   ```
   Example (en):

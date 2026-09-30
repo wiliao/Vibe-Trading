@@ -79,11 +79,11 @@ MAX_SYMBOLS_ENV = "SWARM_GROUNDING_MAX_SYMBOLS"
 PROMPT_TABLE_TAIL = 5
 
 # Symbol patterns understood by the bundled loaders. Anchored on word
-# boundaries so substrings of longer text don't trigger.
+# boundaries so substrings of longer text don't trigger. Only the surviving
+# US/Canada shapes are scanned: a removed market's suffix is not a project
+# symbol in this build.
 _SYMBOL_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b[A-Z]{1,5}\.US\b"),
-    re.compile(r"\b\d{3,5}\.HK\b"),
-    re.compile(r"\b\d{6}\.(?:SZ|SH|BJ)\b"),
     re.compile(r"\b[A-Z0-9&.-]+\.(?:TO|V)\b"),
 )
 
