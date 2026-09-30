@@ -135,13 +135,13 @@ def _build_explicit_run(tmp_path: Path, run_id: str) -> Path:
     _write_equity(run_dir, dates, portfolio, benchmark)
     _write_csv(
         run_dir / "artifacts" / "positions.csv",
-        ["timestamp", "600519.SH", "AAPL.US"],
+        ["timestamp", "AAPL.US", "TD.TO"],
         [[day, "0.4", "0.3"] for day in dates],
     )
-    _write_ohlcv(run_dir, "600519.SH", dates, 100.0, 120.0)
-    _write_ohlcv(run_dir, "AAPL.US", dates, 100.0, 90.0)
-    _write_config(run_dir, ["600519.SH", "AAPL.US"], benchmark="000300.SH")
-    _write_metrics(run_dir, extra={"benchmark_ticker": "000300.SH"})
+    _write_ohlcv(run_dir, "AAPL.US", dates, 100.0, 120.0)
+    _write_ohlcv(run_dir, "TD.TO", dates, 100.0, 90.0)
+    _write_config(run_dir, ["AAPL.US", "TD.TO"], benchmark="SPY")
+    _write_metrics(run_dir, extra={"benchmark_ticker": "SPY"})
     return run_dir
 
 
@@ -199,7 +199,7 @@ def test_attribution_explicit_mode_asset_class_with_cash(tmp_path: Path, monkeyp
     assert response.status_code == 200
     data = response.json()
     assert data["exists"] is True
-    assert data["benchmark"] == {"ticker": "000300.SH", "mode": "explicit"}
+    assert data["benchmark"] == {"ticker": "SPY", "mode": "explicit"}
     assert data["factor"] is not None
     assert data["factor"]["beta"] == pytest.approx(0.8, abs=1e-6)
 
@@ -210,9 +210,9 @@ def test_attribution_explicit_mode_asset_class_with_cash(tmp_path: Path, monkeyp
     assert "Cash" in sectors
     assert sectors["Cash"]["portfolio_weight"] == pytest.approx(0.3, abs=1e-9)
     assert sectors["Cash"]["benchmark_weight"] == pytest.approx(0.0, abs=1e-9)
-    assert sectors["a_share"]["benchmark_weight"] == pytest.approx(1.0, abs=1e-9)
-    assert sectors["a_share"]["portfolio_return"] == pytest.approx(0.20, abs=1e-9)
-    assert sectors["us_equity"]["portfolio_return"] == pytest.approx(-0.10, abs=1e-9)
+    assert sectors["us_equity"]["benchmark_weight"] == pytest.approx(1.0, abs=1e-9)
+    assert sectors["us_equity"]["portfolio_return"] == pytest.approx(0.20, abs=1e-9)
+    assert sectors["ca_equity"]["portfolio_return"] == pytest.approx(-0.10, abs=1e-9)
     # Response floats are rounded to 6 decimals, so the exact tie-out identity
     # holds here within combined rounding error rather than machine epsilon.
     assert (

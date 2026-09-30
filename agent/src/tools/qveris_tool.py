@@ -15,7 +15,6 @@ from typing import Any
 
 import httpx
 
-from backtest.loaders.qveris_loader import quoted_call_cost
 from src.agent.tools import BaseTool
 
 SIGNUP_URL = "https://qveris.ai/?ref=Vyjjo5G_1cAHJA"
@@ -182,6 +181,10 @@ def _parse_expected_cost(value: Any) -> float | None:
     "1 credits/result" billed 9.66 credits for one stock-year (#1494). Shared
     with the bar loader so the two budget gates read a quote the same way.
     """
+    # Imported lazily: the qveris bar loader is being retired, and importing it
+    # at module scope registered a source the US/CA build no longer lists.
+    from backtest.loaders.qveris_loader import quoted_call_cost
+
     return quoted_call_cost(value)
 
 
