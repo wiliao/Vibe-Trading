@@ -4,20 +4,7 @@ export interface PositionsPanel {
   weightByDate: Map<string, Record<string, number>>;
 }
 
-export type AssetClass =
-  | "a_share"
-  | "us_equity"
-  | "hk_equity"
-  | "ca_equity"
-  | "ar_equity"
-  | "uk_equity"
-  | "vietnam_equity"
-  | "kr_equity"
-  | "india_equity"
-  | "crypto"
-  | "futures"
-  | "forex"
-  | "other";
+export type AssetClass = "us_equity" | "ca_equity" | "other";
 
 export interface GroupWeight {
   group: string;
@@ -37,30 +24,16 @@ export function isDateColumn(key: string): boolean {
   return DATE_COLUMNS.has(key.toLowerCase());
 }
 
+/**
+ * Exchange suffix -> asset class for the two supported equity markets. US
+ * listings carry `.US`; Canadian listings carry `.TO` (Toronto) or `.V`
+ * (TSX Venture).
+ */
 const EQUITY_SUFFIX_MAP: Record<string, AssetClass> = {
-  SH: "a_share",
-  SZ: "a_share",
-  BJ: "a_share",
-  HK: "hk_equity",
   US: "us_equity",
   TO: "ca_equity",
   V: "ca_equity",
-  BA: "ar_equity",
-  L: "uk_equity",
-  VN: "vietnam_equity",
-  KS: "kr_equity",
-  KQ: "kr_equity",
-  NS: "india_equity",
-  BO: "india_equity",
 };
-
-const CRYPTO_QUOTE_SUFFIXES = new Set(["USDT", "USDC", "USD"]);
-
-const FUTURES_EXCHANGE_SUFFIXES = new Set([
-  "CFFEX", "SHFE", "DCE", "ZCE", "CZCE", "INE", "GFEX",
-  "CBOT", "CME", "NYMEX", "COMEX", "ICE",
-  "EUREX", "LME", "SGX", "TOCOM", "MCX",
-]);
 
 function parseWeightCell(raw: string | undefined): number {
   if (raw === undefined || raw === null || raw === "") return 0;
@@ -120,9 +93,11 @@ export function latestHoldingDate(panel: PositionsPanel): string | null {
 }
 
 /**
- * Heuristic asset-class classification mirroring the backend symbol rules.
- * Order matters: exchange suffixes first, then crypto quote pairs, then
- * forex shapes, then futures exchange suffixes, then bare alpha tickers.
+ * Heuristic asset-class classification mirroring the backend symbol rules for
+ * the US + Canada equity book. An exchange suffix wins; otherwise a bare
+ * alphabetic ticker is read as a US listing. Anything else (indices, odd
+ * exchange suffixes) is "other" so it still renders without being claimed by a
+ * market the app no longer supports.
  */
 export function classifyAssetClass(symbol: string): AssetClass {
   const trimmed = symbol.trim();
@@ -134,17 +109,8 @@ export function classifyAssetClass(symbol: string): AssetClass {
     const suffix = upper.slice(dot + 1);
     const equity = EQUITY_SUFFIX_MAP[suffix];
     if (equity) return equity;
-    if (suffix === "FX") return "forex";
-    if (FUTURES_EXCHANGE_SUFFIXES.has(suffix)) return "futures";
   }
 
-  if (upper.endsWith("-PERP")) return "crypto";
-  const hyphen = upper.lastIndexOf("-");
-  if (hyphen >= 0 && CRYPTO_QUOTE_SUFFIXES.has(upper.slice(hyphen + 1))) return "crypto";
-  const slash = upper.lastIndexOf("/");
-  if (slash >= 0 && CRYPTO_QUOTE_SUFFIXES.has(upper.slice(slash + 1))) return "crypto";
-
-  if (/^[A-Z]{6}$/.test(upper)) return "forex";
   if (/^[A-Z]{1,5}$/.test(upper)) return "us_equity";
 
   return "other";

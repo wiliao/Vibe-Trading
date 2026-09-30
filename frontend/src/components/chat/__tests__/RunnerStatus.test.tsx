@@ -54,10 +54,10 @@ describe("RunnerStatus compact connector panel", () => {
         status={status([
           broker("alpaca", { configured: false, connection_state: "not_configured", transport: "broker_sdk" }),
           broker("longbridge", { configured: true, connection_state: "connected", transport: "broker_sdk" }),
-          broker("etoro", { configured: true, connection_state: "connected", transport: "broker_sdk" }),
-          broker("binance", { configured: true, connection_state: "ready", transport: "broker_sdk" }),
+          broker("tiger", { configured: true, connection_state: "connected", transport: "broker_sdk" }),
+          broker("robinhood", { configured: true, connection_state: "ready", transport: "broker_sdk" }),
           broker("futu", { configured: true, connection_state: null, transport: "broker_sdk" }),
-          broker("okx", { configured: true, connection_state: "error", transport: "broker_sdk" }),
+          broker("error-sdk", { configured: true, connection_state: "error", transport: "broker_sdk" }),
           broker("ibkr", { oauth_token_present: true, is_live_broker: true, transport: "remote_mcp" }),
         ])}
         onRefresh={vi.fn()}
@@ -68,10 +68,10 @@ describe("RunnerStatus compact connector panel", () => {
 
     expect(screen.queryByText("alpaca", { exact: false })).not.toBeInTheDocument();
     expect(screen.getByText("longbridge", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("etoro", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("binance", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("tiger", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("robinhood", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("futu", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("okx", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("error-sdk", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("ibkr", { exact: false })).toBeInTheDocument();
   });
 
@@ -101,12 +101,12 @@ describe("RunnerStatus compact connector panel", () => {
     render(
       <RunnerStatus
         status={status([
-          broker("etoro", {
+          broker("tiger", {
             configured: true,
             connection_state: "connected",
             transport: "broker_sdk",
             readonly: true,
-            profile_id: "etoro-live-sdk-readonly",
+            profile_id: "tiger-live-sdk-readonly",
           }),
         ])}
         onRefresh={vi.fn()}
@@ -143,7 +143,7 @@ describe("RunnerStatus compact connector panel", () => {
       <RunnerStatus
         status={status([
           broker("alpaca", { configured: false, connection_state: "not_configured", transport: "broker_sdk" }),
-          broker("binance", { configured: false, connection_state: null, transport: "broker_sdk" }),
+          broker("robinhood", { configured: false, connection_state: null, transport: "broker_sdk" }),
         ])}
         onRefresh={vi.fn()}
       />,

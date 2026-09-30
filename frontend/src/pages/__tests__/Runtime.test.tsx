@@ -96,17 +96,17 @@ function makeLongbridgeStatus(
   });
 }
 
-function makeEtoroStatus(
+function makeUnhintedStatus(
   authOverrides: Partial<LiveBrokerStatus["auth"]> = {},
 ): LiveStatus {
   return makeStatus({
     brokers: [
       {
         auth: {
-          broker: "etoro",
+          broker: "tiger",
           oauth_token_present: false,
           is_live_broker: false,
-          profile_id: "etoro-live-sdk-readonly",
+          profile_id: "tiger-live-sdk-readonly",
           transport: "broker_sdk",
           configured: false,
           connection_state: "not_configured",
@@ -114,7 +114,7 @@ function makeEtoroStatus(
           ...authOverrides,
         },
         runner: {
-          broker: "etoro",
+          broker: "tiger",
           alive: false,
           last_tick: null,
           last_tick_age_seconds: null,
@@ -258,14 +258,17 @@ describe("Runtime page", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("shows exact missing eToro variable names without rendering secret inputs", async () => {
-    apiMock.getLiveStatus.mockResolvedValue(makeEtoroStatus());
+  it("falls back to the generic missing-setup hint when a connector has no variable list", async () => {
+    apiMock.getLiveStatus.mockResolvedValue(makeUnhintedStatus());
 
     render(<Runtime />);
 
     expect(await screen.findByText("Not configured")).toBeInTheDocument();
-    expect(screen.getByText("ETORO_API_KEY")).toBeInTheDocument();
-    expect(screen.getByText("ETORO_USER_KEY")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Missing configuration. Configure connector credentials in ~/.vibe-trading/ or agent/.env, then verify the connection.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText("LONGBRIDGE_APP_KEY")).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument();
   });

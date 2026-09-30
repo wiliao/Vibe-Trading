@@ -23,18 +23,8 @@ const MAX_EVOLUTION_DATES = 500;
 const MAX_LEGEND_SYMBOLS = 10;
 
 const ASSET_CLASS_LABEL_KEYS = {
-  a_share: "runDetail.positions.assetClass.a_share",
   us_equity: "runDetail.positions.assetClass.us_equity",
-  hk_equity: "runDetail.positions.assetClass.hk_equity",
   ca_equity: "runDetail.positions.assetClass.ca_equity",
-  ar_equity: "runDetail.positions.assetClass.ar_equity",
-  uk_equity: "runDetail.positions.assetClass.uk_equity",
-  vietnam_equity: "runDetail.positions.assetClass.vietnam_equity",
-  kr_equity: "runDetail.positions.assetClass.kr_equity",
-  india_equity: "runDetail.positions.assetClass.india_equity",
-  crypto: "runDetail.positions.assetClass.crypto",
-  futures: "runDetail.positions.assetClass.futures",
-  forex: "runDetail.positions.assetClass.forex",
   other: "runDetail.positions.assetClass.other",
 } as const satisfies Record<AssetClass, string>;
 
@@ -101,13 +91,12 @@ export function PositionsTab({ run }: { run: RunData }) {
     [run.artifacts_positions_csv],
   );
   const latestDate = useMemo(() => latestHoldingDate(panel), [panel]);
-  const hasAShare = useMemo(
+  const hasUnclassified = useMemo(
     () => panel.symbols.some((symbol) => {
-      const assetClass = classifyAssetClass(symbol);
-      // The backend sector-map `_detect_market` defaults UNKNOWN symbols to
-      // a_share, so symbols the frontend classifier buckets as "other" are
-      // still resolvable — include them in the gate.
-      return assetClass === "a_share" || assetClass === "other";
+      // Index symbols (^GSPC) and odd exchange suffixes fall through the
+      // frontend classifier as "other"; the backend sector map still
+      // classifies them offline, so include them in the resolve gate.
+      return classifyAssetClass(symbol) === "other";
     }),
     [panel.symbols],
   );
@@ -270,7 +259,7 @@ export function PositionsTab({ run }: { run: RunData }) {
                 </button>
               ))}
             </div>
-            {hasAShare && (
+            {hasUnclassified && (
               <button
                 type="button"
                 onClick={() => void handleResolve(false)}

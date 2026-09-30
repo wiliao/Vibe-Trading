@@ -31,7 +31,7 @@ describe("escapeHtml", () => {
   it("passes already-safe strings through unchanged", () => {
     expect(escapeHtml("plain text 123")).toBe("plain text 123");
     expect(escapeHtml("2024-01-02")).toBe("2024-01-02");
-    expect(escapeHtml("600519.SH")).toBe("600519.SH");
+    expect(escapeHtml("AAPL.US")).toBe("AAPL.US");
     expect(escapeHtml("")).toBe("");
   });
 });

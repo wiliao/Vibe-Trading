@@ -67,7 +67,7 @@ describe("WelcomeScreen", () => {
       {
         label: "Check if a stock is expensive",
         prompt:
-          "Use the financial_rigor tool to verify Kweichow Moutai's valuation: price 1500, EPS 68.6, book value per share 180 — compute PE, PB, ROE exactly, then a three-scenario valuation (growth 12%/8%/0%, PE 22/18/14, 3 years)",
+          "Use the financial_rigor tool to verify Apple's valuation: price 230, EPS 6.5, book value per share 4.5 — compute PE, PB, ROE exactly, then a three-scenario valuation (growth 12%/8%/0%, PE 32/26/20, 3 years)",
       },
       {
         label: "Options risk check (Greeks)",
@@ -77,12 +77,12 @@ describe("WelcomeScreen", () => {
       {
         label: "Balance a 3-stock portfolio",
         prompt:
-          "Build a risk-parity portfolio with 000001.SZ, 600519.SH, 000858.SZ, backtest for the full year of 2024, and compare with equal-weighted benchmark",
+          "Build a risk-parity portfolio with AAPL.US, MSFT.US, RY.TO, backtest for the full year of 2024, and compare with equal-weighted benchmark",
       },
       {
         label: "Buy or sell? Let a committee debate",
         prompt:
-          "[Swarm Team Mode] Use the investment_committee preset to evaluate whether to go long or short on 600519.SH given current market conditions",
+          "[Swarm Team Mode] Use the investment_committee preset to evaluate whether to go long or short on AAPL.US given current market conditions",
       },
     ];
     const user = userEvent.setup();
@@ -139,7 +139,7 @@ describe("WelcomeScreen", () => {
     expect(library).not.toBeNull();
     expect(library).toHaveAttribute("aria-hidden", "true");
     expect(
-      screen.queryByRole("button", { name: /A-Share MACD Strategy/ }),
+      screen.queryByRole("button", { name: /US Equity MACD Strategy/ }),
     ).not.toBeInTheDocument();
 
     await user.click(trigger);
@@ -154,7 +154,7 @@ describe("WelcomeScreen", () => {
       "focus-visible:ring-primary/40",
     );
     for (const category of [
-      "A-Share Backtest",
+      "US & Canada Backtest",
       "Research & Analysis",
       "Value Investing",
       "AI Analyst Teams",

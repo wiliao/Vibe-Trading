@@ -27,21 +27,9 @@ export function SourcePrioritySettings() {
   // Literal keys per market (typed i18n rejects interpolated keys); unknown
   // markets from a newer backend fall back to their raw key.
   const labels: Record<string, string> = {
-    a_share: t("settings.sourcePriority.markets.a_share"),
     us_equity: t("settings.sourcePriority.markets.us_equity"),
-    hk_equity: t("settings.sourcePriority.markets.hk_equity"),
-    india_equity: t("settings.sourcePriority.markets.india_equity"),
-    kr_equity: t("settings.sourcePriority.markets.kr_equity"),
     ca_equity: t("settings.sourcePriority.markets.ca_equity"),
-    vietnam_equity: t("settings.sourcePriority.markets.vietnam_equity"),
-    ar_equity: t("settings.sourcePriority.markets.ar_equity"),
-    uk_equity: t("settings.sourcePriority.markets.uk_equity"),
     index: t("settings.sourcePriority.markets.index"),
-    crypto: t("settings.sourcePriority.markets.crypto"),
-    futures: t("settings.sourcePriority.markets.futures"),
-    fund: t("settings.sourcePriority.markets.fund"),
-    macro: t("settings.sourcePriority.markets.macro"),
-    forex: t("settings.sourcePriority.markets.forex"),
   };
   const [entries, setEntries] = useState<SourceOrderEntry[] | null>(null);
   const [drafts, setDrafts] = useState<Drafts>({});

@@ -68,11 +68,8 @@ function llmSettings() {
 
 function dataSourceSettings() {
   return {
-    tushare_token_configured: false,
-    baostock_supported: true,
-    baostock_installed: true,
-    baostock_message: "BaoStock available",
     env_path: "agent/.env",
+    source_orders: [],
   };
 }
 

@@ -55,11 +55,11 @@ describe("RunDetail page", () => {
     apiMock.getRun.mockResolvedValue({
       status: "success",
       run_id: "20260811_110751_32_d951c8",
-      prompt: "回测 000001.SZ 在 2024 年的 20/50 日均线交叉策略。",
-      chart_symbols: ["000001.SZ"],
+      prompt: "回测 AAPL.US 在 2024 年的 20/50 日均线交叉策略。",
+      chart_symbols: ["AAPL.US"],
       run_card: {
-        backtest: { codes: ["000001.SZ"], start_date: "2024-01-01", end_date: "2024-12-31", engine: "daily" },
-        data_sources: ["tencent"],
+        backtest: { codes: ["AAPL.US"], start_date: "2024-01-01", end_date: "2024-12-31", engine: "daily" },
+        data_sources: ["yahoo"],
       },
     });
     apiMock.getRunCode.mockResolvedValueOnce({});
@@ -70,7 +70,7 @@ describe("RunDetail page", () => {
     // the UI language, not the prompt's. A Chinese prompt under an English UI
     // must not leak a Chinese title into an otherwise English report.
     expect(
-      await screen.findByRole("heading", { name: "000001.SZ · 20/50-day moving-average crossover" })
+      await screen.findByRole("heading", { name: "AAPL.US · 20/50-day moving-average crossover" })
     ).toBeInTheDocument();
     expect(screen.getByText("RUN 20260811_110751_32_d951c8")).toHaveClass("text-[10px]");
   });
@@ -80,8 +80,8 @@ describe("RunDetail page", () => {
     apiMock.getRun.mockResolvedValue({
       status: "success",
       run_id: "zh-run",
-      prompt: "回测 000001.SZ 在 2024 年的 20/50 日均线交叉策略。",
-      chart_symbols: ["000001.SZ"],
+      prompt: "回测 AAPL.US 在 2024 年的 20/50 日均线交叉策略。",
+      chart_symbols: ["AAPL.US"],
     });
     apiMock.getRunCode.mockResolvedValueOnce({});
     const previous = i18n.language;
@@ -91,7 +91,7 @@ describe("RunDetail page", () => {
     try {
       renderRunDetail("/runs/zh-run?view=dashboard");
       expect(
-        await screen.findByRole("heading", { name: "000001.SZ · 20/50 日均线交叉策略" })
+        await screen.findByRole("heading", { name: "AAPL.US · 20/50 日均线交叉策略" })
       ).toBeInTheDocument();
     } finally {
       await act(async () => {

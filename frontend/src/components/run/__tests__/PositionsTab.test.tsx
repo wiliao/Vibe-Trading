@@ -124,9 +124,9 @@ describe("PositionsTab", () => {
   });
 
   const multiSymbolRows = [
-    { timestamp: "2023-07-31", "159913.SZ": "0.0", "AAPL.US": "0.0" },
-    { timestamp: "2023-08-01", "159913.SZ": "0.6", "AAPL.US": "0.3" },
-    { timestamp: "2023-08-02", "159913.SZ": "0.0", "AAPL.US": "0.0" },
+    { timestamp: "2023-07-31", "AAPL.US": "0.0", "RY.TO": "0.0" },
+    { timestamp: "2023-08-01", "AAPL.US": "0.6", "RY.TO": "0.3" },
+    { timestamp: "2023-08-02", "AAPL.US": "0.0", "RY.TO": "0.0" },
   ];
 
   it("shows the selected date label and holdings count", () => {
@@ -138,8 +138,8 @@ describe("PositionsTab", () => {
 
   it("renders short legs as labelled slices and counts them in holdings", () => {
     const shortRows = [
-      { timestamp: "2024-03-01", "600519.SH": "0.4", "000858.SZ": "-0.2" },
-      { timestamp: "2024-03-04", "600519.SH": "0.4", "000858.SZ": "-0.2" },
+      { timestamp: "2024-03-01", "AAPL.US": "0.4", "RY.TO": "-0.2" },
+      { timestamp: "2024-03-04", "AAPL.US": "0.4", "RY.TO": "-0.2" },
     ];
     render(<PositionsTab run={makeRun(shortRows)} />);
 
@@ -155,8 +155,8 @@ describe("PositionsTab", () => {
           .flatMap((s) => (s.data ?? []).map((d) => d.name));
       }),
     );
-    expect(pieNames).toContain("000858.SZ Short");
-    expect(pieNames).toContain("600519.SH");
+    expect(pieNames).toContain("RY.TO Short");
+    expect(pieNames).toContain("AAPL.US");
   });
 
   it("renders pie by default and switches to treemap via the toggle", () => {
@@ -170,23 +170,23 @@ describe("PositionsTab", () => {
     expect(seriesTypes()).toContain("treemap");
   });
 
-  it("hides the resolve button for a crypto-only payload", () => {
-    const cryptoRows = [
-      { timestamp: "2024-01-01", "BTC-USDT": "0.6", "ETH-USDT": "0.4" },
-      { timestamp: "2024-01-02", "BTC-USDT": "0.5", "ETH-USDT": "0.5" },
+  it("hides the resolve button when every symbol classifies as US/Canada equity", () => {
+    const equityRows = [
+      { timestamp: "2024-01-01", "AAPL.US": "0.6", "RY.TO": "0.4" },
+      { timestamp: "2024-01-02", "AAPL.US": "0.5", "RY.TO": "0.5" },
     ];
-    render(<PositionsTab run={makeRun(cryptoRows)} />);
+    render(<PositionsTab run={makeRun(equityRows)} />);
 
     expect(screen.queryByText("Resolve industries")).not.toBeInTheDocument();
   });
 
   it("shows the resolve button for a symbol the frontend classifier cannot place", () => {
-    // "BTCUSDT" has no exchange suffix / quote pair the frontend recognises, so
-    // it classifies as "other"; the backend defaults unknowns to a_share, so the
-    // button must still be offered.
+    // "^GSPC" has no recognised exchange suffix and no bare-ticker shape, so it
+    // classifies as "other"; the backend sector map still classifies such
+    // symbols offline, so the button must still be offered.
     const unknownRows = [
-      { timestamp: "2024-01-01", BTCUSDT: "0.6" },
-      { timestamp: "2024-01-02", BTCUSDT: "0.5" },
+      { timestamp: "2024-01-01", "^GSPC": "0.6" },
+      { timestamp: "2024-01-02", "^GSPC": "0.5" },
     ];
     render(<PositionsTab run={makeRun(unknownRows)} />);
 
@@ -195,8 +195,8 @@ describe("PositionsTab", () => {
 
   it("shows the empty-state note and no charts for an all-zero payload", () => {
     const zeroRows = [
-      { timestamp: "2024-01-01", "159913.SZ": "0.0" },
-      { timestamp: "2024-01-02", "159913.SZ": "0" },
+      { timestamp: "2024-01-01", "AAPL.US": "0.0" },
+      { timestamp: "2024-01-02", "AAPL.US": "0" },
     ];
     render(<PositionsTab run={makeRun(zeroRows)} />);
 
@@ -210,14 +210,14 @@ describe("PositionsTab", () => {
         ok: true,
         run_id: "run-test",
         symbols: {
-          "600519.SH": { asset_class: "a_share", industry: "白酒Ⅱ", industry_source: "eastmoney" },
+          "^GSPC": { asset_class: "index", industry: "Technology Hardware", industry_source: "eastmoney" },
         },
         unresolved: [],
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<PositionsTab run={makeRun([{ timestamp: "2024-01-01", "600519.SH": "0.7" }])} />);
+    render(<PositionsTab run={makeRun([{ timestamp: "2024-01-01", "^GSPC": "0.7" }])} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Resolve industries" }));
 
@@ -226,7 +226,7 @@ describe("PositionsTab", () => {
     // observed, the wait returns immediately and the sector chart has not been
     // re-rendered yet.
     await waitFor(() => {
-      expect(barCategoryAxes().some((names) => names.includes("白酒Ⅱ"))).toBe(true);
+      expect(barCategoryAxes().some((names) => names.includes("Technology Hardware"))).toBe(true);
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -239,7 +239,7 @@ describe("PositionsTab", () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("boom"));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<PositionsTab run={makeRun([{ timestamp: "2024-01-01", "600519.SH": "0.7" }])} />);
+    render(<PositionsTab run={makeRun([{ timestamp: "2024-01-01", "^GSPC": "0.7" }])} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Resolve industries" }));
 
@@ -257,8 +257,8 @@ describe("PositionsTab", () => {
   });
 
   const marketNeutralRows = [
-    { timestamp: "2024-05-01", "600519.SH": "0.5", "000858.SZ": "-0.5" },
-    { timestamp: "2024-05-02", "600519.SH": "0.5", "000858.SZ": "-0.5" },
+    { timestamp: "2024-05-01", "AAPL.US": "0.5", "RY.TO": "-0.5" },
+    { timestamp: "2024-05-02", "AAPL.US": "0.5", "RY.TO": "-0.5" },
   ];
 
   it("renders a market-neutral book instead of the empty state", () => {
@@ -275,27 +275,27 @@ describe("PositionsTab", () => {
     render(<PositionsTab run={makeRun(marketNeutralRows)} />);
 
     const names = pieSliceNames();
-    expect(names).toContain("600519.SH");
-    expect(names).toContain("000858.SZ Short");
+    expect(names).toContain("AAPL.US");
+    expect(names).toContain("RY.TO Short");
     expect(names).not.toContain("Cash");
   });
 
   it("keeps a gross-basis cash slice for a short-only book", () => {
     const shortOnlyRows = [
-      { timestamp: "2024-06-01", "000858.SZ": "-0.4" },
-      { timestamp: "2024-06-03", "000858.SZ": "-0.4" },
+      { timestamp: "2024-06-01", "RY.TO": "-0.4" },
+      { timestamp: "2024-06-03", "RY.TO": "-0.4" },
     ];
     render(<PositionsTab run={makeRun(shortOnlyRows)} />);
 
     const names = pieSliceNames();
-    expect(names).toContain("000858.SZ Short");
+    expect(names).toContain("RY.TO Short");
     expect(names).toContain("Cash");
   });
 
   it("uses a symmetric sector axis when the book is net short", () => {
     const netShortRows = [
-      { timestamp: "2024-07-01", "600519.SH": "0.3", "000858.SZ": "-0.5" },
-      { timestamp: "2024-07-02", "600519.SH": "0.3", "000858.SZ": "-0.5" },
+      { timestamp: "2024-07-01", "AAPL.US": "0.3", "RY.TO": "-0.5" },
+      { timestamp: "2024-07-02", "AAPL.US": "0.3", "RY.TO": "-0.5" },
     ];
     render(<PositionsTab run={makeRun(netShortRows)} />);
 
@@ -320,9 +320,9 @@ describe("PositionsTab", () => {
   });
 
   it("ranks persistent shorts into the evolution top set and splits the remainder", () => {
-    const weights: Record<string, string> = { "000001.SZ": "-0.4" };
+    const weights: Record<string, string> = { "AAPL.US": "-0.4" };
     for (let i = 0; i < 10; i += 1) weights[`L${i}.US`] = "0.02";
-    weights["000002.SZ"] = "-0.01";
+    weights["RY.TO"] = "-0.01";
     const rows = [
       { timestamp: "2024-01-01", ...weights },
       { timestamp: "2024-01-02", ...weights },
@@ -330,7 +330,7 @@ describe("PositionsTab", () => {
     render(<PositionsTab run={makeRun(rows)} />);
 
     const names = evolutionSeriesNames();
-    expect(names).toContain("000001.SZ");
+    expect(names).toContain("AAPL.US");
     expect(names).toContain("Other (long)");
     expect(names).toContain("Other (short)");
     expect(names).not.toContain("Other");

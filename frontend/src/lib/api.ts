@@ -806,8 +806,11 @@ export interface LLMModelsResponse {
     | null;
 }
 
+/** Markets with a configurable per-market data-source fallback order. */
+export type SourceOrderMarket = "us_equity" | "ca_equity" | "index";
+
 export interface SourceOrderEntry {
-  market: string;
+  market: SourceOrderMarket;
   env_var: string;
   default_order: string[];
   effective_order: string[];
@@ -816,28 +819,17 @@ export interface SourceOrderEntry {
 }
 
 export interface SourceOrderUpdate {
-  market: string;
+  market: SourceOrderMarket;
   /** New order (permutation of default_order). null/omitted = reset to default. */
   order?: string[] | null;
 }
 
 export interface DataSourceSettings {
-  tushare_token_configured: boolean;
-  tushare_token_hint?: string | null;
-  gildata_token_configured: boolean;
-  gildata_token_hint?: string | null;
-  baostock_supported: boolean;
-  baostock_installed: boolean;
-  baostock_message: string;
   env_path: string;
   source_orders?: SourceOrderEntry[];
 }
 
 export interface UpdateDataSourceSettingsRequest {
-  tushare_token?: string;
-  clear_tushare_token?: boolean;
-  gildata_token?: string;
-  clear_gildata_token?: boolean;
   source_orders?: SourceOrderUpdate[];
 }
 
@@ -1220,20 +1212,7 @@ export interface RunData {
 // --- Positions sector-map types (GET /runs/{runId}/positions/sectors) ---
 
 /** Asset classes reported by the backend sector-map endpoint. */
-export type SectorAssetClass =
-  | "a_share"
-  | "us_equity"
-  | "hk_equity"
-  | "india_equity"
-  | "kr_equity"
-  | "ca_equity"
-  | "ar_equity"
-  | "uk_equity"
-  | "vietnam_equity"
-  | "index"
-  | "crypto"
-  | "futures"
-  | "forex";
+export type SectorAssetClass = "us_equity" | "ca_equity" | "index";
 
 export interface SectorInfo {
   asset_class: SectorAssetClass;

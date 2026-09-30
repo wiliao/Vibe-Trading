@@ -8,7 +8,7 @@ import { api, type CorrelationRegimeResponse } from "@/lib/api";
 const WINDOWS = [30, 60, 90, 180, 365] as const;
 
 export function Correlation() {
-  const [codes, setCodes] = useState("000001.SZ,600519.SH,000858.SZ,601318.SH");
+  const [codes, setCodes] = useState("AAPL.US,MSFT.US,SPY.US,RY.TO");
   const [days, setDays] = useState<number>(90);
   const [method, setMethod] = useState<"pearson" | "spearman">("pearson");
   const [showRegime, setShowRegime] = useState(false);
@@ -74,7 +74,7 @@ export function Correlation() {
               invalidateResult();
               setCodes(e.target.value);
             }}
-            placeholder="000001.SZ,600519.SH,000858.SZ"
+            placeholder="AAPL.US,MSFT.US,SPY.US"
             className="w-full px-3 py-2 rounded-md border bg-background text-sm"
           />
           <p className="text-xs text-muted-foreground">

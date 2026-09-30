@@ -418,11 +418,6 @@ const SDK_CONNECTOR_SETUP_HINTS = {
     introKey: "runtime.missingLongbridgeVariables",
     variables: ["LONGBRIDGE_APP_KEY", "LONGBRIDGE_APP_SECRET", "LONGBRIDGE_ACCESS_TOKEN"],
   },
-  etoro: {
-    introKey: "runtime.missingEtoroVariables",
-    variables: ["ETORO_API_KEY", "ETORO_USER_KEY"],
-    fileHintKey: "runtime.missingEtoroFileHint",
-  },
 } as const;
 
 function ConnectorMissingSetup({ broker, t }: { broker: string; t: TFunction }) {
@@ -443,9 +438,6 @@ function ConnectorMissingSetup({ broker, t }: { broker: string; t: TFunction }) 
           <li key={variable}>{variable}</li>
         ))}
       </ul>
-      {"fileHintKey" in hints && hints.fileHintKey ? (
-        <p className="mt-2 text-sm text-muted-foreground">{t(hints.fileHintKey)}</p>
-      ) : null}
     </section>
   );
 }

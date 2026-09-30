@@ -26,9 +26,9 @@ const CATEGORIES: Category[] = [
         promptKey: "welcome.examples.crossMarketPortfolioPrompt",
       },
       {
-        titleKey: "welcome.examples.btcMacd",
-        descKey: "welcome.examples.btcMacdDesc",
-        promptKey: "welcome.examples.btcMacdPrompt",
+        titleKey: "welcome.examples.usMacd",
+        descKey: "welcome.examples.usMacdDesc",
+        promptKey: "welcome.examples.usMacdPrompt",
       },
       {
         titleKey: "welcome.examples.usTechMaxDiv",

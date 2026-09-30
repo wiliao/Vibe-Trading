@@ -60,11 +60,8 @@ function llmSettings() {
 
 function dataSourceSettings() {
   return {
-    tushare_token_configured: false,
-    baostock_supported: true,
-    baostock_installed: true,
-    baostock_message: "BaoStock available",
     env_path: "agent/.env",
+    source_orders: [],
   };
 }
 
@@ -164,7 +161,7 @@ describe("Settings IM channels panel", () => {
     await waitFor(() => expect(apiMock.startChannels).toHaveBeenCalledTimes(1));
   });
 
-  it("still renders LLM and data source settings when channel status fails", async () => {
+  it("still renders LLM and data source priority when channel status fails", async () => {
     apiMock.getChannelStatus.mockRejectedValue(
       new Error('Expected JSON from /channels/status, got text/html: <!doctype html>'),
     );
@@ -172,7 +169,7 @@ describe("Settings IM channels panel", () => {
     render(<Settings />);
 
     expect(await screen.findByText("LLM Settings")).toBeInTheDocument();
-    expect(screen.getByText("Data Source Settings")).toBeInTheDocument();
+    expect(screen.getByText("Data Source Priority")).toBeInTheDocument();
     expect(screen.getByText("IM Channels")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start channels" })).toBeDisabled();

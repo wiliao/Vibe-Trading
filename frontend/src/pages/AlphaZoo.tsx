@@ -61,10 +61,6 @@ const ZOO_CARDS: ZooCard[] = [
     approxCount: 101,
   },
   {
-    id: "gtja191",
-    approxCount: 191,
-  },
-  {
     id: "academic",
     approxCount: 10,
   },
@@ -74,34 +70,19 @@ const ZOO_CARDS: ZooCard[] = [
   },
 ];
 
-// Benchmarkable data universes (bench + compare): each one needs a panel loader
-// on the backend, so there is no Korea/India entry — the KRX factor capability
-// is a metadata universe, not a benchmark universe.
-const UNIVERSE_OPTIONS = [
-  { value: "csi300" },
-  { value: "sp500" },
-  { value: "btc-usdt" },
-];
+// Benchmarkable data universes (bench + compare): each one needs a panel
+// loader on the backend, and the US+Canada build ships only the S&P 500 panel.
+const UNIVERSE_OPTIONS = [{ value: "sp500" }];
 
-// Metadata universe -> the benchmark universe whose panel represents it. Markets
-// without a panel (equity_in, equity_kr, futures) are intentionally absent.
+// Metadata universe -> the benchmark universe whose panel represents it.
 const BENCH_UNIVERSE_FOR_METADATA: Record<string, string> = {
-  equity_cn: "csi300",
   equity_us: "sp500",
-  crypto: "btc-usdt",
 };
 
 // Factor-metadata universes for the browse filter; GET /alpha/list filters on
 // these directly (they are the values shown in each alpha's "universe" column).
-const FILTER_UNIVERSE_OPTIONS = [
-  { value: "equity_us" },
-  { value: "equity_cn" },
-  { value: "equity_hk" },
-  { value: "equity_in" },
-  { value: "equity_kr" },
-  { value: "crypto" },
-  { value: "futures" },
-];
+// The US+Canada build carries only the US equity metadata universe.
+const FILTER_UNIVERSE_OPTIONS = [{ value: "equity_us" }];
 
 const PAGE_SIZE = 50;
 
@@ -523,10 +504,10 @@ function DetailView({ alphaId }: DetailProps) {
   const meta = a.meta || {};
   const formulaLatex = (meta["formula_latex"] as string | undefined) || "";
   const nickname = (meta["nickname"] as string | undefined) || "";
-  // An alpha's metadata universes (equity_us, equity_kr, ...) are not bench
-  // universes; only the three names with panel loaders are. Translate, and drop
-  // the prefill when the alpha's markets have no benchmark panel (Korea, India)
-  // rather than handing BenchView a value its selector cannot hold.
+  // An alpha's metadata universes (equity_us, ...) are not bench universes;
+  // only names with a panel loader map onto the selector. Drop the prefill when
+  // the alpha's markets have no benchmark panel rather than handing BenchView a
+  // value its selector cannot hold.
   const benchUniverse = (((meta["universe"] as string[] | undefined) || [])
     .map((u) => BENCH_UNIVERSE_FOR_METADATA[u])
     .find(Boolean)) || "";
@@ -657,7 +638,7 @@ function BenchView() {
     const q = new URLSearchParams(locSearch);
     return {
       zoo: q.get("zoo") || "alpha101",
-      universe: q.get("universe") || "csi300",
+      universe: q.get("universe") || "sp500",
       period: q.get("period") || "2020-2025",
       top: Number(q.get("top") || "20"),
     };
@@ -706,9 +687,10 @@ function BenchView() {
       await attachStream(res.job_id);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : i18n.t("alphaZoo.failedToStartBench" as any);
-      // BTC-USDT is single-asset — surface inline rather than as a toast,
-      // because the form is the action context and the message includes a
-      // concrete suggestion for the user's next step.
+      // A single-asset universe cannot produce a cross-sectional IC — surface
+      // that inline rather than as a toast, because the form is the action
+      // context and the message includes a concrete suggestion for the user's
+      // next step.
       if (msg.toLowerCase().includes("single-asset")) {
         setFormError(i18n.t("alphaZoo.singleAssetHint" as any, { message: msg }));
       } else {
@@ -1153,7 +1135,7 @@ function CompareView() {
   }, [locSearch]);
 
   const [idsText, setIdsText] = useState(initialIds);
-  const [universe, setUniverse] = useState("csi300");
+  const [universe, setUniverse] = useState("sp500");
   const [period, setPeriod] = useState("2020-2025");
   const [sort, setSort] = useState("ir");
 
@@ -1287,7 +1269,7 @@ function CompareView() {
             onChange={(e) => setIdsText(e.target.value)}
             disabled={busy}
             rows={2}
-            placeholder="alpha101_1, alpha101_2, gtja191_5"
+            placeholder="alpha101_1, alpha101_2, qlib158_5"
             className="w-full px-3 py-2 rounded-lg border border-border/60 bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
           />
           <p className="text-[11px] text-muted-foreground mt-1">

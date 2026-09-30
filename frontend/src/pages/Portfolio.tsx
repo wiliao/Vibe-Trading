@@ -34,7 +34,6 @@ import i18n from "@/i18n";
 const BROKER_COLORS: Record<string, string> = {
   IBKR: "#f05a47",
   LONGBRIDGE: "#4f6edb",
-  BINANCE: "#f3ba2f",
 };
 
 const HOLDING_COLORS = [

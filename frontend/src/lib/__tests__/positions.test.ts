@@ -12,25 +12,25 @@ import {
 describe("parsePositionsPanel", () => {
   it("parses string weights per date and collects symbols in first-seen order", () => {
     const panel = parsePositionsPanel([
-      { timestamp: "2023-07-31", "159913.SZ": "0.0", "AAPL.US": "0.5" },
-      { timestamp: "2023-08-01", "159913.SZ": "0.95", "BTC-USDT": "0.05" },
+      { timestamp: "2023-07-31", "AAPL.US": "0.0", "RY.TO": "0.5" },
+      { timestamp: "2023-08-01", "AAPL.US": "0.95", "SHOP.TO": "0.05" },
     ]);
 
     expect(panel.dates).toEqual(["2023-07-31", "2023-08-01"]);
-    expect(panel.symbols).toEqual(["159913.SZ", "AAPL.US", "BTC-USDT"]);
-    expect(panel.weightByDate.get("2023-07-31")).toEqual({ "159913.SZ": 0, "AAPL.US": 0.5 });
-    expect(panel.weightByDate.get("2023-08-01")).toEqual({ "159913.SZ": 0.95, "BTC-USDT": 0.05 });
+    expect(panel.symbols).toEqual(["AAPL.US", "RY.TO", "SHOP.TO"]);
+    expect(panel.weightByDate.get("2023-07-31")).toEqual({ "AAPL.US": 0, "RY.TO": 0.5 });
+    expect(panel.weightByDate.get("2023-08-01")).toEqual({ "AAPL.US": 0.95, "SHOP.TO": 0.05 });
   });
 
   it("treats missing and NaN cells as 0", () => {
     const panel = parsePositionsPanel([
-      { timestamp: "2024-01-02", "600519.SH": "not-a-number" },
+      { timestamp: "2024-01-02", "AAPL.US": "not-a-number" },
       { timestamp: "2024-01-03" },
     ]);
 
-    expect(panel.weightByDate.get("2024-01-02")).toEqual({ "600519.SH": 0 });
+    expect(panel.weightByDate.get("2024-01-02")).toEqual({ "AAPL.US": 0 });
     expect(panel.weightByDate.get("2024-01-03")).toEqual({});
-    expect(panel.symbols).toEqual(["600519.SH"]);
+    expect(panel.symbols).toEqual(["AAPL.US"]);
   });
 
   it("skips date columns case-insensitively and tolerates a date alias", () => {
@@ -84,16 +84,16 @@ describe("latestHoldingDate", () => {
 
   it("detects a market-neutral book whose signed sum is zero", () => {
     const panel = panelFrom([
-      { timestamp: "2024-01-01", "600519.SH": "0.5", "000858.SZ": "-0.5" },
-      { timestamp: "2024-01-02", "600519.SH": "0.0", "000858.SZ": "0.0" },
+      { timestamp: "2024-01-01", "AAPL.US": "0.5", "RY.TO": "-0.5" },
+      { timestamp: "2024-01-02", "AAPL.US": "0.0", "RY.TO": "0.0" },
     ]);
     expect(latestHoldingDate(panel)).toBe("2024-01-01");
   });
 
   it("detects a short-only book", () => {
     const panel = panelFrom([
-      { timestamp: "2024-01-01", "000858.SZ": "-0.4" },
-      { timestamp: "2024-01-02", "000858.SZ": "0.0" },
+      { timestamp: "2024-01-01", "RY.TO": "-0.4" },
+      { timestamp: "2024-01-02", "RY.TO": "0.0" },
     ]);
     expect(latestHoldingDate(panel)).toBe("2024-01-01");
   });
@@ -101,43 +101,29 @@ describe("latestHoldingDate", () => {
 
 describe("classifyAssetClass parity with backend rules", () => {
   const cases: Array<[string, ReturnType<typeof classifyAssetClass>]> = [
-    ["600519.SH", "a_share"],
-    ["000001.SZ", "a_share"],
-    ["830799.BJ", "a_share"],
-    ["159913.SZ", "a_share"],
-    ["00700.HK", "hk_equity"],
     ["AAPL.US", "us_equity"],
+    ["MSFT.US", "us_equity"],
+    ["GOOGL.US", "us_equity"],
+    ["AMZN.US", "us_equity"],
+    ["META.US", "us_equity"],
     ["BRK-B.US", "us_equity"],
     ["TD.TO", "ca_equity"],
+    ["SHOP.TO", "ca_equity"],
+    ["BAM.TO", "ca_equity"],
+    ["CNR.TO", "ca_equity"],
     ["PNG.V", "ca_equity"],
-    // Argentina (#1543) plus the two suffixes that landed on the backend
-    // earlier and were never classified here, so they read as "other".
-    ["GGAL.BA", "ar_equity"],
-    ["GOOGL.BA", "ar_equity"],
-    ["VOD.L", "uk_equity"],
-    ["VIC.VN", "vietnam_equity"],
-    ["005930.KS", "kr_equity"],
-    ["035720.KQ", "kr_equity"],
-    ["RELIANCE.NS", "india_equity"],
-    ["TCS.BO", "india_equity"],
-    ["BTC-USDT", "crypto"],
-    ["ETH-USDC", "crypto"],
-    ["SOL-USD", "crypto"],
-    ["ETH/USDT", "crypto"],
-    ["BTC-USDT-PERP", "crypto"],
-    ["EURUSD", "forex"],
-    ["USDCNH", "forex"],
-    ["XAUUSD.FX", "forex"],
-    ["IF2406.CFFEX", "futures"],
-    ["RB2510.SHFE", "futures"],
-    ["M2509.DCE", "futures"],
-    ["CL2512.NYMEX", "futures"],
-    ["GC2512.COMEX", "futures"],
+    ["SHOP.V", "ca_equity"],
     ["AAPL", "us_equity"],
     ["NVDA", "us_equity"],
-    ["", "other"],
+    ["SPY", "us_equity"],
+    // Unknown/odd shapes fall through to "other" rather than being claimed by
+    // a market the app no longer supports: dotted non-exchange suffixes,
+    // index symbols with a caret, numeric codes, and the empty string.
+    ["BRK.B", "other"],
+    ["^GSPC", "other"],
+    ["^VIX", "other"],
     ["12345", "other"],
-    ["BTCUSDT", "other"],
+    ["", "other"],
   ];
 
   it.each(cases)("classifies %s as %s", (symbol, expected) => {
@@ -152,12 +138,12 @@ describe("classifyAssetClass parity with backend rules", () => {
 describe("aggregateWeights", () => {
   it("groups by the provided function and sorts descending", () => {
     const result = aggregateWeights(
-      { "600519.SH": 0.4, "000858.SZ": 0.2, "AAPL.US": 0.3 },
-      (symbol) => (symbol.endsWith(".US") ? "us" : "cn"),
+      { "AAPL.US": 0.4, "RY.TO": 0.2, "SHOP.TO": 0.3 },
+      (symbol) => (symbol.endsWith(".TO") ? "ca" : "us"),
     );
-    expect(result.map((item) => item.group)).toEqual(["cn", "us"]);
-    expect(result[0].weight).toBeCloseTo(0.6, 10);
-    expect(result[1].weight).toBeCloseTo(0.3, 10);
+    expect(result.map((item) => item.group)).toEqual(["ca", "us"]);
+    expect(result[0].weight).toBeCloseTo(0.5, 10);
+    expect(result[1].weight).toBeCloseTo(0.4, 10);
   });
 
   it("keeps up to 12 groups untouched", () => {
@@ -194,7 +180,7 @@ describe("aggregateWeights", () => {
 
 describe("withCashSlice", () => {
   it("adds a cash pseudo-symbol for the uninvested remainder", () => {
-    const result = withCashSlice({ "AAPL.US": 0.6, "BTC-USDT": 0.2 });
+    const result = withCashSlice({ "AAPL.US": 0.6, "RY.TO": 0.2 });
     expect(result[CASH_SYMBOL]).toBeCloseTo(0.2, 10);
     expect(result["AAPL.US"]).toBe(0.6);
   });
@@ -221,22 +207,22 @@ describe("withCashSlice", () => {
   });
 
   it("adds no invented cash for a market-neutral book", () => {
-    const result = withCashSlice({ "600519.SH": 0.5, "000858.SZ": -0.5 });
+    const result = withCashSlice({ "AAPL.US": 0.5, "RY.TO": -0.5 });
     expect(CASH_SYMBOL in result).toBe(false);
   });
 
   it("derives cash from gross exposure for a short-only book", () => {
-    const result = withCashSlice({ "000858.SZ": -0.4 });
+    const result = withCashSlice({ "RY.TO": -0.4 });
     expect(result[CASH_SYMBOL]).toBeCloseTo(0.6, 10);
   });
 
   it("derives cash from gross exposure for a mixed long-short book", () => {
-    const result = withCashSlice({ "600519.SH": 0.4, "000858.SZ": -0.2 });
+    const result = withCashSlice({ "AAPL.US": 0.4, "RY.TO": -0.2 });
     expect(result[CASH_SYMBOL]).toBeCloseTo(0.4, 10);
   });
 
   it("omits cash when the book is levered (gross above 1)", () => {
-    const result = withCashSlice({ "600519.SH": 0.8, "000858.SZ": -0.5 });
+    const result = withCashSlice({ "AAPL.US": 0.8, "RY.TO": -0.5 });
     expect(CASH_SYMBOL in result).toBe(false);
   });
 });

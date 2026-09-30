@@ -55,7 +55,7 @@ const snapshot = {
   accounts: [
     { broker: "ibkr", status: "ok" as const, total_usd: 600, total_cny: 4320, position_count: 1, last_success_at: "2026-08-09T00:00:00Z", portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "stocks_etfs", note: "Dedicated mapping." } },
     { broker: "longbridge", status: "ok" as const, total_usd: 300, total_cny: 2160, position_count: 1, last_success_at: "2026-08-09T00:00:00Z", portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "stocks_etfs", note: "Dedicated mapping." } },
-    { broker: "binance", status: "ok" as const, total_usd: 100, total_cny: 720, position_count: 1, last_success_at: "2026-08-09T00:00:00Z", portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "spot", note: "Dedicated mapping." } },
+    { broker: "alpaca", status: "ok" as const, total_usd: 100, total_cny: 720, position_count: 1, last_success_at: "2026-08-09T00:00:00Z", portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "stocks_etfs", note: "Dedicated mapping." } },
   ],
   positions: [{
     broker: "ibkr", symbol: "AAPL", name: "Apple", asset_type: "stock", market: "US",
@@ -76,9 +76,9 @@ const snapshotWithFailedSource = {
   accounts: [
     ...snapshot.accounts,
     {
-      source_id: "binance-2",
-      broker: "binance",
-      label: "Binance backup",
+      source_id: "alpaca-2",
+      broker: "alpaca",
+      label: "Alpaca backup",
       status: "error" as const,
       error_code: "ConnectionError",
       error: "Read timed out after 30s",
@@ -87,7 +87,7 @@ const snapshotWithFailedSource = {
       last_success_at: FAILED_LAST_SUCCESS,
     },
   ],
-  warnings: ["Binance backup could not be read and is excluded from the totals."],
+  warnings: ["Alpaca backup could not be read and is excluded from the totals."],
 };
 
 const snapshotWithFailedOAuth = {
@@ -122,13 +122,13 @@ const portfolioConfiguration = {
     sources: [
       { connection_id: "ibkr", label: "IBKR", enabled: true, order: 0, include_cash: true },
       { connection_id: "longbridge", label: "Longbridge", enabled: true, order: 1, include_cash: true },
-      { connection_id: "binance", label: "Binance", enabled: true, order: 2, include_cash: true },
+      { connection_id: "alpaca", label: "Alpaca", enabled: true, order: 2, include_cash: true },
     ],
   },
   catalog: [
     { id: "ibkr", connection_id: "ibkr", profile_id: "ibkr-live-official-mcp-readonly", connector: "ibkr", label: "IBKR", environment: "live" as const, transport: "remote_mcp" as const, capabilities: ["mcp.read.discovery"], readonly: true, notes: "", selected: true, source_id: "ibkr", supports_reconnect: true, credential_fields: [], credential_status: {}, credentials_configured: false, portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "stocks_etfs", note: "Dedicated mapping." } },
     { id: "longbridge", connection_id: "longbridge", profile_id: "longbridge-live-sdk-readonly", connector: "longbridge", label: "Longbridge", environment: "live" as const, transport: "broker_sdk" as const, capabilities: ["account.read", "positions.read"], readonly: true, notes: "", selected: true, source_id: "longbridge", supports_reconnect: false, credential_fields: [], credential_status: {}, credentials_configured: false, portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "stocks_etfs", note: "Dedicated mapping." } },
-    { id: "binance", connection_id: "binance", profile_id: "binance-live-sdk-readonly", connector: "binance", label: "Binance", environment: "live" as const, transport: "broker_sdk" as const, capabilities: ["account.read", "positions.read"], readonly: true, notes: "", selected: true, source_id: "binance", supports_reconnect: false, credential_fields: [], credential_status: {}, credentials_configured: false, portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "spot", note: "Dedicated mapping." } },
+    { id: "alpaca", connection_id: "alpaca", profile_id: "alpaca-live-sdk-readonly", connector: "alpaca", label: "Alpaca", environment: "live" as const, transport: "broker_sdk" as const, capabilities: ["account.read", "positions.read"], readonly: true, notes: "", selected: true, source_id: "alpaca", supports_reconnect: false, credential_fields: [], credential_status: {}, credentials_configured: false, portfolio_compatibility: { level: "native" as const, contract_version: 1, asset_scope: "stocks_etfs", note: "Dedicated mapping." } },
   ],
 };
 
@@ -156,7 +156,7 @@ describe("Portfolio page", () => {
         sources: {
           ibkr: { status: "ok" },
           longbridge: { status: "ok" },
-          binance: { status: "ok" },
+          alpaca: { status: "ok" },
         },
       },
     });
@@ -298,8 +298,8 @@ describe("Portfolio page", () => {
           schema_version: 1,
           auth_type: "api_key",
           credential_fields: [],
-          dependency: "ccxt",
-          install_command: "pip install ccxt keyring",
+          dependency: "alpaca-py",
+          install_command: "pip install alpaca-py keyring",
           test_operation: "account.read",
           setup_hint: "Create a read-only key.",
           secret_storage: "os_keyring",
@@ -322,10 +322,10 @@ describe("Portfolio page", () => {
     fireEvent.click(screen.getByRole("button", { name: i18n.t("portfolio.connections.saveVault") }));
 
     await waitFor(() => expect(mocked.saveConnectionCredentials).toHaveBeenCalledWith(
-      "binance",
+      "alpaca",
       { api_key: "local-key", api_secret: "local-secret" },
     ));
-    expect(screen.getByText("ccxt")).toBeInTheDocument();
+    expect(screen.getByText("alpaca-py")).toBeInTheDocument();
   });
 
   it("reports an unreadable account as an error and keeps it out of the total", async () => {

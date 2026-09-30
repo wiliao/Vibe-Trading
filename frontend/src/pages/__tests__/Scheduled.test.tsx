@@ -223,7 +223,7 @@ function verdict(overrides: Partial<VerdictRecord> = {}): VerdictRecord {
     recorded_at: 1_789_000_000_000,
     parse: "ok",
     outcome: "FLAT",
-    items: [{ symbol: "600519.SH", state: "FLAT", reason: "band held" }],
+    items: [{ symbol: "AAPL.US", state: "FLAT", reason: "band held" }],
     previous: null,
     ...overrides,
   };
@@ -240,14 +240,14 @@ describe("Scheduled page verdict cell", () => {
       run({
         last_verdict: verdict({
           outcome: "DRIFT",
-          items: [{ symbol: "600519.SH", state: "DRIFT", reason: "band crossed" }],
+          items: [{ symbol: "AAPL.US", state: "DRIFT", reason: "band crossed" }],
           previous: verdict({ session_id: "sess-0", outcome: "FLAT", recorded_at: 1_788_000_000_000 }),
         }),
       }),
     ]);
     render(<Scheduled />);
 
-    expect(await screen.findByText(/600519.SH DRIFT/)).toBeInTheDocument();
+    expect(await screen.findByText(/AAPL.US DRIFT/)).toBeInTheDocument();
     expect(screen.getByText(/FLAT → DRIFT/)).toBeInTheDocument();
     expect(screen.getByText(/as of/)).toBeInTheDocument();
   });
