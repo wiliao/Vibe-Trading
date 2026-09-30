@@ -7,7 +7,6 @@ over a configurable lookback window. Used by the /correlation API endpoint.
 from __future__ import annotations
 
 import logging
-import re
 from typing import Dict, Literal
 
 import pandas as pd
@@ -18,92 +17,37 @@ logger = logging.getLogger(__name__)
 
 
 def infer_market(code: str) -> str:
-    """Infer market key from a ticker symbol.
+    """Infer market key from a ticker symbol (delegates to the engine classifier).
 
-    Resolution order:
-
-    1. Crypto pair spellings (``BTC-USDT``, ``ETH/USD`` …).
-    2. Explicit exchange suffix — always authoritative (``.HK``, ``.SH``/
-       ``.SZ``/``.BJ``, ``.TO``/``.V``, ``.US``). Bare HK and A-share codes
-       are both purely numeric, so the suffix is the only reliable
-       disambiguator.
-    3. Bare numeric codes by digit length: A-share codes are exactly 6 digits
-       (600000, 000001, 300750, 688981, 830799); HK codes are at most 5
-       (700, 0700, 9988, 3690). Prefix alone cannot tell them apart — both
-       markets use leading 0 and 3.
-    4. Anything else (alphabetic tickers) is a US equity.
+    One source of truth: the backtest engine's ``_detect_market`` owns symbol
+    -> market classification. This wrapper keeps correlation's public
+    ``infer_market`` name without a second, drifting classifier.
     """
-    code_upper = code.strip().upper()
-    crypto_suffixes = ("USDT", "BTC", "ETH", "BNB", "SOL", "ADA", "DOGE")
-    if any(code_upper.endswith(s) for s in crypto_suffixes) or "/" in code:
-        return "crypto"
-    if code_upper.endswith(".HK"):
-        return "hk_equity"
-    if code_upper.endswith((".SH", ".SZ", ".BJ")):
-        return "a_share"
-    if code_upper.endswith((".KS", ".KQ")):
-        return "kr_equity"
-    if code_upper.endswith((".TO", ".V")):
-        return "ca_equity"
-    if code_upper.endswith(".US"):
-        return "us_equity"
-    # Yahoo's continuous-front-month futures notation (``GC=F``, ``CL=F``,
-    # ``SI=F``, ``HG=F``, ``MGC=F``). Mirrors the same pattern in
-    # ``backtest.engines._market_hooks._MARKET_PATTERNS`` so this offline
-    # classifier stays consistent with the engine-side classifier.
-    if re.match(r"^[A-Z]{2,5}=F$", code_upper):
-        return "futures"
-    # Yahoo's forex notation (``XAUUSD=X``, ``EURUSD=X``).
-    if re.match(r"^[A-Z]{6}=X$", code_upper):
-        return "forex"
-    # Bare 6-character precious-metal / FX symbols. Whitelist-restricted to
-    # a small set of base codes (ISO 4217 metals + G10 currencies) so a
-    # length-only pattern never re-routes a legitimate 6-letter US ticker.
-    if re.match(
-        r"^(?:XAU|XAG|XPT|XPD|EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD)[A-Z]{3}$",
-        code_upper,
-    ):
-        return "forex"
-    if code_upper.isdigit():
-        if len(code_upper) == 6:
-            return "a_share"
-        if len(code_upper) <= 5:
-            return "hk_equity"
-    return "us_equity"
+    from backtest.engines._market_hooks import _detect_market
+
+    return _detect_market(code)
 
 
 def _normalize_symbol(code: str, market: str) -> str:
     """Convert a user-supplied code to the project's canonical loader symbol.
 
-    The data loaders key US/HK/A-share instruments by an exchange-suffixed
-    symbol (``AAPL.US``, ``0700.HK``, ``600000.SH``); a bare ticker such as
-    ``AAPL`` or ``600000`` matches no loader and fetches nothing. Crypto pairs
-    (``BTC-USDT``) are already canonical, and any code that already carries a
-    ``.`` suffix is left untouched.
+    The data loaders key US instruments by an exchange-suffixed symbol
+    (``AAPL.US``); a bare ticker such as ``AAPL`` matches no loader and fetches
+    nothing. Any code that already carries a ``.`` suffix is left untouched.
 
     Args:
-        code: The raw code as typed by the user (e.g. ``AAPL``, ``600000``).
+        code: The raw code as typed by the user (e.g. ``AAPL``).
         market: The market key from :func:`infer_market`.
 
     Returns:
         The canonical symbol the market's loaders expect.
     """
     cleaned = code.strip()
-    # Crypto pairs and anything already exchange-qualified pass through as-is.
-    if market == "crypto" or "." in cleaned:
+    # Anything already exchange-qualified passes through as-is.
+    if "." in cleaned:
         return cleaned
-    upper = cleaned.upper()
     if market == "us_equity":
-        return f"{upper}.US"
-    if market == "hk_equity":
-        return f"{upper}.HK"
-    if market == "a_share":
-        # 6xxxxx -> Shanghai; 4xxxxx / 8xxxxx -> Beijing; else (0/3) Shenzhen.
-        if upper[:1] == "6":
-            return f"{upper}.SH"
-        if upper[:1] in ("4", "8"):
-            return f"{upper}.BJ"
-        return f"{upper}.SZ"
+        return f"{cleaned.upper()}.US"
     return cleaned
 
 
@@ -290,7 +234,7 @@ def compute_correlation_matrix(
     """Fetch price data and compute correlation matrix for a list of assets.
 
     Args:
-        codes: List of asset codes (e.g. ["BTC-USDT", "ETH-USDT", "SPY"]).
+        codes: List of asset codes (e.g. ["AAPL", "MSFT", "SPY"]).
         days: Lookback window in days (default 90).
         method: Correlation method.
 

@@ -60,28 +60,23 @@ def _clean_order_env():
 
 
 def test_source_order_env_var() -> None:
-    assert source_order_env_var("a_share") == "MARKET_DATA_ORDER_A_SHARE"
-    assert (
-        source_order_env_var("vietnam_equity")
-        == "MARKET_DATA_ORDER_VIETNAM_EQUITY"
-    )
+    assert source_order_env_var("us_equity") == "MARKET_DATA_ORDER_US_EQUITY"
+    assert source_order_env_var("ca_equity") == "MARKET_DATA_ORDER_CA_EQUITY"
 
 
 def test_parse_source_order_strips_lowercases_and_drops_empty() -> None:
-    assert parse_source_order(" TUSHARE, tencent ,, ") == ["tushare", "tencent"]
+    assert parse_source_order(" YAHOO, yfinance ,, ") == ["yahoo", "yfinance"]
     assert parse_source_order("") == []
 
 
 def test_is_valid_source_order_requires_exact_permutation() -> None:
-    assert registry.is_valid_source_order(
-        "crypto", ["local", "okx", "binance", "ccxt", "yfinance"]
-    )
-    assert not registry.is_valid_source_order("crypto", ["okx"])  # subset
-    assert not registry.is_valid_source_order("crypto", ["okx"] * 5)  # dupes
+    assert registry.is_valid_source_order("ca_equity", ["local", "yahoo", "yfinance"])
+    assert not registry.is_valid_source_order("ca_equity", ["yahoo"])  # subset
+    assert not registry.is_valid_source_order("ca_equity", ["yahoo"] * 3)  # dupes
     assert not registry.is_valid_source_order(
-        "crypto", ["okx", "binance", "ccxt", "yfinance", "stooq"]
+        "ca_equity", ["yahoo", "yfinance", "local", "stooq"]
     )  # foreign member
-    assert not registry.is_valid_source_order("no_such_market", ["okx"])
+    assert not registry.is_valid_source_order("no_such_market", ["yahoo"])
 
 
 def test_get_default_source_order_returns_copy() -> None:
@@ -103,7 +98,7 @@ def test_get_default_source_order_returns_copy() -> None:
 def test_import_time_refresh_left_defaults_intact() -> None:
     for market, chain in FALLBACK_CHAINS.items():
         assert chain == registry._DEFAULT_CHAINS[market]
-    assert registry.get_source_order_override("a_share") is None
+    assert registry.get_source_order_override("ca_equity") is None
 
 
 def test_no_env_overrides_refresh_is_noop_for_patched_chains() -> None:
@@ -122,24 +117,20 @@ def test_no_env_overrides_refresh_is_noop_for_patched_chains() -> None:
 
 
 def test_refresh_gated_on_env_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(
-        "MARKET_DATA_ORDER_CRYPTO", "binance,okx,ccxt,yfinance,local"
-    )
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "yfinance,yahoo,local")
     refresh_source_order_overrides()
-    first = registry.FALLBACK_CHAINS["crypto"]
-    assert first == ["binance", "okx", "ccxt", "yfinance", "local"]
+    first = registry.FALLBACK_CHAINS["ca_equity"]
+    assert first == ["yfinance", "yahoo", "local"]
 
     # Unchanged env -> no-op, entry object untouched.
     refresh_source_order_overrides()
-    assert registry.FALLBACK_CHAINS["crypto"] is first
+    assert registry.FALLBACK_CHAINS["ca_equity"] is first
 
     # Changed env -> reassignment (new list object).
-    monkeypatch.setenv(
-        "MARKET_DATA_ORDER_CRYPTO", "ccxt,okx,binance,yfinance,local"
-    )
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "local,yahoo,yfinance")
     refresh_source_order_overrides()
-    assert registry.FALLBACK_CHAINS["crypto"] is not first
-    assert registry.FALLBACK_CHAINS["crypto"][0] == "ccxt"
+    assert registry.FALLBACK_CHAINS["ca_equity"] is not first
+    assert registry.FALLBACK_CHAINS["ca_equity"][0] == "local"
 
 
 def test_override_reorders_in_place_for_byname_importers(
@@ -150,24 +141,24 @@ def test_override_reorders_in_place_for_byname_importers(
     The reassignment must be a setitem on the same dict object so those
     by-name references observe the new order.
     """
-    monkeypatch.setenv("MARKET_DATA_ORDER_FUTURES", "local,akshare")
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "local,yahoo,yfinance")
     refresh_source_order_overrides()
-    assert FALLBACK_CHAINS["futures"] == ["local", "akshare"]
+    assert FALLBACK_CHAINS["ca_equity"] == ["local", "yahoo", "yfinance"]
 
-    override = registry.get_source_order_override("futures")
-    assert override == ["local", "akshare"]
+    override = registry.get_source_order_override("ca_equity")
+    assert override == ["local", "yahoo", "yfinance"]
     # Returned copies — callers cannot corrupt internal state.
     override.append("zzz")
-    assert registry.get_source_order_override("futures") == ["local", "akshare"]
+    assert registry.get_source_order_override("ca_equity") == ["local", "yahoo", "yfinance"]
 
 
 @pytest.mark.parametrize(
     "raw",
     [
-        "tushare,akshare",  # dropped 'local'
-        "tushare,akshare,local,ccxt",  # extra member
-        "tushare,tushare,akshare,local",  # duplicate
-        "tushare,akshare,local,yahoo",  # member of another market
+        "yahoo,yfinance",  # dropped 'local'
+        "yahoo,yfinance,local,stooq",  # extra member
+        "yahoo,yahoo,yfinance,local",  # duplicate
+        "yahoo,yfinance,local,sina",  # member of another market
     ],
 )
 def test_invalid_values_keep_default_and_warn(
@@ -175,49 +166,44 @@ def test_invalid_values_keep_default_and_warn(
     caplog: pytest.LogCaptureFixture,
     raw: str,
 ) -> None:
-    monkeypatch.setenv("MARKET_DATA_ORDER_FUND", raw)
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", raw)
     with caplog.at_level(logging.WARNING):
         refresh_source_order_overrides()
-    assert registry.FALLBACK_CHAINS["fund"] == ["tushare", "akshare", "local"]
-    assert registry.get_source_order_override("fund") is None
-    assert any("MARKET_DATA_ORDER_FUND" in r.message for r in caplog.records)
+    assert registry.FALLBACK_CHAINS["ca_equity"] == ["yahoo", "yfinance", "local"]
+    assert registry.get_source_order_override("ca_equity") is None
+    assert any("MARKET_DATA_ORDER_CA_EQUITY" in r.message for r in caplog.records)
 
 
 def test_empty_string_resets_to_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(
-        "MARKET_DATA_ORDER_A_SHARE",
-        "tushare,tencent,mootdx,eastmoney,baostock,akshare,gildata,local",
-    )
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "yfinance,yahoo,local")
     refresh_source_order_overrides()
-    assert registry.FALLBACK_CHAINS["a_share"][0] == "tushare"
+    assert registry.FALLBACK_CHAINS["ca_equity"][0] == "yfinance"
 
-    monkeypatch.setenv("MARKET_DATA_ORDER_A_SHARE", "")
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "")
     refresh_source_order_overrides()
-    assert registry.FALLBACK_CHAINS["a_share"] == registry.get_default_source_order("a_share")
-    assert registry.get_source_order_override("a_share") is None
+    assert registry.FALLBACK_CHAINS["ca_equity"] == registry.get_default_source_order("ca_equity")
+    assert registry.get_source_order_override("ca_equity") is None
 
 
 def test_default_snapshot_never_aliased(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("MARKET_DATA_ORDER_MACRO", "tushare,akshare,local")
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "local,yahoo,yfinance")
     refresh_source_order_overrides()
-    assert registry._DEFAULT_CHAINS["macro"] == ["akshare", "tushare", "local"]
+    assert registry._DEFAULT_CHAINS["ca_equity"] == ["yahoo", "yfinance", "local"]
 
-    monkeypatch.delenv("MARKET_DATA_ORDER_MACRO")
+    monkeypatch.delenv("MARKET_DATA_ORDER_CA_EQUITY")
     refresh_source_order_overrides()
-    assert registry._DEFAULT_CHAINS["macro"] == ["akshare", "tushare", "local"]
-    assert registry.FALLBACK_CHAINS["macro"] == ["akshare", "tushare", "local"]
+    assert registry._DEFAULT_CHAINS["ca_equity"] == ["yahoo", "yfinance", "local"]
+    assert registry.FALLBACK_CHAINS["ca_equity"] == ["yahoo", "yfinance", "local"]
 
 
 def test_ensure_registered_rechecks_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The refresh hook sits before the ``_registered`` early return."""
-    monkeypatch.setenv(
-        "MARKET_DATA_ORDER_KR_EQUITY", "yahoo,pykrx,yfinance,local"
-    )
+    monkeypatch.setenv("MARKET_DATA_ORDER_CA_EQUITY", "yfinance,yahoo,local")
     registry._ensure_registered()
-    assert registry.FALLBACK_CHAINS["kr_equity"][0] == "yahoo"
+    assert registry.FALLBACK_CHAINS["ca_equity"][0] == "yfinance"

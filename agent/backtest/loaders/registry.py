@@ -10,7 +10,6 @@ of import order.
 from __future__ import annotations
 
 import logging
-import re
 from threading import Lock
 from typing import Any, Type
 
@@ -34,33 +33,15 @@ _registration_lock = Lock()
 # Keep in sync with ``_loader_modules`` below — the regression test
 # ``test_valid_sources_covers_all_registered_loaders`` enforces full coverage.
 VALID_SOURCES: set[str] = {
-    "tushare",
-    "okx",
-    "nobitex",
-    "wallex",
-    "binance",
-    "yfinance",
-    "akshare",
-    "baostock",
-    "tencent",
-    "mootdx",
-    "ccxt",
-    "futu",
-    "eastmoney",
-    "sina",
-    "stooq",
     "yahoo",
+    "yfinance",
+    "stooq",
+    "sina",
+    "eastmoney",
     "finnhub",
     "alphavantage",
     "tiingo",
     "fmp",
-    "gildata",
-    "qveris",  # QVERIS-INTEGRATION
-    "india_broker",
-    "pykrx",
-    "longbridge",
-    "mt5",
-    "tickerall",
     "local",
     "auto",
 }
@@ -96,18 +77,7 @@ def _ensure_registered() -> None:
             return
 
         _loader_modules = [
-            "backtest.loaders.tushare",
-            "backtest.loaders.okx",
-            "backtest.loaders.nobitex",
-            "backtest.loaders.wallex",
-            "backtest.loaders.binance_loader",
             "backtest.loaders.yfinance_loader",
-            "backtest.loaders.akshare_loader",
-            "backtest.loaders.baostock_loader",
-            "backtest.loaders.tencent_loader",
-            "backtest.loaders.mootdx_loader",
-            "backtest.loaders.ccxt_loader",
-            "backtest.loaders.futu",
             "backtest.loaders.eastmoney_loader",
             "backtest.loaders.sina_loader",
             "backtest.loaders.stooq_loader",
@@ -116,13 +86,6 @@ def _ensure_registered() -> None:
             "backtest.loaders.alphavantage_loader",
             "backtest.loaders.tiingo_loader",
             "backtest.loaders.fmp_loader",
-            "backtest.loaders.gildata_loader",
-            "backtest.loaders.qveris_loader",  # QVERIS-INTEGRATION
-            "backtest.loaders.india_broker_loader",
-            "backtest.loaders.pykrx_loader",
-            "backtest.loaders.longbridge",
-            "backtest.loaders.mt5_loader",
-            "backtest.loaders.tickerall_loader",
             "backtest.loaders.local_loader",
         ]
         import importlib
@@ -137,24 +100,13 @@ def _ensure_registered() -> None:
 
 # Sources that must NEVER silently fall through to a network loader when the
 # caller asked for them explicitly. ``local`` reads the user's own configured
-# files (``~/.vibe-trading/data-bridge/config.yaml``); its ``markets`` set spans
-# every market only so the cross-market auto-resolver can *reach* it, not so an
-# unavailable ``local`` request can degrade into an unrelated network source.
-# An explicit ``local`` request that is unavailable is a config problem the user
-# must see, not something to paper over with a Yahoo/Tencent fetch.
-# ``tickerall`` joins for the same reason (explicit-only, the user's own broker key).
-# ``fmp`` joins because an explicit ``source="fmp"`` request must not silently
-# return data from a different source when the Stable endpoint 403s — the
-# caller asked for FMP provenance, not a Yahoo fallback (issue #1270).
-# ``nobitex``/``wallex`` join for a stronger version of the same reason: they
-# are the only sources quoting in Iranian Toman, and they declare
-# ``markets = {"crypto"}`` purely to be reachable. Degrading an unavailable
-# ``BTCIRT`` request into the crypto chain would hand a USDT-quoted series back
-# as if it were Toman — a caliber error of about six orders of magnitude, not a
-# missing-data error. An unreachable Iranian endpoint must be visible.
-_NO_NETWORK_FALLBACK_SOURCES: frozenset[str] = frozenset(
-    {"local", "qveris", "tickerall", "fmp", "nobitex", "wallex"}
-)  # QVERIS-INTEGRATION
+# files (``~/.vibe-trading/data-bridge/config.yaml``); an unavailable ``local``
+# request is a config problem the user must see, not something to paper over
+# with a Yahoo fetch. ``fmp`` joins because an explicit ``source="fmp"`` request
+# must not silently return data from a different source when the Stable
+# endpoint 403s — the caller asked for FMP provenance, not a Yahoo fallback
+# (issue #1270).
+_NO_NETWORK_FALLBACK_SOURCES: frozenset[str] = frozenset({"local", "fmp"})
 
 
 def is_no_network_fallback_source(source: str) -> bool:
@@ -176,18 +128,6 @@ def is_no_network_fallback_source(source: str) -> bool:
 # that must be politely throttled; Finnhub/AlphaVantage/Tiingo/FMP are key-gated
 # REST fallbacks placed deeper in the chain.
 FALLBACK_CHAINS: dict[str, list[str]] = {
-    "a_share": [
-        "tencent",
-        "mootdx",
-        "eastmoney",
-        "baostock",
-        "akshare",
-        "tushare",
-        # Key-gated commercial vendor (恒生聚源): trails the free sources so
-        # paid quota is only spent when the public endpoints cannot serve.
-        "gildata",
-        "local",
-    ],
     "us_equity": [
         "yahoo",
         "stooq",
@@ -198,51 +138,13 @@ FALLBACK_CHAINS: dict[str, list[str]] = {
         "fmp",
         "finnhub",
         "alphavantage",
-        "longbridge",
-        "akshare",
         "local",
     ],
-    # HK: tencent leads (no observed IP ban); akshare (Eastmoney-backed)
-    # precedes the Yahoo-SDK family, which is blocked from mainland IPs;
-    # tushare hk_daily is key-gated.
-    "hk_equity": [
-        "tencent",
-        "eastmoney",
-        "yahoo",
-        "futu",
-        "akshare",
-        "yfinance",
-        "tushare",
-        "longbridge",
-        "local",
-    ],
-    "india_equity": ["yahoo", "yfinance", "india_broker", "local"],
-    "kr_equity": ["pykrx", "yahoo", "yfinance", "local"],
     # TSX (.TO) / TSX Venture (.V): direct Yahoo first, SDK fallback second.
     "ca_equity": ["yahoo", "yfinance", "local"],
-    # Argentina (BYMA .BA): Yahoo public chart first, yfinance fallback.
-    "ar_equity": ["yahoo", "yfinance", "local"],
-    # UK (LSE .L): direct Yahoo first, SDK fallback second.
-    "uk_equity": ["yahoo", "yfinance", "local"],
-    # Vietnam (.VN): Yahoo lists HOSE only — HNX and UPCOM are unsupported,
-    # so those two are reachable only through the user's local files.
-    "vietnam_equity": ["yahoo", "yfinance", "local"],
-    # OKX first (native), then dedicated Binance, then generic CCXT / Yahoo.
-    "crypto": ["okx", "binance", "ccxt", "yfinance", "local"],
-    # tushare led this chain while implementing no futures endpoint at all
-    # (#1395): ``resolve_loader`` walks FALLBACK_CHAINS and never consults a
-    # loader's ``markets`` set, so trimming that set alone would have left
-    # tushare first in line, returning empty frames before akshare was ever
-    # asked. akshare serves Chinese contracts off the token-free Sina daily
-    # endpoints; a global contract has no network source and reaches ``local``.
-    "futures": ["akshare", "local"],
-    "fund": ["tushare", "akshare", "local"],
-    "macro": ["akshare", "tushare", "local"],
-    # mt5 leads when a local MetaTrader 5 terminal is attached (Windows-only,
-    # broker feed); otherwise it reports unavailable and the chain proceeds.
-    "forex": ["mt5", "akshare", "yfinance", "local"],
-    # Yahoo index symbols (^SPX, ^NDX, ^FTSE, ^VIX, ...): served verbatim by
-    # the public chart endpoint, same as the =F/=X conventions.
+    # Yahoo index symbols (^SPX, ^NDX, ^VIX, ...): served verbatim by the
+    # public chart endpoint. Kept as its own non-settlement market (D1) so
+    # indices never route through an equity settlement currency.
     "index": ["yahoo", "yfinance", "local"],
 }
 
@@ -262,64 +164,29 @@ PRICE_CALIBER_BY_SOURCE: dict[str, str] = {
     "yahoo": "split_dividend",  # quote series split-adjusted at origin, scaled to adjclose
     "yfinance": "split_dividend",  # auto_adjust=True
     "eastmoney": "split_dividend",  # fqt=1 (forward-adjusted) on every kline call
-    # Tencent's qfq subtracts cash dividends from the price level instead of
-    # scaling by a ratio: between corporate actions qfq = raw + c, and c steps by
-    # the dividend at each ex-date (#1493, measured on 600519.SH where five
-    # constant offsets cover 500 bars). The level is therefore not on the same
-    # scale as the multiplicative sources above, so it gets its own caliber.
-    "tencent": "split_dividend_additive",  # fqkline qfq, additive in dividends
-    "akshare": "split_dividend",  # adjust="qfq", including the stock_us_hist path
-    "baostock": "split_dividend",  # adjustflag="2"
-    "tushare": "split_dividend",  # adj_factor applied via cn_adjust (A-share/fund)
     "tiingo": "split_dividend",  # prefers adjOpen/High/Low/Close, else adjClose/close
     "fmp": "split_dividend",  # Stable historical-price-eod/full, scaled by adjClose/close
-    "gildata": "split_dividend",  # StockDailyQuote restorationStatus=1 (前复权), measured vs live payload
-    # Split-adjusted only.
-    "pykrx": "split",  # get_market_ohlcv_by_date(adjusted=True), Naver-backed
     # Unadjusted.
     "sina": "raw",
     "alphavantage": "raw",  # TIME_SERIES_DAILY, not the _ADJUSTED endpoint
-    "longbridge": "raw",  # pins AdjustType.NoAdjust
 }
 
-#: Per-(source, market) exceptions to the per-source table.
-PRICE_CALIBER_BY_SOURCE_MARKET: dict[tuple[str, str], str] = {
-    # Tushare publishes no HK adjustment-factor series, so its HK path is raw.
-    ("tushare", "hk_equity"): "raw",
-    # Tencent serves no adjusted series for HK at all: its fqkline reply carries
-    # only "day" (never "qfqday"/"hfqday") for HK symbols, so the loader's
-    # ``qfqday or day`` fallback silently serves unadjusted bars and the `,qfq`
-    # request parameter changes nothing. Checked on 00939.HK and 00700.HK against
-    # eastmoney, whose adjusted HK series does differ from its raw one, so the
-    # actions exist and are simply not served here (#1493).
-    ("tencent", "hk_equity"): "raw",
-    # Eastmoney's A-share fqt=1 is additive in the same way, with the same
-    # offsets: 600519.SH fqt=1 - fqt=0 takes five values (-103.46 / -79.58 /
-    # -51.98 / -28.02 / 0) over 500 bars against 367 distinct ratios, and
-    # 601398.SH five against 253 (measured 2026-09-21). akshare's
-    # stock_zh_a_hist(adjust="qfq") requests that endpoint with fqt=1. Their HK
-    # and US series are not measured and keep the per-source label.
-    ("eastmoney", "a_share"): "split_dividend_additive",
-    ("akshare", "a_share"): "split_dividend_additive",
-}
+#: Per-(source, market) exceptions to the per-source table. Empty after the
+#: US/CA refactor: the surviving sources' per-source calibers hold for both
+#: remaining settlement markets, and ``index`` is handled by
+#: ``_INDEX_CALIBER_MARKETS`` below.
+PRICE_CALIBER_BY_SOURCE_MARKET: dict[tuple[str, str], str] = {}
 
-#: Markets with no corporate-action adjustment concept. Their sources stamp
-#: "na" and stay out of mixed-caliber comparisons.
-_NA_CALIBER_MARKETS = frozenset({"crypto", "forex", "futures", "macro"})
+#: Markets with no corporate-action adjustment concept. Empty after the US/CA
+#: refactor: the removed crypto/forex/futures/macro markets were the only ones
+#: with no adjustment concept.
+_NA_CALIBER_MARKETS = frozenset()
 
 #: A price index has no corporate actions, so every source serves the one
-#: unadjusted level, whatever it does to a stock: eastmoney fqt=1 equals fqt=0
-#: on every bar of 000300.SH, 000001.SH, 000016.SH, 000905.SH, 399001.SZ,
-#: 399006.SZ and 899050.BJ, Tencent's fqkline returns only "day" for the six
-#: SSE/SZSE ones (nothing at all for 899050.BJ), and Yahoo's adjclose equals
-#: close on ^GSPC, ^NDX and ^HSI (measured 2026-09-22).
-#: The per-source table stamped them by what the source does to a stock, so an
-#: A-share index read as additive and a Yahoo index as dividend-adjusted (#1541).
-#: Indices stay comparable: a price index beside a dividend-adjusted stock is a
-#: real caliber mix. A-share index codes are exchange-specific: 000001.SH is
-#: the SSE Composite, 000001.SZ is Ping An Bank.
+#: unadjusted level: Yahoo's adjclose equals close on ^GSPC and ^NDX. Indices
+#: stay comparable to one another; a price index beside a dividend-adjusted
+#: stock is a real caliber mix.
 _INDEX_CALIBER_MARKETS = frozenset({"index"})
-_A_SHARE_INDEX_CODE = re.compile(r"^(?:000\d{3}\.SH|399\d{3}\.SZ|899\d{3}\.BJ)$", re.I)
 
 #: Calibers that participate in mixed-caliber comparison. "unknown" and "na"
 #: never do: the first is unmeasured, the second has nothing to adjust for.
@@ -357,7 +224,8 @@ def price_caliber(source: str, market: str | None = None, symbol: str | None = N
     Args:
         source: Loader that served the prices.
         market: Market the symbol belongs to.
-        symbol: The served symbol, needed to tell an A-share index from a stock.
+        symbol: Retained for call-site compatibility; unused after the US/CA
+            refactor (the A-share index special case is gone).
 
     Returns:
         One of "raw", "split", "split_dividend", "split_dividend_additive"
@@ -367,9 +235,7 @@ def price_caliber(source: str, market: str | None = None, symbol: str | None = N
     """
     if market in _NA_CALIBER_MARKETS:
         return "na"
-    if market in _INDEX_CALIBER_MARKETS or (
-        market == "a_share" and symbol is not None and _A_SHARE_INDEX_CODE.match(symbol)
-    ):
+    if market in _INDEX_CALIBER_MARKETS:
         return "raw"
     return PRICE_CALIBER_BY_SOURCE_MARKET.get(
         (source, market), PRICE_CALIBER_BY_SOURCE.get(source, "unknown")
@@ -565,7 +431,7 @@ def resolve_loader(market: str) -> Any:
     ``is_available()`` returns ``True``.
 
     Args:
-        market: Market type key (e.g. ``"a_share"``, ``"crypto"``).
+        market: Market type key (e.g. ``"us_equity"``, ``"ca_equity"``).
 
     Returns:
         A loader instance.
@@ -631,14 +497,7 @@ def get_loader_cls_with_fallback(source: str) -> Type[Any]:
             "local": "Check your Data Bridge config "
             "(~/.vibe-trading/data-bridge/config.yaml) — it must exist and "
             "list at least one source.",
-            "tickerall": "Set TICKERALL_API_KEY and TICKERALL_ACCOUNT_ID.",
             "fmp": "Set FMP_API_KEY.",
-            "nobitex": "Nobitex's public endpoint was unreachable. It quotes in "
-            "Toman (IRT) and has no substitute — check network access "
-            "to apiv2.nobitex.ir.",
-            "wallex": "Wallex's public endpoint was unreachable. It quotes in "
-            "Toman (TMN) and has no substitute — check network access "
-            "to api.wallex.ir.",
         }.get(source, "")
         raise NoAvailableSourceError(
             f"Data source '{source}' is unavailable and does not fall back to a "

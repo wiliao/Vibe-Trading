@@ -15,61 +15,32 @@ DEFAULT_MAX_ROWS = 250
 
 # Symbol -> preferred source. The matched source is a member of its market's
 # fallback chain (registry.FALLBACK_CHAINS), so an unavailable preferred source
-# still degrades gracefully to the rest of the chain. US equities route to the
-# throttle-tolerant Yahoo public endpoint first (lower IP-ban risk than the
-# yfinance SDK), A-shares and HK equities to the never-banned Tencent endpoint.
+# still degrades gracefully to the rest of the chain. US and Canadian equities
+# route to the throttle-tolerant Yahoo public endpoint first (lower IP-ban risk
+# than the yfinance SDK); unmatched formats fall back to Yahoo and are
+# market-validated by ``backtest.engines._market_hooks._detect_market``.
 _SOURCE_PATTERNS = [
     (re.compile(r"^local:", re.I), "local"),
-    (re.compile(r"^\d{6}\.(SZ|SH|BJ)$", re.I), "tencent"),
     (re.compile(r"^[A-Z]+\.US$", re.I), "yahoo"),
-    (re.compile(r"^\d{3,5}\.HK$", re.I), "tencent"),
-    # India: NSE (RELIANCE.NS) / BSE (500325.BO). Tickers may carry '&' and '-'
-    # (e.g. M&M.NS, BAJAJ-AUTO.NS). Served by Yahoo's public chart endpoint.
-    (re.compile(r"^[A-Z0-9&.\-]+\.(NS|BO)$", re.I), "yahoo"),
     # Canada: Toronto Stock Exchange (TD.TO) / TSX Venture (PNG.V).
     (re.compile(r"^[A-Z0-9&.\-]+\.(TO|V)$", re.I), "yahoo"),
-    # Argentina: BYMA equities and CEDEARs use Yahoo's canonical .BA suffix.
-    (re.compile(r"^[A-Z0-9&.\-]+\.BA$", re.I), "yahoo"),
-    # UK: London Stock Exchange (VOD.L, SHEL.L). Yahoo serves the suffix
-    # verbatim; without this they fell through to the tushare default and were
-    # routed to China-market loaders that cannot resolve them.
-    (re.compile(r"^[A-Z0-9&.\-]+\.L$", re.I), "yahoo"),
-    # Yahoo futures (GC=F, CL=F) and forex (EURUSD=X) suffix conventions —
-    # served verbatim by Yahoo's public chart endpoint (#718). Without these,
-    # such symbols fell through to the ``tushare`` default and were routed to
-    # China-market loaders that cannot resolve them.
-    (re.compile(r"^[A-Z0-9]+=F$", re.I), "yahoo"),
-    (re.compile(r"^[A-Z]+=X$", re.I), "yahoo"),
-    # Yahoo index symbols (^SPX, ^GSPC, ^FTSE, ^VIX, ...) — served verbatim,
-    # same convention as =F/=X. Without this they fell to the tushare default.
+    # Yahoo index symbols (^SPX, ^GSPC, ^VIX, ...) — served verbatim.
     (re.compile(r"^\^[A-Za-z0-9.\-]+$", re.I), "yahoo"),
-    # Korea: KOSPI (005930.KS) / KOSDAQ (247540.KQ), 6-digit codes. Served by
-    # pykrx (KRX public data, no auth); registry falls back to Yahoo/yfinance.
-    (re.compile(r"^\d{6}\.(KS|KQ)$", re.I), "pykrx"),
-    (re.compile(r"^[A-Z]+-USDT$", re.I), "okx"),
-    (re.compile(r"^[A-Z]+/USDT$", re.I), "ccxt"),
-    # Iran: Nobitex IRT-quoted crypto pairs (BTCIRT / BTC-IRT). Toman-
-    # denominated public UDF endpoint, no auth; explicit-source only (not in
-    # the crypto fallback chain — non-IRT pairs would never resolve there).
-    (re.compile(r"^[A-Z]+[-/]?IRT$", re.I), "nobitex"),
-    # Iran: Wallex TMN-quoted crypto pairs (USDTTMN / USDT-TMN). Public UDF
-    # endpoint, no auth; explicit-source only like nobitex.
-    (re.compile(r"^[A-Z]+[-/]?TMN$", re.I), "wallex"),
-    # Forex pairs and metals (EUR/USD, XAU/USD, EURUSD.FX). mt5 is the head of
-    # the forex chain and degrades to akshare/yfinance via the registry when no
-    # local MT5 terminal is attached. The 3-letter quote cannot collide with
-    # the 4-letter /USDT crypto rule above.
-    (re.compile(r"^[A-Z]{3}/[A-Z]{3}$", re.I), "mt5"),
-    (re.compile(r"^[A-Z]{6}\.FX$", re.I), "mt5"),
 ]
 
 
 def detect_source(code: str) -> str:
-    """Infer the best loader source for a normalized symbol."""
+    """Infer the best loader source for a normalized symbol.
+
+    Unmatched formats return ``"yahoo"`` — the universal public source for the
+    two surviving markets. Market validity is enforced separately by
+    ``backtest.engines._market_hooks._detect_market``, which fails loud on
+    anything that is not US/CA/index.
+    """
     for pattern, source in _SOURCE_PATTERNS:
         if pattern.match(code):
             return source
-    return "tushare"
+    return "yahoo"
 
 
 

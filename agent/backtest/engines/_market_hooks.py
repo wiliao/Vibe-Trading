@@ -40,112 +40,21 @@ _CN_FUTURES_PRODUCTS = {
 }
 
 
-#: The main continuous contract, spelled ``<product>0`` (``RB0``, ``IF0``).
-#: Built from the product whitelist rather than a width rule, because a
-#: bare ``<letters>0`` is otherwise indistinguishable from an ordinary
-#: ticker; anchoring on the whitelist leaves no collision surface.
-_CN_FUTURES_MAIN_PATTERN = r"^(?:{})0$".format(
-    "|".join(sorted(_CN_FUTURES_PRODUCTS, key=len, reverse=True))
-)
-
 _MARKET_PATTERNS = [
-    (re.compile(r"^\d{6}\.(SZ|SH|BJ)$", re.I), "a_share"),
-    (re.compile(r"^(51|15|56)\d{4}\.(SZ|SH)$", re.I), "a_share"),
     # US equities: tickers may carry a class-share dot (BRK.B.US, BF.B.US)
-    # and a hyphen (e.g. BF-B.US) — same characters as ca/india/uk below.
+    # and a hyphen (e.g. BF-B.US).
     (re.compile(r"^[A-Z0-9&.\-]+\.US$", re.I), "us_equity"),
-    (re.compile(r"^\d{3,5}\.HK$", re.I), "hk_equity"),
-    # India equities: NSE (RELIANCE.NS) / BSE (500325.BO); tickers may carry
-    # '&' and '-' (e.g. M&M.NS, BAJAJ-AUTO.NS).
-    (re.compile(r"^[A-Z0-9&.\-]+\.(NS|BO)$", re.I), "india_equity"),
-    # Korea equities: KOSPI (005930.KS) / KOSDAQ (247540.KQ), 6-digit codes.
-    (re.compile(r"^\d{6}\.(KS|KQ)$", re.I), "kr_equity"),
     # Canada equities: Toronto Stock Exchange (TD.TO) and TSX Venture
     # (PNG.V). Yahoo carries both suffixes verbatim.
     (re.compile(r"^[A-Z0-9&.\-]+\.(TO|V)$", re.I), "ca_equity"),
-    # Argentina: BYMA listings use Yahoo's canonical .BA suffix. Keep this
-    # as a distinct market so ARS can never be mixed with USD/CNY accounting.
-    (re.compile(r"^[A-Z0-9&.\-]+\.BA$", re.I), "ar_equity"),
-    # UK equities: London Stock Exchange (VOD.L, SHEL.L). Yahoo carries the
-    # suffix verbatim.
-    (re.compile(r"^[A-Z0-9&.\-]+\.L$", re.I), "uk_equity"),
-    # Vietnam equities: HOSE (VIC.VN). Tickers are three letters in practice;
-    # the class stays broad to admit fund certificates and ETF codes.
-    (re.compile(r"^[A-Z0-9]+\.VN$", re.I), "vietnam_equity"),
-    (re.compile(r"^[A-Z]+-USDT$", re.I), "crypto"),
-    (re.compile(r"^[A-Z]+/USDT$", re.I), "crypto"),
-    # yfinance's native crypto spelling (BTC-USD, ETH-USD). Distinct from
-    # USDT pairs only in the quote currency; both belong to CryptoEngine.
-    (re.compile(r"^[A-Z]+-USD$", re.I), "crypto"),
-    # Concatenated spot pairs (BTCUSDT, ETHUSDC) with no separator. Same
-    # quote-asset table the trade-journal parser uses; without it these fell
-    # through every pattern and got a_share rules (T+1, no shorting) on a
-    # perpetual. Bare metals/FX (XAUUSD) end in USD, not USDT/USDC/BUSD, so
-    # they still reach the forex whitelist below.
-    (re.compile(r"^[A-Z]{2,}(?:USDT|USDC|BUSD)$", re.I), "crypto"),
-    # China futures: product+delivery.exchange (e.g. IF2406.CFFEX, rb2410.SHFE)
-    # Tushare suffix spellings (SHF/CZC/CFX/GFE) classify here too.
-    (re.compile(r"^[A-Za-z]{1,2}\d{3,4}\.(ZCE|DCE|SHFE|INE|CFFEX|GFEX|SHF|CZC|CFX|GFE)$", re.I), "futures"),
-    # Global futures: product+month-code (e.g. ESZ4, CLF25, GCM2025)
-    (re.compile(r"^[A-Z]{2,4}[FGHJKMNQUVXZ]\d{1,2}$", re.I), "futures"),
-    # Global futures: product+YYMM (e.g. CL2412, ES2503)
-    (re.compile(r"^[A-Z]{2,4}\d{4}$", re.I), "futures"),
-    # Global futures: bare product code with exchange (e.g. ES.CME)
-    (re.compile(r"^[A-Z]{2,4}\.(CME|CBOT|NYMEX|COMEX|ICE|EUREX)$", re.I), "futures"),
-    # Global futures: dated contract carrying its venue (ESZ4.CME, CL2412.NYMEX,
-    # GCM2025.COMEX). The bare dated forms above matched, and the continuous
-    # form with a venue matched, but the combination fell through every pattern
-    # to the a_share default below — a USD contract then priced in CNY under
-    # T+1 with no shorting. Same class as #1394 on the global side. The product
-    # width opens to {1,4} here (not on the bare forms) because a recognized
-    # futures venue already proves the class: CBOT lists single-letter grains
-    # (C, S, W, O), which ``^[A-Z]{2,4}\d{4}$`` cannot express without also
-    # claiming bare codes it has no venue to justify.
-    (re.compile(
-        r"^[A-Z]{1,4}(?:[FGHJKMNQUVXZ]\d{1,2}|\d{4})\.(CME|CBOT|NYMEX|COMEX|ICE|EUREX)$",
-        re.I,
-    ), "futures"),
-    # China futures: main continuous contract (RB0, IF0, MA0). Dated contracts
-    # live ~240 trading days (RB2601 measured at 242), so any backtest longer
-    # than a contract cycle has to name the rolled series. It fell through to
-    # the a_share default, which put a leveraged futures series under T+1 and
-    # no shorting, and kept it out of the futures loader chain entirely.
-    (re.compile(_CN_FUTURES_MAIN_PATTERN, re.I), "futures"),
-    # Forex pairs: XXX/YYY or XXXXXX.FX
-    (re.compile(r"^[A-Z]{3}/[A-Z]{3}$"), "forex"),
-    (re.compile(r"^[A-Z]{6}\.FX$"), "forex"),
-    # Yahoo notations for FX and futures. ``=X`` is Yahoo's forex form
-    # (``XAUUSD=X``, ``EURUSD=X``, ``GBPCNY=X``); ``=F`` is Yahoo's
-    # continuous-front-month futures form (``GC=F``, ``CL=F``, ``SI=F``,
-    # ``HG=F``, ``MGC=F``). The underlying asset classes differ, so the
-    # patterns route to different markets. Both must come BEFORE any
-    # length-based fallback to win over the catch-all US-equity regex below.
-    # The ``=X`` width stays {3,6} as it was on main: this PR only asserts
-    # 6-character pairs, so narrowing it to {6} would drop shorter forms
-    # already covered here for no gain.
-    (re.compile(r"^[A-Z]{3,6}=X$", re.I), "forex"),
-    (re.compile(r"^[A-Z]{2,5}=F$", re.I), "futures"),
-    # Bare 6-character precious-metal / FX symbols (``XAUUSD``, ``XAGUSD``,
-    # ``XPTUSD``, ``XPDUSD``, ``EURUSD``, ``GBPUSD``, ``USDJPY``, ``USDCHF``,
-    # ``AUDUSD``, ``NZDUSD``, ``USDCAD``). Whitelist-restricted to a small
-    # set of base codes so legitimate US tickers of any 6-letter length are
-    # never re-routed. The four metal codes are ISO 4217; the rest are G10
-    # currencies. Length-only patterns (``^[A-Z]{6}$``) are deliberately
-    # rejected — they over-match tickers like ``NFLXLI`` or ``AMZNLY``.
-    (re.compile(
-        r"^(?:XAU|XAG|XPT|XPD|EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD)[A-Z]{3}$",
-        re.I,
-    ), "forex"),
-    # Yahoo index symbols (^SPX, ^NDX, ^FTSE, ^VIX, ...) — served verbatim,
-    # same as the =F/=X conventions. Classified as their own market so they
-    # never route through an equity/China chain or a cash currency. Kept from
-    # main: this PR's branch point predates it.
+    # Yahoo index symbols (^SPX, ^NDX, ^VIX, ...) — served verbatim.
+    # Classified as their own market (D1) so they never route through an
+    # equity settlement currency.
     (re.compile(r"^\^[A-Za-z0-9.\-]+$"), "index"),
     # Bare US tickers (AAPL, MSFT, SPY, T, ...). Must stay LAST so every
-    # suffixed equity / futures / crypto / forex form above wins first.
-    # ``{1,5}`` covers every standard US ticker length while 6-char bare
-    # forex/metals (caught by the whitelist above) and longer unknown codes
-    # fall through to the a_share default.
+    # suffixed form above wins first. ``{1,5}`` covers every standard US
+    # ticker length; longer unknown codes fall through to the fail-loud
+    # default in ``_detect_market``.
     (re.compile(r"^[A-Z]{1,5}$", re.I), "us_equity"),
 ]
 
@@ -156,33 +65,12 @@ _CHINA_EXCHANGES = {"CFFEX", "SHFE", "DCE", "ZCE", "INE", "GFEX"}
 _EXCHANGE_ALIASES = {"SHF": "SHFE", "CZC": "ZCE", "CFX": "CFFEX", "GFE": "GFEX"}
 
 # Supported settlement-currency contract per market. A composite backtest holds
-# one shared capital pool, so a code set spanning two of these would add CNY to
-# USD to KRW as if they were the same unit. The suffix alone cannot prove an
-# LSE line's currency; UK loaders admit only declared GBP/GBp and reject every
-# other/unknown quote before it reaches this table.
+# one shared capital pool, so a code set spanning both markets would add USD to
+# CAD as if they were the same unit.
 _MARKET_CURRENCY = {
-    "a_share": "CNY",
     "us_equity": "USD",
-    "hk_equity": "HKD",
-    "india_equity": "INR",
-    "kr_equity": "KRW",
     "ca_equity": "CAD",
-    "ar_equity": "ARS",
-    "uk_equity": "GBP",
-    "vietnam_equity": "VND",
-    # Every crypto pattern in _MARKET_PATTERNS is USDT-quoted, and USDT is
-    # carried at its USD peg. This is the one approximation in the table: a
-    # depeg would make a crypto+US book wrong by the depeg amount, which is
-    # orders of magnitude below the CNY/USD-style unit error this guard exists
-    # to catch.
-    "crypto": "USD",
 }
-
-# Non-US futures venues. The GlobalFuturesEngine is USD-denominated end to end
-# — margin, commission and contract multipliers are all in USD and it carries
-# no EUR or JPY product — so anything it handles settles in USD unless the
-# symbol names a venue that does not.
-_FUTURES_EXCHANGE_CURRENCY = {"EUREX": "EUR"}
 
 
 # HKEX's Stock Code Allocation Plan (updated 2026-03-12) assigns a trading
@@ -233,30 +121,15 @@ def code_currency(code: str) -> str:
         code: Ticker / symbol string.
 
     Returns:
-        A currency code such as ``"CNY"``. A forex pair resolves to its quote
-        currency and Chinese futures to ``"CNY"``. A symbol whose currency
+        A currency code such as ``"USD"`` or ``"CAD"``. A symbol whose currency
         cannot be established returns a ``"UNKNOWN:<market>"`` marker rather
         than a guess, so a homogeneous set still compares equal while a mixed
         one cannot pass a same-currency check by accident.
     """
     code = strip_local_prefix(code)
     market = _detect_market(code)
-    if market == "hk_equity":
-        return hk_counter_currency(code) or _MARKET_CURRENCY[market]
     if market in _MARKET_CURRENCY:
         return _MARKET_CURRENCY[market]
-    if market == "forex":
-        pair = code.upper().replace("/", "")
-        if pair.endswith(".FX"):
-            pair = pair[:-3]
-        if pair.endswith("=X"):
-            pair = pair[:-2]
-        return pair[3:6] if len(pair) == 6 else "UNKNOWN:forex"
-    if market == "futures":
-        if _is_china_futures(code):
-            return "CNY"
-        exchange = code.upper().rpartition(".")[2]
-        return _FUTURES_EXCHANGE_CURRENCY.get(exchange, "USD")
     return f"UNKNOWN:{market}"
 
 def strip_local_prefix(code: str) -> str:
@@ -282,20 +155,24 @@ def _detect_market(code: str) -> str:
         code: Ticker / symbol string.
 
     Returns:
-        Market type (a_share/us_equity/hk_equity/india_equity/kr_equity/
-        ca_equity/ar_equity/crypto/futures/forex).
-        Bare 1-5 letter alphabetic tickers resolve to ``us_equity``;
-        bare 6-letter codes that start with a precious-metal or G10
-        currency code (whitelist) resolve to ``forex``; concatenated
-        crypto pairs (``BTCUSDT``) resolve to ``crypto``; Yahoo's
-        ``=F`` (futures) and ``=X`` (forex) notations are recognized;
-        any other unknown format defaults to ``a_share``.
+        One of ``"us_equity"``, ``"ca_equity"`` or ``"index"``. Bare 1-5
+        letter alphabetic tickers resolve to ``us_equity``; ``.US``,
+        ``.TO``/``.V`` and ``^``-prefixed index symbols resolve to their
+        markets. Any format that matches no pattern is a user error in a
+        US/CA-only build and raises ``ValueError`` (fail loud) rather than
+        silently misrouting to a removed market.
+
+    Raises:
+        ValueError: The symbol matches no supported US/CA/index pattern.
     """
     symbol = strip_local_prefix(code)
     for pattern, market in _MARKET_PATTERNS:
         if pattern.match(symbol):
             return market
-    return "a_share"
+    raise ValueError(
+        f"Unsupported symbol format {code!r}: expected a US ticker "
+        f"(bare or .US), a Canadian ticker (.TO/.V), or a ^-prefixed index."
+    )
 
 
 def _is_china_futures(code: str) -> bool:
