@@ -51,7 +51,7 @@ class TestLoaderContract:
     def test_class_attributes(self) -> None:
         loader = DataLoader()
         assert loader.name == "eastmoney"
-        assert loader.markets == {"a_share", "hk_equity", "us_equity"}
+        assert loader.markets == {"us_equity"}
         assert loader.requires_auth is False
 
     def test_is_available_true(self) -> None:

@@ -42,11 +42,8 @@ dependencies = [
     "duckdb>=1.2.0",
     "scikit-learn>=1.3.0",
     "joblib>=1.3.0",
-    "tushare>=1.2.89",
     "requests>=2.31.0",
     "yfinance>=0.2.30",
-    "akshare>=1.12.0",
-    "ccxt>=4.5.71",
     "aiohttp>=3.14.3",
     "cryptography>=50.0.0",
     "fastapi>=0.104.0",
@@ -114,27 +111,6 @@ include = ["src*", "backtest*", "cli*", "evals*"]
 ibkr = [
     "ib_async>=2.0",
 ]
-longbridge = [
-    "longbridge>=0.2.5",
-]
-mt5 = [
-    # Official Windows-only bridge to a locally running MetaTrader 5 terminal
-    # (broker connector + mt5 data loader). Lazy-imported; on other platforms
-    # the marker makes this a no-op and everything degrades gracefully.
-    "MetaTrader5>=5.0.45; sys_platform == 'win32'",
-]
-zerodha = [
-    # Zerodha Kite Connect (India NSE/BSE) broker connector + india_broker
-    # loader backend. Lazy-imported with a named error; zerodha_available()
-    # stays False (loader falls through to Shoonya/Dhan) until installed.
-    "kiteconnect>=4.0.0",
-]
-upbit = [
-    # Upbit (Korea, KRW crypto) broker connector JWT signing. Lazy-imported
-    # with a named error naming this extra; upbit_jwt_available() stays False
-    # until installed.
-    "PyJWT>=2.8.0",
-]
 deepseek = [
     "langchain-deepseek>=1.0.0,<2",
 ]
@@ -157,11 +133,6 @@ openbb = [
     # when this import succeeds, so a base install stays unaffected.
     "openbb-ai>=2.0.0,<3",
 ]
-krx = [
-    # Free, no-auth Korea (KRX: KOSPI/KOSDAQ) EOD OHLCV. Without this extra
-    # the kr_equity chain falls back to yahoo/yfinance (.KS/.KQ suffixes).
-    "pykrx>=1.0.45",
-]
 stats = [
     # Econometrics behind src/quantlib/timeseries: stationarity (ADF),
     # cointegration, Granger causality, Ljung-Box, VIF and GARCH. Those
@@ -169,12 +140,6 @@ stats = [
     # extra, so the base install stays lean and nothing silently degrades.
     "statsmodels>=0.14",
     "arch>=6.0",
-]
-ashare = [
-    # Free, no-auth A-share source over BaoStock's TCP protocol; bypasses the
-    # HTTP CDN IP blocks that affect eastmoney-backed sources. The Tencent
-    # A-share loader needs no extra dependency (stdlib HTTP only).
-    "baostock>=0.8.8",
 ]
 harmonic = [
     "pyharmonics>=1.5.0",

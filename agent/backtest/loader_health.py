@@ -20,29 +20,14 @@ import sys
 import tempfile
 
 CANARY_SYMBOLS = {
-    "akshare": "601398.SH",
-    "baostock": "sh.601398",
-    "binance": "BTC-USDT",
-    "ccxt": "BTC-USDT",
-    "eastmoney": "601398.SH",
-    "mootdx": "601398.SH",
-    "nobitex": "BTC-IRT",
-    "okx": "BTC-USDT",
-    "pykrx": "005930.KS",
+    "eastmoney": "AAPL.US",
     "sina": "AAPL.US",
     "stooq": "AAPL.US",
-    "tencent": "601398.SH",
-    "wallex": "BTC-TMN",
     "yahoo": "AAPL",
     "yfinance": "AAPL",
 }
 EXCLUDED_PUBLIC_SOURCES = {"local": "operator files, not a public endpoint"}
 DEPENDENCIES = {
-    "akshare": "akshare",
-    "baostock": "baostock",
-    "ccxt": "ccxt",
-    "mootdx": "mootdx",
-    "pykrx": "pykrx",
     "yfinance": "yfinance",
 }
 FRESHNESS_DAYS = 14

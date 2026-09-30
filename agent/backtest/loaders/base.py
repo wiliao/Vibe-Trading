@@ -466,7 +466,10 @@ _LOADER_CACHE_TRUE_VALUES = {"1", "true", "yes", "on"}
 # persisted. v5 USD/unknown .L entries must never be served as static GBP.
 # v7: tencent fqkline paginates backward (#1410) — entries cached under the
 # forward walk hold tail-truncated multi-year series and must never be served.
-_LOADER_CACHE_VERSION = 7
+# v8: US/CA refactor — removed-market loaders (tushare/akshare/ccxt/…) and their
+# source names are gone; a frame cached by a deleted source must not be served
+# into a build whose chain no longer contains it.
+_LOADER_CACHE_VERSION = 8
 _LOADER_FRAME_METADATA_ATTRS = ("quote_currency", "currency_conversion")
 
 

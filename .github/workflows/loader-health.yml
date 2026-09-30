@@ -23,8 +23,8 @@ jobs:
           python-version: '3.11'
           cache: pip
       - name: Install isolated public-source dependencies
-        # mootdx requires an older httpx than the application; do not install
-        # these optional SDKs into the application's dependency environment.
+        # No optional SDKs are needed for the surviving yahoo/yfinance canary;
+        # keep this environment separate from the full application regardless.
         run: |
           python -m venv "$RUNNER_TEMP/loader-health-venv"
           "$RUNNER_TEMP/loader-health-venv/bin/python" -m pip install -r tools/requirements-loader-health.txt

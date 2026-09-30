@@ -13,7 +13,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from backtest.loaders import longbridge as longbridge_loader
 from src.live.classification import ToolClass
 from src.trading.connectors.longbridge import credentials as lb_credentials
 from src.trading import profiles, service
@@ -250,35 +249,6 @@ def test_connector_uses_environment_credentials(monkeypatch, tmp_path) -> None:
     assert cfg.region == "cn"
     monkeypatch.setattr(lb, "longbridge_available", lambda: False)
     assert lb.check_status(cfg)["credential_source"] == "environment"
-
-
-def test_loader_and_connector_resolve_same_source(monkeypatch, tmp_path) -> None:
-    values = {
-        "app_key": "shared-file-key",
-        "app_secret": "shared-file-secret",
-        "access_token": "shared-file-token",
-    }
-    for env_name in (
-        "LONGBRIDGE_APP_KEY",
-        "LONGBRIDGE_APP_SECRET",
-        "LONGBRIDGE_ACCESS_TOKEN",
-    ):
-        monkeypatch.delenv(env_name, raising=False)
-    (tmp_path / "longbridge.json").write_text(json.dumps(values), encoding="utf-8")
-    monkeypatch.setattr(lb, "get_runtime_root", lambda: tmp_path)
-    monkeypatch.setattr(lb_credentials, "get_runtime_root", lambda: tmp_path)
-
-    connector = lb.build_config()
-    loader = longbridge_loader.LongbridgeLoader()
-
-    assert (connector.app_key, connector.app_secret, connector.access_token) == (
-        loader._app_key,
-        loader._app_secret,
-        loader._access_token,
-    )
-    monkeypatch.setattr(lb, "longbridge_available", lambda: False)
-    assert lb.check_status(connector)["credential_source"] == "runtime_file"
-    assert loader._credential_source == "runtime_file"
 
 
 def test_connector_reports_conflict_without_sdk_call(monkeypatch, tmp_path) -> None:

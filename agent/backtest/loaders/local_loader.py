@@ -221,7 +221,7 @@ class DataLoader:
     """Config-driven local data loader for CSV, Parquet, and DuckDB."""
 
     name = "local"
-    markets = {"us_equity", "a_share", "hk_equity", "crypto", "futures", "forex", "macro", "fund"}
+    markets = {"us_equity", "ca_equity"}
     requires_auth = False
 
     def __init__(self) -> None:

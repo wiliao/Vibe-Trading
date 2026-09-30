@@ -43,6 +43,8 @@ DELETIONS: list[tuple[str, str, str, str]] = [
     ("agent/backtest/loaders/tickerall_loader.py", "file", "2", "premium aggregator"),
     ("agent/backtest/loaders/qveris_loader.py", "file", "2", "premium aggregator"),
     ("agent/backtest/loaders/cn_adjust.py", "file", "2", "A-share adjustment factors"),
+    ("agent/backtest/loaders/akshare_loader.py", "file", "2", "A-share source (D2: drop)"),
+    ("agent/backtest/loaders/longbridge.py", "file", "2", "HK/US broker feed (D2: drop)"),
     # eastmoney_client.py is conditional (kept if the US eastmoney path uses it).
 
     # --- Phase 3: backtest engines + crypto evidence --------------------------
@@ -78,6 +80,7 @@ DELETIONS: list[tuple[str, str, str, str]] = [
     ("agent/src/tools/iwencai_tool.py", "file", "5", "A-share iwencai search"),
     ("agent/src/tools/taiwan_stock_data_tool.py", "file", "5", "Taiwan market"),
     ("agent/src/tools/tushare_fallbacks.py", "file", "5", "A-share fallback support"),
+    ("agent/src/tools/orderbook_depth_tool.py", "file", "5", "crypto orderbook tool (ccxt)"),
     # market_screener_tool.py is ported to SP500 (decision D5), not deleted.
 
     # --- Phase 6: broker connectors -------------------------------------------

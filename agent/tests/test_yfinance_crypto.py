@@ -49,14 +49,8 @@ class TestToYfinanceSymbolCrypto:
 
 
 class TestDataLoaderCryptoMarket:
-    def test_crypto_in_markets(self) -> None:
-        assert "crypto" in DataLoader.markets
-
     def test_us_equity_still_supported(self) -> None:
         assert "us_equity" in DataLoader.markets
-
-    def test_hk_equity_still_supported(self) -> None:
-        assert "hk_equity" in DataLoader.markets
 
     def test_canadian_equity_supported(self) -> None:
         assert "ca_equity" in DataLoader.markets
