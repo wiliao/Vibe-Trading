@@ -47,8 +47,6 @@ from backtest.loaders.base import (
 from backtest.engines._market_hooks import (  # noqa: F401  (re-exported)
     _detect_market,
     _detect_submarket,
-    _is_china_futures,
-    hk_counter_currency,
     strip_local_prefix,
 )
 from backtest.rebalance_mask import RebalanceMask, validate_rebalance_mask
@@ -838,26 +836,14 @@ def _validate_signal_engine_class(engine_cls) -> None:
 
 
 # --- Market detection ---
-# ``_MARKET_PATTERNS``, ``_detect_market``, ``_is_china_futures``,
-# ``_detect_submarket`` are imported from ``_market_hooks`` above and
-# re-exported here for back-compat (swarm/grounding.py, tests).
+# ``_MARKET_PATTERNS``, ``_detect_market`` and ``_detect_submarket`` are
+# imported from ``_market_hooks`` above and re-exported here for back-compat
+# (swarm/grounding.py, tests).
 
 # Back-compat: market type -> legacy source name (for engine selection & metrics)
 _MARKET_TO_SOURCE = {
-    "a_share": "tushare",
     "us_equity": "yfinance",
-    "hk_equity": "yfinance",
-    "india_equity": "yahoo",
-    "kr_equity": "pykrx",
     "ca_equity": "yahoo",
-    "ar_equity": "yahoo",
-    "uk_equity": "yahoo",
-    "vietnam_equity": "yahoo",
-    "crypto": "okx",
-    "futures": "tushare",
-    "fund": "tushare",
-    "macro": "akshare",
-    "forex": "akshare",
     "index": "yahoo",
 }
 
@@ -869,10 +855,16 @@ def _detect_source(code: str) -> str:
         code: Ticker / symbol string.
 
     Returns:
-        Source name (tushare/okx/yfinance/akshare).
+        Source name (yfinance/yahoo).
+
+    Raises:
+        ValueError: The detected market has no legacy source mapping.
     """
     market = _detect_market(code)
-    return _MARKET_TO_SOURCE.get(market, "tushare")
+    source = _MARKET_TO_SOURCE.get(market)
+    if source is None:
+        raise ValueError(f"No legacy source mapping for market {market!r}")
+    return source
 
 
 def _group_codes_by_market(codes: List[str]) -> Dict[str, List[str]]:
@@ -1478,134 +1470,47 @@ def _annualisation_bars(
 
 
 def _create_market_engine(source: str, config: dict, codes: List[str]):
-    """Create the appropriate market engine based on data source and market type.
+    """Create the market engine for a US / Canada / index code set.
 
-    Routing priority:
-      1. Detect market type from symbol patterns (futures, forex, etc.)
-      2. Fall back to source-based routing (okx->crypto, tushare->china_a, etc.)
+    Routing follows the instrument market only:
+      - a multi-market basket goes to ``CompositeEngine``;
+      - index symbols price as US-listed instruments;
+      - US / Canada equities use ``GlobalEquityEngine`` with the submarket.
 
     Args:
-        source: Data source (okx/ccxt/tushare/akshare/yfinance).
+        source: Data source name (retained for call-site compatibility; the
+            engine is chosen from the codes, not the loader name).
         config: Backtest configuration.
         codes: Instrument codes.
 
     Returns:
         BaseEngine subclass instance.
-    """
-    # Detect dominant market type from codes
-    markets = {_detect_market(c) for c in codes} if codes else set()
 
-    # The Hong Kong pool books in HKD. HKEX numbers its RMB and USD counters
-    # in their own code ranges, and no source in the hk_equity chain but Yahoo
-    # declares a currency, so the code decides before any engine prices them.
-    foreign_counters = sorted(
-        f"{c} ({hk_counter_currency(c)})"
-        for c in codes
-        if _detect_market(c) == "hk_equity" and hk_counter_currency(c) not in (None, "HKD")
-    )
-    if foreign_counters:
-        raise ValueError(
-            "Hong Kong backtests book in HKD, but these codes are HKEX counters traded "
-            f"in another currency: {', '.join(foreign_counters)}. Use the HKD-traded "
-            "counter of the same security instead."
-        )
+    Raises:
+        ValueError: The code set names no supported market.
+    """
+    markets = {_detect_market(c) for c in codes} if codes else set()
 
     # Cross-market -> CompositeEngine
     if len(markets) > 1:
         from backtest.engines.composite import CompositeEngine
         return CompositeEngine(config, codes)
 
-    # Futures routing (Wave 2)
-    if "futures" in markets:
-        # Distinguish China vs global futures by exchange suffix
-        if any(_is_china_futures(c) for c in codes):
-            from backtest.engines.china_futures import ChinaFuturesEngine
-            return ChinaFuturesEngine(config)
-        from backtest.engines.global_futures import GlobalFuturesEngine
-        return GlobalFuturesEngine(config)
-
-    # Forex routing (Wave 2)
-    if "forex" in markets:
-        from backtest.engines.forex import ForexEngine
-        return ForexEngine(config)
-
-    # India equity routing — must precede source-based routing because India's
-    # effective source is ``yahoo``, which has no Wave-1 branch and would
-    # otherwise fall through to the crypto default.
-    if "india_equity" in markets:
-        from backtest.engines.india_equity import IndiaEquityEngine
-        return IndiaEquityEngine(config)
-
-    # Korea equity routing — same reason as India: its effective source
-    # (``pykrx``) has no Wave-1 branch and would fall through to the default.
-    if "kr_equity" in markets:
-        from backtest.engines.korea_equity import KoreaEquityEngine
-        return KoreaEquityEngine(config)
-
-    # Vietnam equity routing — same reason as India and Korea: its effective
-    # source (``yahoo``) has no Wave-1 branch and would fall through to the
-    # default.
-    if "vietnam_equity" in markets:
-        from backtest.engines.vietnam_equity import VietnamEquityEngine
-        return VietnamEquityEngine(config)
-    # Argentina market-data routing is supported, but BYMA execution rules
-    # are not modeled yet. Fail closed instead of silently applying US/crypto
-    # commissions, lot sizes, settlement, or short-selling assumptions.
-    if "ar_equity" in markets:
-        raise ValueError(
-            "Argentina .BA market data is supported, but Argentina backtest "
-            "execution rules are not modeled yet"
-        )
-
-    # Index symbols (^SPX, ^FTSE, ...) — priced like a US/global-listed
-    # instrument (GlobalEquityEngine, US rules) and never the China/crypto
-    # default the source-based fallback would pick.
+    # Index symbols (^SPX, ^VIX, ...) price like a US-listed instrument.
     if "index" in markets:
         from backtest.engines.global_equity import GlobalEquityEngine
         return GlobalEquityEngine(config, market=_detect_submarket(codes))
 
-    # Original routing (Wave 1)
-    if source in ("okx", "ccxt"):
-        from backtest.engines.crypto import CryptoEngine
-        return CryptoEngine(config)
-    elif source in ("tushare", "akshare"):
-        if markets & {"us_equity", "hk_equity", "ca_equity", "uk_equity"}:
-            from backtest.engines.global_equity import GlobalEquityEngine
-            market = _detect_submarket(codes)
-            return GlobalEquityEngine(config, market=market)
-        from backtest.engines.china_a import ChinaAEngine
-        return ChinaAEngine(config)
-    elif source == "yfinance":
-        # yfinance serves crypto pairs (BTC-USDT, BTC-USD) next to equities,
-        # so route on the instrument market here too. Handing crypto to
-        # GlobalEquityEngine applies zero-commission equity rules while the
-        # CryptoEngine fee keys (taker_rate/maker_rate/slippage) sit ignored
-        # in the config, and nothing warns.
-        if "crypto" in markets:
-            from backtest.engines.crypto import CryptoEngine
-            return CryptoEngine(config)
+    # US / Canada equity.
+    if markets & {"us_equity", "ca_equity"}:
         from backtest.engines.global_equity import GlobalEquityEngine
-        market = _detect_submarket(codes)
-        return GlobalEquityEngine(config, market=market)
-    else:
-        # Sources without a dedicated branch (local, stooq, tencent, ...):
-        # follow the instrument market rather than the loader name, so e.g. a
-        # local AAPL.US dataset gets US-equity execution rules instead of crypto.
-        if markets & {"us_equity", "hk_equity", "ca_equity", "uk_equity"}:
-            from backtest.engines.global_equity import GlobalEquityEngine
-            market = _detect_submarket(codes)
-            return GlobalEquityEngine(config, market=market)
-        # A-shares need the same treatment. Every branchless source that serves
-        # them -- local, tencent, eastmoney, baostock, mootdx, sina -- used to
-        # land here and fall through to the crypto default, which applies none
-        # of the A-share rules (stamp tax, T+1, price limits, 100-share lots)
-        # and does charge an 8-hourly perpetual funding fee against the
-        # position. The run still succeeds, which is what makes it dangerous.
-        if "a_share" in markets:
-            from backtest.engines.china_a import ChinaAEngine
-            return ChinaAEngine(config)
-        from backtest.engines.crypto import CryptoEngine
-        return CryptoEngine(config)
+        return GlobalEquityEngine(config, market=_detect_submarket(codes))
+
+    raise ValueError(
+        "No engine for market set "
+        f"{sorted(markets) or 'empty'}: backtests support US, Canada, and "
+        "index symbols only."
+    )
 
 
 def _detect_primary_source(codes: List[str], source: str) -> str:

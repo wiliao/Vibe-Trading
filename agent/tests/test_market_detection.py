@@ -94,8 +94,8 @@ class TestCodeCurrency:
     def test_settlement_currency(self, code: str, expected: str) -> None:
         assert code_currency(code) == expected
 
-    def test_index_has_no_settlement_currency(self) -> None:
-        assert code_currency("^SPX") == "UNKNOWN:index"
+    def test_index_is_usd_comparable(self) -> None:
+        assert code_currency("^SPX") == "USD"
 
 
 class TestDetectSource:

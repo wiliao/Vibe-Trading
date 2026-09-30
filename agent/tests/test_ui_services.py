@@ -128,7 +128,7 @@ def test_fetch_data_map_does_not_expose_config_mutables_to_loader(
     )
 
     class MutatingLoader:
-        name = "tushare"
+        name = "yahoo"
 
         def fetch(self, codes, start_date, end_date, **kwargs):
             kwargs["fields"].append("injected")
@@ -136,10 +136,10 @@ def test_fetch_data_map_does_not_expose_config_mutables_to_loader(
 
     monkeypatch.setattr(runner, "_get_loader", lambda source: MutatingLoader)
     config = {
-        "codes": ["000001.SZ"],
+        "codes": ["AAPL.US"],
         "start_date": "2026-01-01",
         "end_date": "2026-01-02",
-        "source": "tushare",
+        "source": "yahoo",
         "extra_fields": ["amount"],
     }
 
@@ -240,32 +240,6 @@ def test_main_reuses_explicit_source_snapshot(
 
     assert CountingLoader.calls == 1
     assert observed["close"] == 10.0
-
-
-def test_fetch_auto_restores_original_crypto_symbol(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    frame = pd.DataFrame(
-        {"open": [1.0], "high": [1.0], "low": [1.0], "close": [1.0]},
-        index=pd.DatetimeIndex([pd.Timestamp("2026-01-01")]),
-    )
-
-    class OkxLoader:
-        name = "okx"
-
-        def fetch(self, codes, start_date, end_date, **kwargs):
-            del start_date, end_date, kwargs
-            assert codes == ["BTC-USDT"]
-            return {"BTC-USDT": frame}
-
-    monkeypatch.setattr(runner, "resolve_loader", lambda market: OkxLoader())
-
-    result = runner._fetch_auto(
-        ["BTC/USDT"],
-        {"start_date": "2026-01-01", "end_date": "2026-01-02"},
-    )
-
-    assert list(result) == ["BTC/USDT"]
 
 
 def test_fetch_auto_falls_back_only_for_missing_symbols(

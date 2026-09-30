@@ -70,7 +70,7 @@ def test_unavailable_endpoint_is_not_skipped(monkeypatch):
 
     monkeypatch.setitem(
         LOADER_REGISTRY,
-        "tencent",
+        "yahoo",
         type(
             "Loader",
             (),
@@ -80,7 +80,7 @@ def test_unavailable_endpoint_is_not_skipped(monkeypatch):
             },
         ),
     )
-    assert health.probe("tencent", TODAY) == {
+    assert health.probe("yahoo", TODAY) == {
         "status": "unavailable",
         "reason": "availability_probe_failed",
         "attempts": 2,
@@ -98,7 +98,7 @@ def test_network_error_is_sanitized_and_retried(monkeypatch):
 
     monkeypatch.setitem(
         LOADER_REGISTRY,
-        "tencent",
+        "yahoo",
         type(
             "Loader",
             (),
@@ -109,7 +109,7 @@ def test_network_error_is_sanitized_and_retried(monkeypatch):
             },
         ),
     )
-    result = health.probe("tencent", TODAY)
+    result = health.probe("yahoo", TODAY)
     assert result["status"] == "unreachable" and len(calls) == 2
     assert "secret" not in json.dumps(result)
 
@@ -120,11 +120,11 @@ def test_child_deadline_is_failure(monkeypatch):
         raise subprocess.TimeoutExpired(args[0], 0.1)
 
     monkeypatch.setattr(health.subprocess, "run", timeout)
-    assert health.run_source("tencent", TODAY, 0.1)["status"] == "timeout"
+    assert health.run_source("yahoo", TODAY, 0.1)["status"] == "timeout"
 
 
 def test_real_child_is_killed_at_deadline():
-    assert health.run_source("tencent", TODAY, 0.001)["status"] == "timeout"
+    assert health.run_source("yahoo", TODAY, 0.001)["status"] == "timeout"
 
 
 @pytest.mark.parametrize(
@@ -167,7 +167,7 @@ def test_child_report_handling(monkeypatch, payload, status):
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(health.subprocess, "run", child)
-    assert health.run_source("tencent", TODAY, 1)["status"] == status
+    assert health.run_source("yahoo", TODAY, 1)["status"] == status
 
 
 def test_second_attempt_recovers_without_fallback(monkeypatch):
@@ -179,11 +179,11 @@ def test_second_attempt_recovers_without_fallback(monkeypatch):
         calls.append(codes)
         if len(calls) == 1:
             return {}
-        return {"601398.SH": frame()}
+        return {"AAPL": frame()}
 
     monkeypatch.setitem(
         LOADER_REGISTRY,
-        "tencent",
+        "yahoo",
         type(
             "Loader",
             (),
@@ -194,6 +194,6 @@ def test_second_attempt_recovers_without_fallback(monkeypatch):
             },
         ),
     )
-    result = health.probe("tencent", TODAY)
+    result = health.probe("yahoo", TODAY)
     assert result["status"] == "healthy" and result["attempts"] == 2
-    assert calls == [["601398.SH"], ["601398.SH"]]
+    assert calls == [["AAPL"], ["AAPL"]]

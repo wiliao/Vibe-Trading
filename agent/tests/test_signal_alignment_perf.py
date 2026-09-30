@@ -21,7 +21,7 @@ from backtest.engines.base import (
     _ffill_1d,
     _ffill_2d,
 )
-from backtest.engines.china_a import ChinaAEngine
+from backtest.engines.global_equity import GlobalEquityEngine
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ class TestAlignGoldStandard:
         # New (optimized) path
         dates_opt, close_opt, _, pos_opt, _ = _align(data_map, signal_map, list(codes))
         codes_opt = list(pos_opt.columns)
-        engine_opt = ChinaAEngine({"initial_cash": 1_000_000})
+        engine_opt = GlobalEquityEngine({"initial_cash": 1_000_000})
         engine_opt._execute_bars(dates_opt, data_map, close_opt, pos_opt, codes_opt)
         equity_opt = pd.Series(
             [s.equity for s in engine_opt.equity_snapshots],
@@ -296,7 +296,7 @@ class TestAlignGoldStandard:
             data_map, signal_map, list(codes)
         )
         codes_ref = list(pos_ref.columns)
-        engine_ref = ChinaAEngine({"initial_cash": 1_000_000})
+        engine_ref = GlobalEquityEngine({"initial_cash": 1_000_000})
         engine_ref._execute_bars(dates_ref, data_map, close_ref, pos_ref, codes_ref)
         equity_ref = pd.Series(
             [s.equity for s in engine_ref.equity_snapshots],
@@ -504,7 +504,7 @@ class TestExecuteBarsOptimization:
         # Sync codes after potential all-NaN drops
         codes = [c for c in codes if c in target_pos.columns]
 
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
         engine._execute_bars(dates, data_map, close_df, target_pos, codes)
         return engine, dates, close_df, target_pos, codes
 
@@ -784,7 +784,7 @@ class TestFundPanelCompatibility:
         dates, close_df, _, target_pos, _ = _align(data_map, signal_map, list(codes))
         valid_codes = [c for c in codes if c in target_pos.columns]
 
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
         engine._execute_bars(dates, data_map, close_df, target_pos, valid_codes)
 
         # Should complete with equity snapshots for every bar

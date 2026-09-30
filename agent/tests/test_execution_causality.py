@@ -6,14 +6,8 @@ import pandas as pd
 import pytest
 
 from backtest.engines.base import BaseEngine
-from backtest.engines.china_a import ChinaAEngine
-from backtest.engines.china_futures import ChinaFuturesEngine
 from backtest.engines.composite import CompositeEngine
-from backtest.engines.crypto import CryptoEngine
-from backtest.engines.forex import ForexEngine
 from backtest.engines.global_equity import GlobalEquityEngine
-from backtest.engines.global_futures import GlobalFuturesEngine
-from backtest.engines.india_equity import IndiaEquityEngine
 
 
 class _FrictionlessEngine(BaseEngine):
@@ -82,45 +76,6 @@ def test_rotation_is_independent_of_close_open_symbol_order() -> None:
     assert [symbol for symbol, _, _ in a_first_trades] == ["A", "B"]
 
 
-def test_open_signal_exit_precedes_close_based_liquidation() -> None:
-    dates = pd.date_range("2026-01-05", periods=2, freq="D")
-    bars = pd.DataFrame(
-        {
-            "open": [100.0, 100.0],
-            "high": [100.0, 100.0],
-            "low": [100.0, 10.0],
-            "close": [100.0, 10.0],
-        },
-        index=dates,
-    )
-    symbol = "BTC-USDT"
-    close_df = pd.DataFrame({symbol: bars["close"]}, index=dates)
-    target_pos = pd.DataFrame({symbol: [1.0, 0.0]}, index=dates)
-    engine = CryptoEngine(
-        {
-            "initial_cash": 1_000.0,
-            "leverage": 10.0,
-            "maker_rate": 0.0,
-            "taker_rate": 0.0,
-            "slippage": 0.0,
-            "funding_rate": 0.0,
-        }
-    )
-
-    engine._execute_bars(
-        dates,
-        {symbol: bars},
-        close_df,
-        target_pos,
-        [symbol],
-    )
-
-    assert len(engine.trades) == 1
-    assert engine.trades[0].exit_reason == "signal"
-    assert engine.trades[0].exit_price == 100.0
-    assert engine.capital == 1_000.0
-
-
 class _FeeEngine(_FrictionlessEngine):
     def calc_commission(self, size, price, direction, is_open):
         return 10.0
@@ -160,13 +115,7 @@ def _engine_case(name: str, codes: list[str], reverse: bool) -> tuple[BaseEngine
         "funding_rate": 0.0,
     }
     factories = {
-        "china_a": lambda: ChinaAEngine(config),
         "global_equity": lambda: GlobalEquityEngine(config, market="us"),
-        "crypto": lambda: CryptoEngine(config),
-        "china_futures": lambda: ChinaFuturesEngine(config),
-        "global_futures": lambda: GlobalFuturesEngine(config),
-        "forex": lambda: ForexEngine(config),
-        "india_equity": lambda: IndiaEquityEngine(config),
         "composite": lambda: CompositeEngine(config, ordered),
     }
     return factories[name](), ordered
@@ -175,14 +124,8 @@ def _engine_case(name: str, codes: list[str], reverse: bool) -> tuple[BaseEngine
 @pytest.mark.parametrize(
     ("name", "codes"),
     [
-        ("china_a", ["000001.SZ", "000002.SZ"]),
         ("global_equity", ["AAPL.US", "MSFT.US"]),
-        ("crypto", ["BTC-USDT", "ETH-USDT"]),
-        ("china_futures", ["IF2406.CFFEX", "IF2407.CFFEX"]),
-        ("global_futures", ["ESZ4", "ESH5"]),
-        ("forex", ["EUR/USD", "GBP/USD"]),
-        ("india_equity", ["RELIANCE.NS", "TCS.NS"]),
-        ("composite", ["AAPL.US", "BTC-USDT"]),
+        ("composite", ["AAPL.US", "^SPX"]),
     ],
 )
 def test_engine_family_execution_is_code_order_independent(

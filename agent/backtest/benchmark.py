@@ -22,12 +22,7 @@ from backtest.metrics import bar_returns, buy_and_hold_return
 
 MARKET_BENCHMARKS: dict[str, Optional[str]] = {
     "us_equity":  "SPY",
-    "hk_equity":  "HK.03100",   # Hang Seng China Enterprises ETF
     "ca_equity":  "XIC.TO",     # S&P/TSX Capped Composite ETF
-    "a_share":    "000300.SH",  # CSI 300 (China A-share core index)
-    "crypto":     "BTC-USDT",
-    "futures":    "ES.CME",      # E-mini S&P 500 futures
-    "forex":      None,         # no universal benchmark
 }
 
 

@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 
 from backtest.benchmark import BenchmarkResult
-from backtest.engines.china_a import ChinaAEngine
+from backtest.engines.global_equity import GlobalEquityEngine
 from backtest.metrics import bar_returns, buy_and_hold_return
 
 
@@ -75,7 +75,7 @@ def test_excess_return_matches_corrected_benchmark_return(monkeypatch, tmp_path)
         "backtest.benchmark.resolve_benchmark", lambda **kwargs: fake_result
     )
 
-    engine = ChinaAEngine({"initial_cash": 1_000_000.0})
+    engine = GlobalEquityEngine({"initial_cash": 1_000_000.0})
     metrics = engine.run_backtest(
         _config(tmp_path, dates), _FakeLoader(bars), _FlatSignal(), tmp_path
     )
@@ -118,7 +118,7 @@ def test_excess_return_unaffected_when_no_external_benchmark(tmp_path):
         "initial_cash": 1_000_000.0,
     }
 
-    engine = ChinaAEngine({"initial_cash": 1_000_000.0})
+    engine = GlobalEquityEngine({"initial_cash": 1_000_000.0})
     metrics = engine.run_backtest(config, _FakeLoader(bars), _FlatSignal(), tmp_path)
 
     assert "benchmark_return" not in metrics or metrics.get("benchmark_ticker") is None

@@ -11,7 +11,6 @@ import pytest
 
 from backtest import runner
 from backtest.benchmark import _fetch_benchmark
-from backtest.engines._market_hooks import _interval_span_hours
 from backtest.loaders.base import resample_bars, source_interval
 from backtest.metrics import calc_bars_per_year
 from src.api.attribution_core import _attribution_bars_per_year
@@ -181,11 +180,6 @@ class TestAnnualisation:
 
     def test_a_minute_is_still_a_minute(self):
         assert calc_bars_per_year("1m", "yahoo") == 252 * 390
-
-    def test_the_funding_span_of_a_period_bar(self):
-        assert _interval_span_hours("1W") == 168.0
-        assert _interval_span_hours("1M") == 730.5
-        assert _interval_span_hours("1m") == pytest.approx(1 / 60)
 
     def test_attribution_reads_1M_as_a_month(self):
         assert _attribution_bars_per_year("1M") == 12

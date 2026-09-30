@@ -1,9 +1,8 @@
 """Empirical cross-source volume consistency guard (HKUDS/Vibe-Trading#1062).
 
-Fetches the same settled A-share trading day from every reachable loader and
+Fetches the same settled US trading day from every reachable loader and
 asserts the reported volumes agree within tolerance. This is the runtime lock
-the #1062 audit called for: unit drift between fallback sources (the original
-bug: baostock shares vs tencent/eastmoney lots, exactly 100x) fails loudly
+the #1062 audit called for: unit drift between fallback sources fails loudly
 here instead of silently corrupting volume analysis.
 
 Network-guarded by design — sources unreachable from the test environment are
@@ -15,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-CODE = "600519.SH"
+CODE = "AAPL.US"
 TRADE_DATE = "2026-07-31"
 TOLERANCE = 0.01
 
@@ -34,17 +33,17 @@ def _volume_from(loader_cls) -> float | None:
     return float(value)
 
 
-def test_a_share_volume_consistent_across_sources():
-    from backtest.loaders.baostock_loader import DataLoader as BaostockLoader
+def test_us_volume_consistent_across_sources():
     from backtest.loaders.eastmoney_loader import DataLoader as EastmoneyLoader
-    from backtest.loaders.mootdx_loader import DataLoader as MootdxLoader
-    from backtest.loaders.tencent_loader import DataLoader as TencentLoader
+    from backtest.loaders.sina_loader import DataLoader as SinaLoader
+    from backtest.loaders.stooq_loader import DataLoader as StooqLoader
+    from backtest.loaders.yahoo_loader import DataLoader as YahooLoader
 
     candidates = [
-        ("tencent", TencentLoader),
+        ("yahoo", YahooLoader),
+        ("stooq", StooqLoader),
+        ("sina", SinaLoader),
         ("eastmoney", EastmoneyLoader),
-        ("baostock", BaostockLoader),
-        ("mootdx", MootdxLoader),
     ]
     volumes: dict[str, float] = {}
     for name, loader_cls in candidates:
@@ -53,7 +52,7 @@ def test_a_share_volume_consistent_across_sources():
             volumes[name] = value
 
     if len(volumes) < 2:
-        pytest.skip(f"fewer than two reachable A-share sources: {sorted(volumes)}")
+        pytest.skip(f"fewer than two reachable US sources: {sorted(volumes)}")
 
     baseline_name = next(iter(volumes))
     baseline = volumes[baseline_name]

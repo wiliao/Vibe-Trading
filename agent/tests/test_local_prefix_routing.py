@@ -18,7 +18,7 @@ import yaml
 
 import backtest.loaders.local_loader as local_loader
 import backtest.runner as runner
-from backtest.engines._market_hooks import _is_china_futures, code_currency
+from backtest.engines._market_hooks import code_currency
 from backtest.loaders.base import NoAvailableSourceError
 from backtest.loaders.registry import _ensure_registered
 
@@ -76,24 +76,29 @@ def network(monkeypatch: pytest.MonkeyPatch) -> type[_NetworkLoader]:
         runner, "_get_loader", lambda source: real_get_loader(source) if source == "local" else _NetworkLoader
     )
     monkeypatch.setitem(runner.LOADER_REGISTRY, "fakenet", _NetworkLoader)
-    monkeypatch.setattr(runner, "FALLBACK_CHAINS", {m: ["fakenet"] for m in ("us_equity", "a_share", "hk_equity")})
+    monkeypatch.setattr(runner, "FALLBACK_CHAINS", {m: ["fakenet"] for m in ("us_equity", "ca_equity", "index")})
     monkeypatch.setattr(runner, "resolve_loader", lambda market: _NetworkLoader())
     return _NetworkLoader
 
 
 @pytest.mark.parametrize(
     ("code", "market"),
-    [("local:AAPL.US", "us_equity"), ("LOCAL:00700.HK", "hk_equity"), ("local:600519.SH", "a_share")],
+    [("local:AAPL.US", "us_equity"), ("LOCAL:TD.TO", "ca_equity"), ("local:^SPX", "index")],
 )
 def test_market_rules_follow_the_bare_symbol(code: str, market: str) -> None:
     assert runner._detect_market(code) == market
 
 
-def test_currency_and_futures_checks_follow_the_bare_symbol() -> None:
+def test_currency_checks_follow_the_bare_symbol() -> None:
     assert code_currency("local:AAPL.US") == "USD"
-    assert code_currency("local:00700.HK") == "HKD"
-    assert code_currency("local:EURUSD") == "USD"  # a forex pair's quote currency is parsed from the symbol
-    assert _is_china_futures("local:RB2410") is True
+    assert code_currency("local:TD.TO") == "CAD"
+    assert code_currency("local:^SPX") == "USD"
+
+
+@pytest.mark.parametrize("code", ["local:00700.HK", "local:600519.SH", "local:EURUSD"])
+def test_removed_markets_fail_loud(code: str) -> None:
+    with pytest.raises(ValueError):
+        runner._detect_market(code)
 
 
 @pytest.mark.parametrize("source", ["local", "auto"])

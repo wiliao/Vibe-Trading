@@ -794,9 +794,8 @@ class BaseEngine(ABC):
         """Per-engine facts about how this run was priced.
 
         Default empty. An engine overrides this to state something the metrics
-        cannot be derived from — currently ChinaFuturesEngine reporting which
-        products it priced on a generic default instead of a table entry
-        (#1393), where the alternative is a number that looks like data.
+        cannot be derived from, where the alternative is a number that looks
+        like data.
 
         Returns:
             Extra keys merged into the metrics dict; empty when there is

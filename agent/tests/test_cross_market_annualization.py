@@ -127,7 +127,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
     @staticmethod
     def _frame(index) -> dict:
-        return {"600519.SH": pd.DataFrame({"close": [10.0] * len(index)}, index=index)}
+        return {"AAPL.US": pd.DataFrame({"close": [10.0] * len(index)}, index=index)}
 
     @staticmethod
     def _session(days: int, per_day: int, freq: str, start: str = "2026-09-07") -> pd.DatetimeIndex:
@@ -146,7 +146,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.date_range("2024-01-02", periods=654, freq="B"))
-        assert _annualisation_bars("1D", "tushare", data, ["600519.SH"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 252
 
     def test_declared_intraday_against_daily_bars_uses_the_matched_interval(self):
         """The corrected count still comes from the per-source table, looked up
@@ -154,10 +154,10 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.date_range("2024-01-02", periods=654, freq="B"))
-        resolved = _annualisation_bars("1H", "tushare", data, ["600519.SH"])
+        resolved = _annualisation_bars("1H", "yahoo", data, ["AAPL.US"])
 
-        assert calc_bars_per_year("1H", "tushare") > 1000   # the declaration is intraday
-        assert resolved == calc_bars_per_year("1D", "tushare") == 252
+        assert calc_bars_per_year("1H", "yahoo") > 1000   # the declaration is intraday
+        assert resolved == calc_bars_per_year("1D", "yahoo") == 252
 
     # --- window length must not decide the outcome (issue found in review) ---
 
@@ -166,7 +166,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.bdate_range("2026-09-08", periods=5))
-        assert _annualisation_bars("1D", "yahoo", data, ["600519.SH"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 252
 
     def test_five_daily_bars_starting_monday_keep_the_declared_count(self):
         """Calendar alignment must not change the verdict: a Monday-start week
@@ -179,30 +179,30 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         assert (monday[-1] - monday[0]).days == 4
 
         data = self._frame(monday)
-        assert _annualisation_bars("1D", "yahoo", data, ["600519.SH"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 252
 
     def test_one_week_of_hourly_bars_keeps_the_declared_count(self):
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=7, freq="1h"))
         declared = calc_bars_per_year("1H", "yahoo")
-        assert _annualisation_bars("1H", "yahoo", data, ["600519.SH"]) == declared
+        assert _annualisation_bars("1H", "yahoo", data, ["AAPL.US"]) == declared
 
     def test_one_session_of_minute_bars_keeps_the_declared_count(self):
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=1, per_day=390, freq="1min"))
         declared = calc_bars_per_year("1m", "yahoo")
-        assert _annualisation_bars("1m", "yahoo", data, ["600519.SH"]) == declared
+        assert _annualisation_bars("1m", "yahoo", data, ["AAPL.US"]) == declared
 
     # --- session shapes that a spacing measurement must tolerate ---
 
-    def test_a_share_four_hour_session_keeps_the_declared_count(self):
+    def test_intraday_four_hour_session_keeps_the_declared_count(self):
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=4, freq="1h"))
-        assert _annualisation_bars("1H", "tushare", data, ["600519.SH"]) == \
-            calc_bars_per_year("1H", "tushare")
+        assert _annualisation_bars("1H", "yahoo", data, ["AAPL.US"]) == \
+            calc_bars_per_year("1H", "yahoo")
 
     def test_a_trading_halt_does_not_change_the_verdict(self):
         """The median reports the regular spacing; one long gap cannot outvote it."""
@@ -211,17 +211,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         index = pd.bdate_range("2025-01-06", periods=60).append(
             pd.bdate_range("2025-08-01", periods=60)
         )
-        assert _annualisation_bars("1D", "tushare", self._frame(index), ["600519.SH"]) == 252
-
-    def test_crypto_daily_is_not_tripped_by_the_check(self):
-        """365-day markets keep their own table entry."""
-        from backtest.runner import _annualisation_bars
-
-        n = 700
-        data = {"BTC-USDT": pd.DataFrame(
-            {"close": [10.0] * n}, index=pd.date_range("2024-01-02", periods=n, freq="D")
-        )}
-        assert _annualisation_bars("1D", "okx", data, ["BTC-USDT"]) == 365
+        assert _annualisation_bars("1D", "yahoo", self._frame(index), ["AAPL.US"]) == 252
 
     # --- degenerate inputs ---
 
@@ -229,9 +219,9 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         "data",
         [
             {},
-            {"600519.SH": pd.DataFrame({"close": []})},
+            {"AAPL.US": pd.DataFrame({"close": []})},
             # Too few bars for a median that survives a weekend gap.
-            {"600519.SH": pd.DataFrame(
+            {"AAPL.US": pd.DataFrame(
                 {"close": [1.0, 2.0]}, index=pd.to_datetime(["2026-09-11", "2026-09-14"])
             )},
         ],
@@ -239,7 +229,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
     def test_unmeasurable_data_falls_back_to_the_declaration(self, data):
         from backtest.runner import _annualisation_bars
 
-        assert _annualisation_bars("1D", "tushare", data, ["600519.SH"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 252
 
     def test_only_price_frames_are_measured(self):
         """Injected fundamental panels must not decide the annualisation."""
@@ -249,7 +239,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         data["_fundamentals"] = pd.DataFrame(
             {"pe": [1.0] * 5}, index=pd.date_range("2024-01-02", periods=5, freq="YE")
         )
-        assert _annualisation_bars("1D", "tushare", data, ["600519.SH"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 252
 
     # --- weekly / monthly files, and spacing wider than any supported interval ---
 
@@ -264,7 +254,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.date_range("2024-01-05", periods=60, freq="W-FRI"))
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            resolved = _annualisation_bars(declared, "tushare", data, ["600519.SH"])
+            resolved = _annualisation_bars(declared, "yahoo", data, ["AAPL.US"])
 
         assert resolved == 52
         assert any("annualising as 1W (52 bars/year)" in r.getMessage() for r in caplog.records)
@@ -273,7 +263,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.date_range("2020-01-01", periods=48, freq="MS"))
-        assert _annualisation_bars("1D", "yahoo", data, ["600519.SH"]) == 12
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 12
 
     @pytest.mark.parametrize(("declared", "freq"), [("1W", "W-FRI"), ("1M", "BME")])
     def test_a_declared_weekly_or_monthly_run_keeps_its_count_silently(self, declared, freq, caplog):
@@ -282,7 +272,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.date_range("2020-01-01", periods=60, freq=freq))
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            resolved = _annualisation_bars(declared, "tushare", data, ["600519.SH"])
+            resolved = _annualisation_bars(declared, "yahoo", data, ["AAPL.US"])
 
         assert resolved == {"1W": 52, "1M": 12}[declared]
         assert caplog.records == []
@@ -295,7 +285,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.bdate_range("2024-01-01", periods=120))
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            resolved = _annualisation_bars(declared, "tushare", data, ["600519.SH"])
+            resolved = _annualisation_bars(declared, "yahoo", data, ["AAPL.US"])
 
         assert resolved == 252
         assert any("annualising as 1D (252 bars/year)" in r.getMessage() for r in caplog.records)
@@ -307,7 +297,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.date_range("2015-03-31", periods=40, freq="QE"))
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            resolved = _annualisation_bars("1D", "tushare", data, ["600519.SH"])
+            resolved = _annualisation_bars("1D", "yahoo", data, ["AAPL.US"])
 
         assert resolved == 4
         assert any("wider than any supported interval" in r.getMessage() for r in caplog.records)
@@ -320,7 +310,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         index = pd.to_datetime(["2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29"])
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            resolved = _annualisation_bars("1D", "yahoo", self._frame(index), ["600519.SH"])
+            resolved = _annualisation_bars("1D", "yahoo", self._frame(index), ["AAPL.US"])
 
         assert resolved == 252
         message = " ".join(r.getMessage() for r in caplog.records)
@@ -332,7 +322,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.date_range("2026-09-07 09:30", periods=200, freq="10s"))
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            resolved = _annualisation_bars("1m", "yahoo", data, ["600519.SH"])
+            resolved = _annualisation_bars("1m", "yahoo", data, ["AAPL.US"])
 
         assert resolved == calc_bars_per_year("1m", "yahoo")
         assert any("matches no supported interval" in r.getMessage() for r in caplog.records)
@@ -344,21 +334,21 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=7, freq="1h"))
-        assert _annualisation_bars("30m", "yahoo", data, ["600519.SH"]) == calc_bars_per_year("1H", "yahoo")
+        assert _annualisation_bars("30m", "yahoo", data, ["AAPL.US"]) == calc_bars_per_year("1H", "yahoo")
 
     def test_four_hour_bars_declared_1h_switch_to_the_four_hour_count(self):
         """A 4x mismatch must switch too: the gate is 1.5, not a larger number."""
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=2, freq="4h"))
-        assert _annualisation_bars("1H", "yahoo", data, ["600519.SH"]) == calc_bars_per_year("4H", "yahoo")
+        assert _annualisation_bars("1H", "yahoo", data, ["AAPL.US"]) == calc_bars_per_year("4H", "yahoo")
 
     def test_spacing_inside_the_tolerance_keeps_the_declaration(self):
         """Bars 72 minutes apart declared 1H sit at ratio 1.2: not a mismatch."""
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=5, freq="72min"))
-        assert _annualisation_bars("1H", "yahoo", data, ["600519.SH"]) == calc_bars_per_year("1H", "yahoo")
+        assert _annualisation_bars("1H", "yahoo", data, ["AAPL.US"]) == calc_bars_per_year("1H", "yahoo")
 
     def test_spacing_near_a_neighbouring_interval_resolves_to_it(self):
         """Bars 72 minutes apart declared 30m are a mismatch (ratio 2.4) whose
@@ -367,21 +357,21 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=5, freq="72min"))
-        assert _annualisation_bars("30m", "yahoo", data, ["600519.SH"]) == calc_bars_per_year("1H", "yahoo")
+        assert _annualisation_bars("30m", "yahoo", data, ["AAPL.US"]) == calc_bars_per_year("1H", "yahoo")
 
     def test_bars_finer_than_declared_switch_as_well(self):
         """The gate is two-sided: hourly bars declared 1D annualise as 1H."""
         from backtest.runner import _annualisation_bars
 
         data = self._frame(self._session(days=5, per_day=7, freq="1h"))
-        assert _annualisation_bars("1D", "yahoo", data, ["600519.SH"]) == calc_bars_per_year("1H", "yahoo")
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == calc_bars_per_year("1H", "yahoo")
 
     def test_three_bars_are_too_few_to_overrule_the_declaration(self):
         """Two differences cannot outvote one gap, so the declaration stands."""
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.bdate_range("2026-09-08", periods=3))
-        assert _annualisation_bars("1H", "yahoo", data, ["600519.SH"]) == calc_bars_per_year("1H", "yahoo")
+        assert _annualisation_bars("1H", "yahoo", data, ["AAPL.US"]) == calc_bars_per_year("1H", "yahoo")
 
     def test_only_price_frames_are_measured_even_when_a_panel_is_longer(self):
         """A longer injected panel must not win the measurement by length."""
@@ -391,24 +381,24 @@ class TestSingleMarketAnnualisationChecksTheServedData:
         data["_fundamentals"] = pd.DataFrame(
             {"pe": [1.0] * 1000}, index=pd.date_range("2024-01-02", periods=1000, freq="h")
         )
-        assert _annualisation_bars("1D", "tushare", data, ["600519.SH"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US"]) == 252
 
     def test_the_longest_price_frame_decides(self):
         """A short hourly stub beside a long daily series does not switch the run."""
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.date_range("2024-01-02", periods=654, freq="B"))
-        data["000001.SZ"] = pd.DataFrame(
+        data["MSFT.US"] = pd.DataFrame(
             {"close": [10.0] * 10}, index=pd.date_range("2024-01-02 09:30", periods=10, freq="h")
         )
-        assert _annualisation_bars("1D", "tushare", data, ["600519.SH", "000001.SZ"]) == 252
+        assert _annualisation_bars("1D", "yahoo", data, ["AAPL.US", "MSFT.US"]) == 252
 
     def test_the_report_is_handed_to_the_caller_for_the_run_card(self):
         from backtest.runner import _annualisation_bars
 
         data = self._frame(pd.date_range("2024-01-02", periods=654, freq="B"))
         warnings: list[str] = []
-        resolved = _annualisation_bars("1H", "tushare", data, ["600519.SH"], warnings=warnings)
+        resolved = _annualisation_bars("1H", "yahoo", data, ["AAPL.US"], warnings=warnings)
 
         assert resolved == 252
         assert len(warnings) == 1 and "annualising as 1D" in warnings[0]
@@ -418,7 +408,7 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.date_range("2024-01-02", periods=654, freq="B"))
         warnings: list[str] = []
-        _annualisation_bars("1D", "tushare", data, ["600519.SH"], warnings=warnings)
+        _annualisation_bars("1D", "yahoo", data, ["AAPL.US"], warnings=warnings)
 
         assert warnings == []
 
@@ -427,6 +417,6 @@ class TestSingleMarketAnnualisationChecksTheServedData:
 
         data = self._frame(pd.date_range("2024-01-02", periods=654, freq="B"))
         with caplog.at_level("WARNING", logger="backtest.runner"):
-            _annualisation_bars("1H", "tushare", data, ["600519.SH"])
+            _annualisation_bars("1H", "yahoo", data, ["AAPL.US"])
 
         assert any("1H" in r.getMessage() for r in caplog.records)

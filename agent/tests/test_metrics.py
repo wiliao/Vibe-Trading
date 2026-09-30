@@ -61,28 +61,16 @@ def _trade(
 
 
 class TestBarsPerYear:
-    def test_daily_tushare(self) -> None:
-        assert calc_bars_per_year("1D", "tushare") == 252
+    def test_daily_yahoo(self) -> None:
+        assert calc_bars_per_year("1D", "yahoo") == 252
 
-    def test_daily_okx(self) -> None:
-        assert calc_bars_per_year("1D", "okx") == 365
+    def test_minute_yahoo(self) -> None:
+        # 252 trading days x 390 minutes/day (US 6.5h session)
+        assert calc_bars_per_year("1m", "yahoo") == 252 * 390
 
-    def test_minute_tushare(self) -> None:
-        # 252 trading days × 240 minutes/day = 60480
-        assert calc_bars_per_year("1m", "tushare") == 252 * 240
-
-    def test_hourly_okx(self) -> None:
-        # 365 days × 24 hours/day = 8760
-        assert calc_bars_per_year("1H", "okx") == 365 * 24
-
-    def test_minute_mootdx(self) -> None:
-        # mootdx is A-share: 252 trading days × 240 minutes/day (regression —
-        # previously fell back to bars_per_day=1, mis-annualising intraday vol)
-        assert calc_bars_per_year("1m", "mootdx") == 252 * 240
-
-    def test_minute_futu(self) -> None:
-        # futu is equity (HK + A-share): same equity annualisation as akshare
-        assert calc_bars_per_year("1m", "futu") == 252 * 240
+    def test_hourly_yahoo(self) -> None:
+        # 252 days x 7 hours/day = 1764
+        assert calc_bars_per_year("1H", "yahoo") == 252 * 7
 
     def test_unknown_source(self) -> None:
         # Falls back to 252 trading days
@@ -90,82 +78,26 @@ class TestBarsPerYear:
 
     def test_unknown_interval(self) -> None:
         # Falls back to 1 bar/day
-        assert calc_bars_per_year("2H", "tushare") == 252
+        assert calc_bars_per_year("2H", "yahoo") == 252
 
-    # ── newly covered sources (#884) ──
-
-    # resampling sources (local files / paid data, default to US equity session)
-    def test_resampling_qveris(self) -> None:
-        assert calc_bars_per_year("1D", "qveris") == 252
-        assert calc_bars_per_year("1m", "qveris") == 252 * 390
-        assert calc_bars_per_year("1H", "qveris") == 252 * 7
-
+    # resampling source (local files / user data, default US equity session)
     def test_resampling_local(self) -> None:
         assert calc_bars_per_year("1D", "local") == 252
         assert calc_bars_per_year("1m", "local") == 252 * 390
+        assert calc_bars_per_year("1H", "local") == 252 * 7
 
-    # crypto (365-day) sources
-    def test_crypto_binance(self) -> None:
-        assert calc_bars_per_year("1D", "binance") == 365
-        assert calc_bars_per_year("1m", "binance") == 365 * 1440
-        assert calc_bars_per_year("1H", "binance") == 365 * 24
+    # Every surviving US / Canada source runs the US 6.5h session.
+    @pytest.mark.parametrize(
+        "source",
+        ["yahoo", "yfinance", "finnhub", "alphavantage", "tiingo", "fmp", "stooq",
+         "sina", "eastmoney"],
+    )
+    def test_us_sources_use_the_us_session(self, source: str) -> None:
+        assert calc_bars_per_year("1D", source) == 252
+        assert calc_bars_per_year("1m", source) == 252 * 390
+        assert calc_bars_per_year("1H", source) == 252 * 7
 
-    # A-share equity (252-day, 240-min session) sources
-    def test_ashare_baostock(self) -> None:
-        assert calc_bars_per_year("1D", "baostock") == 252
-        assert calc_bars_per_year("1m", "baostock") == 252 * 240
-
-    def test_ashare_tencent(self) -> None:
-        assert calc_bars_per_year("1D", "tencent") == 252
-        assert calc_bars_per_year("1m", "tencent") == 252 * 240
-
-    def test_ashare_eastmoney(self) -> None:
-        assert calc_bars_per_year("1D", "eastmoney") == 252
-        assert calc_bars_per_year("1m", "eastmoney") == 252 * 240
-
-    def test_ashare_sina(self) -> None:
-        assert calc_bars_per_year("1D", "sina") == 252
-        assert calc_bars_per_year("1m", "sina") == 252 * 240
-
-    # US equity (252-day, 390-min session) sources
-    def test_us_yahoo(self) -> None:
-        assert calc_bars_per_year("1D", "yahoo") == 252
-        assert calc_bars_per_year("1m", "yahoo") == 252 * 390
-        # same as yfinance
-        assert calc_bars_per_year("1m", "yahoo") == calc_bars_per_year("1m", "yfinance")
-
-    def test_us_finnhub(self) -> None:
-        assert calc_bars_per_year("1D", "finnhub") == 252
-        assert calc_bars_per_year("1m", "finnhub") == 252 * 390
-
-    def test_us_alphavantage(self) -> None:
-        assert calc_bars_per_year("1D", "alphavantage") == 252
-        assert calc_bars_per_year("1m", "alphavantage") == 252 * 390
-
-    def test_us_tiingo(self) -> None:
-        assert calc_bars_per_year("1D", "tiingo") == 252
-        assert calc_bars_per_year("1m", "tiingo") == 252 * 390
-
-    def test_us_fmp(self) -> None:
-        assert calc_bars_per_year("1D", "fmp") == 252
-        assert calc_bars_per_year("1m", "fmp") == 252 * 390
-
-    def test_us_stooq(self) -> None:
-        assert calc_bars_per_year("1D", "stooq") == 252
-        assert calc_bars_per_year("1m", "stooq") == 252 * 390
-
-    def test_us_longbridge(self) -> None:
-        assert calc_bars_per_year("1D", "longbridge") == 252
-        assert calc_bars_per_year("1m", "longbridge") == 252 * 390
-
-    # Indian equity (252-day, 375-min session)
-    def test_india_broker(self) -> None:
-        assert calc_bars_per_year("1D", "india_broker") == 252
-        assert calc_bars_per_year("1m", "india_broker") == 252 * 375
-        assert calc_bars_per_year("5m", "india_broker") == 252 * 75
-        assert calc_bars_per_year("1H", "india_broker") == 252 * 7
-
-    # Verify the default for every VALID_SOURCES entry is not the misleading 252×1 at intraday
+    # Verify the default for every VALID_SOURCES entry is not the misleading 252x1 at intraday
     def test_no_intraday_source_falls_to_default(self) -> None:
         """Every entry in VALID_SOURCES must have a trading-days lookup."""
         from backtest.loaders.registry import VALID_SOURCES
@@ -193,12 +125,12 @@ class TestBarsPerYear:
 
     def test_lowercase_hour_matches_uppercase(self) -> None:
         # Loaders accept 1h/4h after interval-map fixes; annualisation must too.
-        assert calc_bars_per_year("1h", "okx") == calc_bars_per_year("1H", "okx")
-        assert calc_bars_per_year("4h", "ccxt") == calc_bars_per_year("4H", "ccxt")
-        assert calc_bars_per_year("1h", "okx") == 365 * 24
+        assert calc_bars_per_year("1h", "yahoo") == calc_bars_per_year("1H", "yahoo")
+        assert calc_bars_per_year("4h", "stooq") == calc_bars_per_year("4H", "stooq")
+        assert calc_bars_per_year("1h", "yahoo") == 252 * 7
 
     def test_lowercase_day_matches_uppercase(self) -> None:
-        assert calc_bars_per_year("1d", "tushare") == calc_bars_per_year("1D", "tushare")
+        assert calc_bars_per_year("1d", "yahoo") == calc_bars_per_year("1D", "yahoo")
 
     def test_yahoo_source_aliases_yfinance(self) -> None:
         # Runner primary source for US equity is often "yahoo".
@@ -210,9 +142,9 @@ class TestBarsPerYear:
         # normalisation — regression guard for the alias layer that used to
         # skip .strip().lower() on the fallback path.
         assert calc_bars_per_year("1m", "Yahoo") == calc_bars_per_year("1m", "yahoo")
-        assert calc_bars_per_year("1m", "OKX") == calc_bars_per_year("1m", "okx")
+        assert calc_bars_per_year("1m", "STOOQ") == calc_bars_per_year("1m", "stooq")
         assert calc_bars_per_year("1m", "Yahoo") == 252 * 390
-        assert calc_bars_per_year("1m", "OKX") == 365 * 1440
+        assert calc_bars_per_year("1m", "STOOQ") == 252 * 390
 
 
 # ---------------------------------------------------------------------------

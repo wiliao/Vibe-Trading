@@ -34,53 +34,29 @@ from src.market_data import (
 @pytest.mark.parametrize(
     "code,expected",
     [
-        ("600519.SH", "tencent"),
-        ("000001.SZ", "tencent"),
-        ("430139.BJ", "tencent"),
         ("AAPL.US", "yahoo"),
-        ("700.HK", "tencent"),
-        ("00700.HK", "tencent"),
-        ("RELIANCE.NS", "yahoo"),  # India NSE
-        ("TCS.NS", "yahoo"),
-        ("M&M.NS", "yahoo"),  # ampersand in ticker
-        ("BAJAJ-AUTO.NS", "yahoo"),  # hyphen in ticker
-        ("500325.BO", "yahoo"),  # India BSE (numeric scrip code)
+        ("AAPL", "yahoo"),  # bare US ticker
         ("TD.TO", "yahoo"),  # Canada TSX
         ("BBD-B.TO", "yahoo"),  # hyphenated TSX class symbol
         ("PNG.V", "yahoo"),  # Canada TSX Venture
-        ("BTC-USDT", "okx"),
-        ("ETH/USDT", "ccxt"),
-        ("EUR/USD", "mt5"),  # forex pair → mt5 chain head (registry fallback)
-        ("XAU/USD", "mt5"),  # metals share the forex route
-        ("EURUSD.FX", "mt5"),
-        ("XAUUSD.FX", "mt5"),
         ("local:my_file", "local"),
-        # Yahoo futures / forex suffix conventions (#718) — must not fall to the
-        # ``tushare`` default (which routed them to China-market loaders).
-        ("GC=F", "yahoo"),  # gold future
-        ("CL=F", "yahoo"),  # crude future
-        ("EURUSD=X", "yahoo"),  # forex pair
-        ("JPY=X", "yahoo"),  # abbreviated forex pair
         ("^SPX", "yahoo"),  # index (S&P 500)
-        ("^FTSE", "yahoo"),  # index (FTSE 100)
-        ("^VIX", "yahoo"),
-        ("something_weird", "tushare"),  # documented fallback
+        ("^GSPC", "yahoo"),  # index (S&P 500 composite)
+        ("^VIX", "yahoo")
     ],
 )
 def test_detect_source(code: str, expected: str) -> None:
     assert detect_source(code) == expected
 
 
-def test_yahoo_loader_accepts_futures_and_forex_suffixes() -> None:
-    """The yahoo direct loader must accept =F/=X, not just equity suffixes (#718)."""
+def test_yahoo_loader_accepts_us_and_canada_suffixes() -> None:
+    """The yahoo direct loader accepts the surviving US/Canada suffix forms."""
     from backtest.loaders.yahoo_loader import _is_supported
 
-    assert _is_supported("GC=F") is True
-    assert _is_supported("EURUSD=X") is True
-    assert _is_supported("AAPL.US") is True  # unchanged
+    assert _is_supported("AAPL.US") is True
     assert _is_supported("TD.TO") is True
     assert _is_supported("PNG.V") is True
-    assert _is_supported("600519.SH") is False  # A-share still not yahoo
+    assert _is_supported("600519.SH") is False  # A-share no longer supported
 
 
 def test_yahoo_loader_accepts_index_symbols() -> None:
@@ -99,32 +75,24 @@ def test_index_market_detection() -> None:
 
     assert _detect_market("^SPX") == "index"
     assert _detect_market("^N225") == "index"
-    assert code_currency("^SPX").startswith("UNKNOWN")  # honest: index has no cash currency
+    assert code_currency("^SPX") == "USD"  # index levels are USD-comparable
 
 
-def test_forex_pair_x_classifies_as_forex_not_a_share() -> None:
-    """=X pairs must stop falling through to the a_share default (latent misroute)."""
-    from backtest.engines._market_hooks import _detect_market, code_currency
+@pytest.mark.parametrize(
+    "code", ["GBPUSD=X", "EURUSD=X", "JPY=X", "GC=F", "CL=F", "EUR/USD", "BTC-USDT"]
+)
+def test_removed_market_symbols_fail_loud(code: str) -> None:
+    """Forex / futures / crypto symbols are rejected, not silently misrouted."""
+    from backtest.engines._market_hooks import _detect_market
 
-    assert _detect_market("GBPUSD=X") == "forex"
-    assert code_currency("GBPUSD=X") == "USD"
-
-
-def test_abbreviated_fx_pair_x_classes_as_forex() -> None:
-    """JPY=X (USD/JPY abbreviation) must not fall to the a_share default."""
-    from backtest.engines._market_hooks import _detect_market, code_currency
-
-    assert _detect_market("JPY=X") == "forex"
-    assert _detect_market("EUR=X") == "forex"
-    # The hidden base (JPY=X is USD/JPY) is not derivable — honest UNKNOWN,
-    # not a wrong CNY.
-    assert code_currency("JPY=X") == "UNKNOWN:forex"
+    with pytest.raises(ValueError):
+        _detect_market(code)
 
 
 def test_index_backtest_routes_to_global_equity_not_china_or_crypto() -> None:
-    """^SPX must never reach ChinaAEngine/CryptoEngine through the runner."""
+    """^SPX must route to the US equity engine through the runner."""
     from backtest.engines.global_equity import GlobalEquityEngine
-    from backtest.runner import _MARKET_TO_SOURCE, _create_market_engine, _detect_source
+    from backtest.runner import _create_market_engine, _detect_source
 
     assert _detect_source("^SPX") == "yahoo"
     engine = _create_market_engine("yahoo", {}, ["^SPX"])
@@ -141,20 +109,8 @@ def test_composite_builds_index_rule_engine() -> None:
     assert isinstance(engines["index"], GlobalEquityEngine)
 
 
-def test_yahoo_loader_accepts_futures_and_forex_suffixes() -> None:
-    """The yahoo direct loader must accept =F/=X, not just equity suffixes (#718)."""
-    from backtest.loaders.yahoo_loader import _is_supported
-
-    assert _is_supported("GC=F") is True
-    assert _is_supported("EURUSD=X") is True
-    assert _is_supported("AAPL.US") is True  # unchanged
-    assert _is_supported("TD.TO") is True
-    assert _is_supported("PNG.V") is True
-    assert _is_supported("600519.SH") is False  # A-share still not yahoo
-
-
-def test_fetch_market_data_auto_routes_yahoo_suffix_symbols() -> None:
-    """auto mode groups GC=F/EURUSD=X under yahoo, not the tushare/China chain (#718)."""
+def test_fetch_market_data_auto_routes_yahoo_index_symbols() -> None:
+    """auto mode groups index symbols under yahoo, not a removed chain."""
     seen_sources: list[str] = []
 
     class _StubLoader:
@@ -173,7 +129,7 @@ def test_fetch_market_data_auto_routes_yahoo_suffix_symbols() -> None:
         return _StubLoader
 
     out = fetch_market_data(
-        codes=["GC=F", "EURUSD=X", "TD.TO", "PNG.V"],
+        codes=["^SPX", "^VIX", "TD.TO", "PNG.V"],
         start_date="2024-01-01",
         end_date="2024-01-03",
         source="auto",
@@ -181,8 +137,7 @@ def test_fetch_market_data_auto_routes_yahoo_suffix_symbols() -> None:
     )
 
     assert "_unresolved" not in out
-    assert all(code in out for code in ("GC=F", "EURUSD=X", "TD.TO", "PNG.V"))
-    # First source tried must be yahoo (not tushare/akshare from the China chain).
+    assert all(code in out for code in ("^SPX", "^VIX", "TD.TO", "PNG.V"))
     assert seen_sources and seen_sources[0] == "yahoo"
 
 
@@ -350,96 +305,15 @@ def test_fetch_auto_groups_by_detected_source() -> None:
         return _StubLoader
 
     out = fetch_market_data(
-        codes=["AAPL.US", "BTC-USDT"],
+        codes=["AAPL.US", "local:AAPL"],
         start_date="2026-01-01",
         end_date="2026-01-02",
         source="auto",
         loader_resolver=resolver,
     )
-    # AAPL.US -> yahoo, BTC-USDT -> okx: two distinct loader groups resolved.
-    assert set(seen) == {"yahoo", "okx"}
-    assert "AAPL.US" in out and "BTC-USDT" in out
-
-
-def test_fetch_auto_hk_walks_hk_chain_not_us_chain() -> None:
-    """HK symbols must degrade through the hk_equity chain, not the US one.
-
-    A source-name-only chain lookup would match HK's yahoo membership against
-    the us_equity chain first, where the attempt budget exhausts on the
-    US-only stooq/sina loaders and never reaches eastmoney/akshare.
-    """
-    from backtest.loaders.base import NoAvailableSourceError
-
-    attempts: list[str] = []
-
-    def resolver(src: str):
-        attempts.append(src)
-        if src == "eastmoney":
-            return _StubLoader
-        raise NoAvailableSourceError(f"{src} unavailable in test")
-
-    out = fetch_market_data(
-        codes=["00700.HK"],
-        start_date="2026-01-01",
-        end_date="2026-01-02",
-        source="auto",
-        loader_resolver=resolver,
-    )
-    assert attempts[:2] == ["tencent", "eastmoney"]
-    assert "stooq" not in attempts and "sina" not in attempts
+    # AAPL.US -> yahoo, local:AAPL -> local: two distinct loader groups.
+    assert set(seen) == {"yahoo", "local"}
     assert "_unresolved" not in out
-    assert "00700.HK" in out
-
-
-def test_fetch_auto_hk_akshare_reachable_within_default_budget() -> None:
-    """akshare (Eastmoney-backed HK daily) must be reachable within the
-    default ``max_fallback_attempts`` when every earlier HK source is down."""
-    from backtest.loaders.base import NoAvailableSourceError
-
-    attempts: list[str] = []
-
-    def resolver(src: str):
-        attempts.append(src)
-        if src == "akshare":
-            return _StubLoader
-        raise NoAvailableSourceError(f"{src} unavailable in test")
-
-    out = fetch_market_data(
-        codes=["09988.HK"],
-        start_date="2026-01-01",
-        end_date="2026-01-02",
-        source="auto",
-        loader_resolver=resolver,
-    )
-    assert "_unresolved" not in out
-    assert "09988.HK" in out
-    assert attempts[-1] == "akshare"
-    assert len(attempts) <= 5
-
-
-def test_fetch_auto_india_walks_india_chain() -> None:
-    """India symbols must degrade through the india_equity chain (chain
-    selection is market-aware for every market, not just HK)."""
-    from backtest.loaders.base import NoAvailableSourceError
-
-    attempts: list[str] = []
-
-    def resolver(src: str):
-        attempts.append(src)
-        if src == "yfinance":
-            return _StubLoader
-        raise NoAvailableSourceError(f"{src} unavailable in test")
-
-    out = fetch_market_data(
-        codes=["RELIANCE.NS"],
-        start_date="2026-01-01",
-        end_date="2026-01-02",
-        source="auto",
-        loader_resolver=resolver,
-    )
-    assert attempts == ["yahoo", "yfinance"]
-    assert "_unresolved" not in out
-    assert "RELIANCE.NS" in out
 
 
 def test_fetch_auto_us_still_walks_us_chain() -> None:
@@ -628,8 +502,8 @@ def test_ca_venue_sibling_swaps_suffix_only() -> None:
 
 
 @pytest.fixture()
-def a_share_tushare_first():
-    """Apply a tushare-first A-share order override, restore defaults after.
+def us_equity_stooq_first():
+    """Apply a stooq-first US-equity order override, restore defaults after.
 
     Env is managed manually (not via monkeypatch): the fixture's own teardown
     must scrub the var and refresh BEFORE monkeypatch's later undo, otherwise
@@ -637,45 +511,45 @@ def a_share_tushare_first():
     """
     from backtest.loaders import registry
 
-    os.environ["MARKET_DATA_ORDER_A_SHARE"] = (
-        "tushare,tencent,mootdx,eastmoney,baostock,akshare,gildata,local"
+    os.environ["MARKET_DATA_ORDER_US_EQUITY"] = (
+        "stooq,yahoo,sina,eastmoney,yfinance,tiingo,fmp,finnhub,alphavantage,local"
     )
     registry.refresh_source_order_overrides()
     try:
         yield
     finally:
-        os.environ.pop("MARKET_DATA_ORDER_A_SHARE", None)
+        os.environ.pop("MARKET_DATA_ORDER_US_EQUITY", None)
         registry.refresh_source_order_overrides()
 
 
 def test_fetch_auto_respects_source_order_override_head(
-    a_share_tushare_first,
+    us_equity_stooq_first,
 ) -> None:
-    """auto mode starts at the override's head (tushare), not the default's."""
+    """auto mode starts at the override's head (stooq), not the default's."""
     from backtest.loaders.base import NoAvailableSourceError
 
     attempts: list[str] = []
 
     def resolver(src: str):
         attempts.append(src)
-        if src == "tushare":
+        if src == "stooq":
             return _StubLoader
         raise NoAvailableSourceError(f"{src} unavailable in test")
 
     out = fetch_market_data(
-        codes=["600519.SH"],
+        codes=["AAPL.US"],
         start_date="2026-01-01",
         end_date="2026-01-02",
         source="auto",
         loader_resolver=resolver,
     )
-    assert attempts[0] == "tushare"  # default head would be tencent
+    assert attempts[0] == "stooq"  # default head would be yahoo
     assert "_unresolved" not in out
-    assert "600519.SH" in out
+    assert "AAPL.US" in out
 
 
 def test_fetch_explicit_source_stays_src_first_with_override(
-    a_share_tushare_first,
+    us_equity_stooq_first,
 ) -> None:
     """An explicit source= never gets reordered by the market's override."""
     from backtest.loaders.base import NoAvailableSourceError
@@ -684,24 +558,24 @@ def test_fetch_explicit_source_stays_src_first_with_override(
 
     def resolver(src: str):
         attempts.append(src)
-        if src == "tencent":
+        if src == "yahoo":
             return _StubLoader
         raise NoAvailableSourceError(f"{src} unavailable in test")
 
     out = fetch_market_data(
-        codes=["600519.SH"],
+        codes=["AAPL.US"],
         start_date="2026-01-01",
         end_date="2026-01-02",
-        source="tencent",
+        source="yahoo",
         loader_resolver=resolver,
     )
-    assert attempts[0] == "tencent"
-    assert "tushare" not in attempts
-    assert "600519.SH" in out
+    assert attempts[0] == "yahoo"
+    assert "stooq" not in attempts
+    assert "AAPL.US" in out
 
 
 def test_fetch_local_prefix_unaffected_by_override(
-    a_share_tushare_first,
+    us_equity_stooq_first,
 ) -> None:
     """local: codes keep the local entry point — no-network sources are
     exempt from reordering."""
@@ -712,7 +586,7 @@ def test_fetch_local_prefix_unaffected_by_override(
         return _LocalAliasLoader
 
     out = fetch_market_data(
-        codes=["local:600519.SH"],
+        codes=["local:AAPL"],
         start_date="2026-01-01",
         end_date="2026-01-02",
         source="auto",
@@ -723,7 +597,7 @@ def test_fetch_local_prefix_unaffected_by_override(
 
 
 def test_fetch_chain_provider_hook_wins_over_override(
-    a_share_tushare_first,
+    us_equity_stooq_first,
 ) -> None:
     """The fallback_chain_provider test hook defines the chain; the override
     must not leak its order in."""
@@ -733,22 +607,22 @@ def test_fetch_chain_provider_hook_wins_over_override(
 
     def resolver(src: str):
         attempts.append(src)
-        if src == "eastmoney":
+        if src == "sina":
             return _StubLoader
         raise NoAvailableSourceError(f"{src} unavailable in test")
 
     out = fetch_market_data(
-        codes=["600519.SH"],
+        codes=["AAPL.US"],
         start_date="2026-01-01",
         end_date="2026-01-02",
         source="auto",
         loader_resolver=resolver,
-        fallback_chain_provider=lambda src: ["eastmoney"],
+        fallback_chain_provider=lambda src: ["sina"],
     )
     # Detected source first, then the hook's chain — never the override order.
-    assert attempts[:2] == ["tencent", "eastmoney"]
-    assert "tushare" not in attempts
-    assert "600519.SH" in out
+    assert attempts[:2] == ["yahoo", "sina"]
+    assert "stooq" not in attempts
+    assert "AAPL.US" in out
 
 
 # --------------------------------------------------------------------------

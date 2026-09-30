@@ -22,7 +22,7 @@ import pytest
 
 from backtest.engines.base import _align
 from backtest.engines import base as base_engine
-from backtest.engines.china_a import ChinaAEngine
+from backtest.engines.global_equity import GlobalEquityEngine
 from backtest.loaders.base import validate_date_range
 from backtest.runner import BacktestConfigSchema
 
@@ -118,17 +118,17 @@ class TestSymbolIsolation:
 
         _, close_df, _, target_pos, _ = _align(data_map, signal_map, valid_codes)
 
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
 
         # Patch the opening-plan boundary to throw for BAD only.
-        original_plan = ChinaAEngine._plan_open_order
+        original_plan = GlobalEquityEngine._plan_open_order
 
         def _exploding_plan(self, symbol, target_weight, df, ts, equity, **kwargs):
             if symbol == "BAD":
                 raise RuntimeError("Simulated failure for BAD")
             return original_plan(self, symbol, target_weight, df, ts, equity, **kwargs)
 
-        with patch.object(ChinaAEngine, "_plan_open_order", _exploding_plan):
+        with patch.object(GlobalEquityEngine, "_plan_open_order", _exploding_plan):
             # Should NOT raise — exception is caught internally
             engine._execute_bars(dates, data_map, close_df, target_pos, valid_codes)
 
@@ -180,7 +180,7 @@ class TestSymbolIsolation:
         monkeypatch.setattr(base_engine, "TushareFundamentalProvider", lambda: object(), raising=False)
         monkeypatch.setattr(base_engine, "enrich_price_frames_with_fundamentals", fake_enrich, raising=False)
 
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
         engine.run_backtest(
             {
                 "codes": ["000001.SZ"],
@@ -237,7 +237,7 @@ class TestSymbolIsolation:
 
         monkeypatch.setattr("backtest.benchmark.resolve_benchmark", fake_resolve_benchmark)
 
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
         config = {
             "codes": ["000001.SZ"],
             "start_date": "2024-04-01",
@@ -453,19 +453,6 @@ class TestBacktestConfigSchema:
         )
         assert explicit.initial_cash == 50_000
 
-    def test_mootdx_and_futu_sources_accepted(self) -> None:
-        """mootdx and futu are registered loaders, so config validation must
-        accept them. Regression: ``_VALID_SOURCES`` drifted and rejected both
-        even though the agent-facing backtest tool already allowed them."""
-        for src in ("mootdx", "futu"):
-            c = BacktestConfigSchema(
-                codes=["000001.SZ"],
-                start_date="2025-01-01",
-                end_date="2025-06-01",
-                source=src,
-            )
-            assert c.source == src
-
     def test_valid_sources_covers_all_registered_loaders(self) -> None:
         """Every registered loader name must be an accepted config source, so a
         new loader can never be silently rejected by the config schema."""
@@ -528,42 +515,6 @@ class TestDateRangeValidation:
         with pytest.raises(ValueError):
             loader.fetch(["AAPL"], "2025-06-01", "2025-01-01")
 
-    def test_okx_loader_validates_dates(self) -> None:
-        """OKX loader should raise on reversed dates before fetching."""
-        from backtest.loaders.okx import DataLoader
-
-        loader = DataLoader()
-        with pytest.raises(ValueError):
-            loader.fetch(["BTC-USDT"], "2025-06-01", "2025-01-01")
-
-    def test_ccxt_loader_validates_dates(self) -> None:
-        """CCXT loader should raise on reversed dates before fetching."""
-        from backtest.loaders.ccxt_loader import DataLoader
-
-        loader = DataLoader()
-        with pytest.raises(ValueError):
-            loader.fetch(["BTC-USDT"], "2025-06-01", "2025-01-01")
-
-    def test_akshare_loader_validates_dates(self) -> None:
-        """AKShare loader should raise on reversed dates before fetching."""
-        from backtest.loaders.akshare_loader import DataLoader
-
-        loader = DataLoader()
-        with pytest.raises(ValueError):
-            loader.fetch(["000001.SZ"], "2025-06-01", "2025-01-01")
-
-    def test_tushare_loader_validates_dates(self) -> None:
-        """Tushare loader should raise on reversed dates before fetching."""
-        from backtest.loaders.tushare import DataLoader
-
-        # Tushare requires TUSHARE_TOKEN at init; skip if unavailable
-        import os
-        if not os.getenv("TUSHARE_TOKEN"):
-            pytest.skip("TUSHARE_TOKEN not set")
-        loader = DataLoader()
-        with pytest.raises(ValueError):
-            loader.fetch(["000001.SZ"], "2025-06-01", "2025-01-01")
-
 
 # ---------------------------------------------------------------------------
 # 5. Integration: full backtest with bad data doesn't crash
@@ -612,7 +563,7 @@ class TestFullBacktestRobustness:
         )
 
         # Engine should still complete without crashing
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
         engine._execute_bars(dates, data_map, close_df, target_pos, valid_codes)
         assert len(engine.equity_snapshots) == 20
 
@@ -657,7 +608,7 @@ class TestValidationArtifactDir:
         run_dir.mkdir()
         assert not (run_dir / "artifacts").exists()
 
-        engine = ChinaAEngine({"initial_cash": 1_000_000})
+        engine = GlobalEquityEngine({"initial_cash": 1_000_000})
         non_finite = {
             "bootstrap": {
                 "observed_sharpe": float("inf"),

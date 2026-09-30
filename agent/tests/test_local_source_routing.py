@@ -2,7 +2,7 @@
 
 Covers the two halves of the bug:
 1. Engine routing follows the instrument market, not the loader name
-   (local AAPL.US -> GlobalEquityEngine, not CryptoEngine).
+   (local AAPL.US -> GlobalEquityEngine).
 2. Benchmark fetch goes through the configured source's loader instead of
    unconditionally creating a yfinance loader.
 """
@@ -16,8 +16,6 @@ import pytest
 
 from backtest.benchmark import resolve_benchmark
 from backtest.loaders.registry import _NO_NETWORK_FALLBACK_SOURCES
-from backtest.engines.china_a import ChinaAEngine
-from backtest.engines.crypto import CryptoEngine
 from backtest.engines.global_equity import GlobalEquityEngine
 from backtest.runner import _create_market_engine
 
@@ -26,52 +24,37 @@ class TestLocalSourceEngineRouting:
     def test_local_us_equity_routes_to_global_equity_engine(self) -> None:
         engine = _create_market_engine("local", {"initial_cash": 100_000}, ["AAPL.US"])
         assert isinstance(engine, GlobalEquityEngine)
-
-    def test_local_hk_equity_routes_to_global_equity_engine(self) -> None:
-        engine = _create_market_engine("local", {"initial_cash": 100_000}, ["00700.HK"])
-        assert isinstance(engine, GlobalEquityEngine)
+        assert engine.market == "us"
 
     def test_local_canadian_equity_routes_to_canadian_global_rules(self) -> None:
         engine = _create_market_engine("local", {"initial_cash": 100_000}, ["TD.TO"])
         assert isinstance(engine, GlobalEquityEngine)
         assert engine.market == "ca"
 
-    def test_local_crypto_still_routes_to_crypto_engine(self) -> None:
-        engine = _create_market_engine("local", {"initial_cash": 100_000}, ["BTC-USDT"])
-        assert isinstance(engine, CryptoEngine)
+    def test_local_index_routes_to_global_equity_engine(self) -> None:
+        engine = _create_market_engine("local", {"initial_cash": 100_000}, ["^SPX"])
+        assert isinstance(engine, GlobalEquityEngine)
+        assert engine.market == "us"
 
-    def test_local_a_share_routes_to_china_a_engine(self) -> None:
-        engine = _create_market_engine("local", {"initial_cash": 100_000}, ["000001.SZ"])
-        assert isinstance(engine, ChinaAEngine)
+    @pytest.mark.parametrize(
+        "code", ["00700.HK", "BTC-USDT", "000001.SZ", "600519.SH", "EUR/USD"]
+    )
+    def test_removed_markets_fail_loud(self, code: str) -> None:
+        with pytest.raises(ValueError):
+            _create_market_engine("local", {"initial_cash": 100_000}, [code])
 
-    # Sources with no Wave-1 branch in ``_create_market_engine``. Each is a
-    # registered A-share source that a caller can name explicitly -- the
-    # data-routing skill lists baostock/tencent/mootdx/eastmoney as A-share
-    # sources, and ``skills/mootdx/SKILL.md`` documents
-    # ``run(strategy=..., source="mootdx")``. Naming any of them used to route
-    # A-shares to CryptoEngine: no stamp tax, no T+1, no price limits, no
-    # 100-share lots, and an 8-hourly perpetual funding fee charged against
-    # the position. ``"auto"`` is branchless here too -- the runner resolves it
-    # through ``_detect_primary_source`` before calling, but this function must
-    # not depend on that.
+    # After the US/CA refactor engine routing follows the instrument market
+    # only; the source name is no longer consulted. Every source below must
+    # therefore reach the same US-equity engine for a US symbol.
     @pytest.mark.parametrize(
         "source",
-        ["local", "tencent", "eastmoney", "baostock", "mootdx", "sina", "stooq",
-         "yahoo", "auto"],
+        ["local", "eastmoney", "sina", "stooq", "yahoo", "yfinance", "auto"],
     )
-    def test_branchless_sources_route_a_share_to_china_a_engine(
+    def test_branchless_sources_route_us_equity_to_global_equity(
         self, source: str,
     ) -> None:
-        engine = _create_market_engine(source, {"initial_cash": 100_000}, ["600519.SH"])
-        assert isinstance(engine, ChinaAEngine)
-
-    @pytest.mark.parametrize("source", ["tushare", "akshare"])
-    def test_branching_sources_keep_routing_a_share_to_china_a_engine(
-        self, source: str,
-    ) -> None:
-        """The sources that already worked must keep working."""
-        engine = _create_market_engine(source, {"initial_cash": 100_000}, ["600519.SH"])
-        assert isinstance(engine, ChinaAEngine)
+        engine = _create_market_engine(source, {"initial_cash": 100_000}, ["AAPL.US"])
+        assert isinstance(engine, GlobalEquityEngine)
 
 
 class _FakeLoader:

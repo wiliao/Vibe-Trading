@@ -1,10 +1,9 @@
-"""Tests for GlobalEquityEngine (US / HK / Canada) market rules.
+"""Tests for GlobalEquityEngine (US / Canada) market rules.
 
 Validates:
   - US: zero commission, fractional shares, low slippage
-  - HK: stamp tax bilateral, 100-share lots, levies
   - Canada: whole shares, configurable broker cost, TSX/TSXV tick grid
-  - Same-session trading for all three markets
+  - Same-session trading for both markets
   - Both directions allowed
 """
 
@@ -31,12 +30,6 @@ def _us_engine(**overrides) -> GlobalEquityEngine:
     return GlobalEquityEngine(config, market="us")
 
 
-def _hk_engine(**overrides) -> GlobalEquityEngine:
-    config = {"initial_cash": 1_000_000}
-    config.update(overrides)
-    return GlobalEquityEngine(config, market="hk")
-
-
 def _ca_engine(**overrides) -> GlobalEquityEngine:
     config = {"initial_cash": 500_000}
     config.update(overrides)
@@ -58,12 +51,6 @@ class TestCanExecute:
     def test_us_close(self) -> None:
         assert _us_engine().can_execute("AAPL.US", 0, _make_bar()) is True
 
-    def test_hk_long(self) -> None:
-        assert _hk_engine().can_execute("0700.HK", 1, _make_bar()) is True
-
-    def test_hk_short(self) -> None:
-        assert _hk_engine().can_execute("0700.HK", -1, _make_bar()) is True
-
     def test_canada_long_and_short(self) -> None:
         engine = _ca_engine()
         assert engine.can_execute("TD.TO", 1, _make_bar()) is True
@@ -71,7 +58,7 @@ class TestCanExecute:
 
 
 # ---------------------------------------------------------------------------
-# round_size: US fractional vs HK lots
+# round_size: US fractional vs Canada whole shares
 # ---------------------------------------------------------------------------
 
 
@@ -88,16 +75,6 @@ class TestRoundSize:
         engine = _us_engine()
         assert engine.round_size(-5.0, 180.0) == 0.0
 
-    def test_hk_100_share_lots(self) -> None:
-        engine = _hk_engine()
-        assert engine.round_size(350.0, 350.0) == 300
-        assert engine.round_size(99.0, 350.0) == 0
-        assert engine.round_size(500.0, 350.0) == 500
-
-    def test_hk_rounds_down(self) -> None:
-        engine = _hk_engine()
-        assert engine.round_size(199.0, 80.0) == 100
-
     def test_canada_uses_whole_shares_but_keeps_odd_lots(self) -> None:
         engine = _ca_engine()
         assert engine.round_size(19.9, 85.0) == 19.0
@@ -107,7 +84,7 @@ class TestRoundSize:
 
 
 # ---------------------------------------------------------------------------
-# calc_commission: US zero vs HK complex
+# calc_commission: US zero vs Canada broker-configured
 # ---------------------------------------------------------------------------
 
 
@@ -122,60 +99,25 @@ class TestCommission:
         assert engine.calc_commission(100.0, 180.0, 1, is_open=True) == 0.0
         assert engine.calc_commission(100.0, 180.0, 1, is_open=False) == 0.0
 
-    def test_hk_has_commission(self) -> None:
-        engine = _hk_engine()
-        comm = engine.calc_commission(1000, 350.0, 1, is_open=True)
-        assert comm > 0
-
-    def test_hk_stamp_tax_bilateral(self) -> None:
-        """HK stamp tax charged on both buy and sell."""
-        engine = _hk_engine()
-        comm_buy = engine.calc_commission(1000, 350.0, 1, is_open=True)
-        comm_sell = engine.calc_commission(1000, 350.0, 1, is_open=False)
-        # Both should be approximately equal (stamp tax bilateral)
-        assert comm_buy == pytest.approx(comm_sell, rel=0.01)
-
-    def test_hk_commission_components(self) -> None:
-        """Verify HK commission includes all components."""
-        engine = _hk_engine()
-        size, price = 1000, 350.0
-        notional = size * price  # 350,000
-        comm = engine.calc_commission(size, price, 1, is_open=True)
-        # Expected components:
-        expected = (
-            notional * engine.hk_commission      # broker ~¥52.5
-            + notional * engine.hk_stamp_tax     # stamp ~¥350
-            + notional * engine.hk_levy          # SFC+FRC ~¥19.8
-            + notional * engine.hk_settlement    # CCASS ~¥7
-        )
-        assert comm == pytest.approx(expected, abs=0.01)
-
     def test_canada_commission_is_broker_configured(self) -> None:
         engine = _ca_engine(ca_commission=0.001)
         assert engine.calc_commission(100, 25.0, 1, is_open=True) == 2.5
         assert engine.calc_commission(100, 25.0, 1, is_open=False) == 2.5
 
+    def test_canada_zero_commission_by_default(self) -> None:
+        engine = _ca_engine()
+        assert engine.calc_commission(100, 25.0, 1, is_open=True) == 0.0
+
 
 # ---------------------------------------------------------------------------
-# apply_slippage: US low vs HK moderate
+# apply_slippage
 # ---------------------------------------------------------------------------
 
 
 class TestSlippage:
-    def test_us_lower_slippage(self) -> None:
-        engine = _us_engine()
-        us_slipped = engine.apply_slippage(100.0, 1) - 100.0
-        hk_engine = _hk_engine()
-        hk_slipped = hk_engine.apply_slippage(100.0, 1) - 100.0
-        assert us_slipped < hk_slipped
-
     def test_us_slippage_rate(self) -> None:
         engine = _us_engine()
         assert engine.apply_slippage(100.0, 1) == pytest.approx(100.05)
-
-    def test_hk_slippage_rate(self) -> None:
-        engine = _hk_engine()
-        assert engine.apply_slippage(100.0, 1) == pytest.approx(100.1)
 
     def test_custom_slippage(self) -> None:
         engine = GlobalEquityEngine(
@@ -212,10 +154,6 @@ class TestMarketParam:
     def test_default_is_us(self) -> None:
         engine = GlobalEquityEngine({"initial_cash": 100_000})
         assert engine.market == "us"
-
-    def test_hk_market(self) -> None:
-        engine = GlobalEquityEngine({"initial_cash": 100_000}, market="hk")
-        assert engine.market == "hk"
 
     def test_canada_market(self) -> None:
         engine = GlobalEquityEngine({"initial_cash": 100_000}, market="ca")
