@@ -59,11 +59,11 @@ class AlphaCompareTool(BaseTool):
                 "type": "array",
                 "items": {"type": "string"},
                 "minItems": 2,
-                "description": "Alpha ids to compare, e.g. ['alpha101_1', 'gtja191_5'].",
+                "description": "Alpha ids to compare, e.g. ['alpha101_1', 'qlib158_5'].",
             },
             "universe": {
                 "type": "string",
-                "description": "csi300 | sp500 | btc-usdt.",
+                "description": "sp500.",
             },
             "period": {
                 "type": "string",

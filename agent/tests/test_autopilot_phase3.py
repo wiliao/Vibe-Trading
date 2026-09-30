@@ -38,7 +38,7 @@ def _make_hypothesis(**overrides) -> str:
     kwargs = dict(
         title="A-share momentum",
         thesis="Cross-sectional momentum persists in large caps.",
-        universe="CSI 300",
+        universe="S&P 500",
         signal_definition="rank(returns_20d) top decile",
         data_sources=["akshare"],
     )

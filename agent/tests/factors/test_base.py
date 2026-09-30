@@ -205,21 +205,16 @@ def test_vwap_us_typical_price() -> None:
     assert pytest.approx(out.iloc[0, 0]) == (10 + 12 + 8 + 11) / 4.0
 
 
-def test_vwap_cn_uses_amount_volume() -> None:
-    # Tushare ``amount`` is in 千元 (thousand CNY) and ``volume`` is in 手
-    # (100 shares). True VWAP = (amount * 1000 CNY) / (volume * 100 shares).
-    panel = {
-        "amount": _frame([[10000.0]]),  # 10000 千元 = 10,000,000 CNY
-        "volume": _frame([[10.0]]),     # 10 手 = 1000 股
-    }
-    out = vwap(panel, Market.EQUITY_CN)
-    expected = (10000.0 * 1000.0) / (10.0 * 100.0 + 1.0)
-    assert pytest.approx(out.iloc[0, 0]) == expected
+def test_vwap_rejects_a_market_that_no_longer_ships() -> None:
+    """``Market`` is US-equity only; a retired market key fails loudly."""
+    with pytest.raises(ValueError):
+        vwap({"open": _frame([[1.0]]), "high": _frame([[1.0]]),
+              "low": _frame([[1.0]]), "close": _frame([[1.0]])}, "equity_cn")
 
 
 def test_vwap_prefers_panel_vwap_column() -> None:
     panel = {"vwap": _frame([[42.0]])}
-    out = vwap(panel, Market.CRYPTO)
+    out = vwap(panel, Market.EQUITY_US)
     assert pytest.approx(out.iloc[0, 0]) == 42.0
 
 

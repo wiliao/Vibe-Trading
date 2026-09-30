@@ -107,13 +107,12 @@ _VALID_THEMES = {
     "liquidity", "microstructure", "sentiment", "growth", "leverage",
 }
 _VALID_UNIVERSES = {
-    "equity_us", "equity_cn", "equity_hk", "equity_in", "equity_kr",
-    "crypto", "futures",
+    "equity_us",
 }
 # Ranking metrics for /alpha/compare — keep in sync with
 # ``src.factors.compare_runner.SORT_KEYS`` (kept local to avoid a heavy import).
 _VALID_SORTS = {"ir", "ic_mean", "ic_positive_ratio", "ic_count"}
-_BENCH_UNIVERSES = {"csi300", "sp500", "btc-usdt"}
+_BENCH_UNIVERSES = {"sp500"}
 
 
 def _now_iso() -> str:
@@ -399,7 +398,7 @@ def register_alpha_routes(
                 detail=f"unknown theme {theme!r}; expected one of {sorted(_VALID_THEMES)}",
             )
         if universe is not None:
-            _ALIAS = {"csi300": "equity_cn", "sp500": "equity_us", "btc-usdt": "crypto"}
+            _ALIAS = {"sp500": "equity_us"}
             universe = _ALIAS.get(universe, universe)
         if universe is not None and universe not in _VALID_UNIVERSES:
             raise HTTPException(

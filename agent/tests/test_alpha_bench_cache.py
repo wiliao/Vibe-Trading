@@ -39,7 +39,7 @@ def no_api_key(monkeypatch):
 
 
 def test_cache_roundtrips_when_untampered(tmp_path, no_api_key):
-    cache_path = tmp_path / "csi300_2020-01-01_2020-12-31.pkl"
+    cache_path = tmp_path / "sp500_2020-01-01_2020-12-31.pkl"
     panel = _panel()
 
     abt._write_pickle_cache(tmp_path, cache_path, panel)

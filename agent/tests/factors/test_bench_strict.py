@@ -253,7 +253,7 @@ def test_run_bench_strict_returns_expected_schema(
 
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=True,
         n_random_seeds=3,
@@ -282,7 +282,7 @@ def test_run_bench_strict_respects_oos_split(
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=True,
         n_random_seeds=2,
@@ -301,7 +301,7 @@ def test_run_bench_strict_random_control_is_keyword_only() -> None:
     # level — exactly the pattern from Soli22de/Bili_Stock's foundation
     # Backtest(random_control=...) constructor.
     with pytest.raises(TypeError):
-        run_bench_strict("alpha101", "csi300", "2024-2024", True)  # type: ignore[misc]
+        run_bench_strict("alpha101", "sp500", "2024-2024", True)  # type: ignore[misc]
 
 
 def test_run_bench_strict_random_control_false_is_explicit_opt_out(
@@ -313,7 +313,7 @@ def test_run_bench_strict_random_control_false_is_explicit_opt_out(
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=False,
         registry=reg,
@@ -376,7 +376,7 @@ def test_run_bench_strict_emits_legacy_alive_dead_reversed_keys(
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=True,
         registry=reg,
@@ -393,7 +393,7 @@ def test_run_bench_strict_legacy_alive_equals_confirmed_alive(
     _stub_panel(monkeypatch)
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, registry=reg,
     )
     assert result["alive"] == result["confirmed_alive"]
@@ -410,7 +410,7 @@ def test_run_bench_strict_top_lists_include_formula_latex(
     _stub_panel(monkeypatch)
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, registry=reg,
     )
     for bucket in ("top5_by_ir", "top5_by_alpha_t", "dead_examples"):
@@ -426,7 +426,7 @@ def test_run_bench_strict_n_random_seeds_zero_is_clamped(
     _stub_panel(monkeypatch)
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, n_random_seeds=0, registry=reg,
     )
     assert result["n_random_seeds"] == 1
@@ -447,7 +447,7 @@ def test_run_bench_strict_empty_zoo_returns_schema_with_counters(
             raise AssertionError("should not be called")
 
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, registry=EmptyReg(),
     )
     assert result["status"] == "error"
@@ -477,7 +477,7 @@ def test_run_bench_strict_on_progress_exception_is_caught(
             raise RuntimeError("simulated SSE writer closed")
 
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, registry=reg, on_progress=bad_cb,
     )
     assert result["status"] == "ok"
@@ -495,7 +495,7 @@ def test_run_bench_strict_rows_drop_underscore_prefixed_sort_keys(
     _stub_panel(monkeypatch)
     reg = _StubRegistry(panel={})
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, registry=reg,
     )
     for row in result["rows"]:
@@ -573,7 +573,7 @@ def test_run_bench_strict_catches_planted_alive_signal(
             return panel["close"].pct_change(5)
 
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, n_random_seeds=5, registry=PlantedReg(),
     )
     assert result["status"] == "ok"
@@ -611,7 +611,7 @@ def test_run_bench_strict_catches_planted_reversed_signal(
             return -panel["close"].pct_change(5)
 
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=True, n_random_seeds=5, registry=ReversedReg(),
     )
     assert result["status"] == "ok"
@@ -626,7 +626,7 @@ def test_run_bench_strict_rejects_oos_split_outside_loaded_sample(monkeypatch: p
     reg = _StubRegistry(panel={})
     for split in ("2023-12-31", "2025-01-01"):
         result = run_bench_strict(
-            zoo="alpha101", universe="csi300", period="2024-2024",
+            zoo="alpha101", universe="sp500", period="2024-2024",
             random_control=True, oos_split=split, registry=reg,
         )
         assert result["status"] == "error"
@@ -643,7 +643,7 @@ def test_an_oos_split_inside_the_prices_but_outside_the_ic_skips_the_alpha(
     # alpha was still given a category.
     _stub_panel(monkeypatch, n_rows=80)
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=False, oos_split=split, registry=_StubRegistry(panel={}),
     )
     assert result["n_alphas_tested"] == 0
@@ -657,7 +657,7 @@ def test_an_oos_split_leaving_two_ic_observations_is_still_measured(
     # The other side of the guard above: 03-17 leaves exactly 03-18 and 03-19.
     _stub_panel(monkeypatch, n_rows=80)
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=False, oos_split="2024-03-17", registry=_StubRegistry(panel={}),
     )
     assert result["n_alphas_tested"] == 2

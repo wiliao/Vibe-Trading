@@ -894,7 +894,7 @@ def alpha_bench(
     """Benchmark one Alpha Zoo alpha or a complete zoo on a universe.
 
     Args:
-        universe: Universe to benchmark, such as ``sp500`` or ``csi300``.
+        universe: Universe to benchmark (``sp500``).
         period: ``YYYY-YYYY`` or ``YYYY-MM-DD/YYYY-MM-DD``.
         alpha_id: Optional single alpha id; mutually exclusive with ``zoo``.
         zoo: Optional zoo id; mutually exclusive with ``alpha_id``.

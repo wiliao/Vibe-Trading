@@ -181,22 +181,10 @@ class RunResearchAutopilotTool(BaseTool):
 
 
 _UNIVERSE_CODES: dict[str, list[str]] = {
-    "csi 300": ["000300.SH"],
-    "csi300": ["000300.SH"],
-    "csi 500": ["000905.SH"],
-    "csi500": ["000905.SH"],
-    "sse 50": ["000016.SH"],
-    "sse50": ["000016.SH"],
-    "szse comp": ["399001.SZ"],
-    "sse comp": ["000001.SH"],
-    "chinext": ["399006.SZ"],
-    "chi next": ["399006.SZ"],
     "s&p 500": ["SPY.US"],
     "sp500": ["SPY.US"],
     "nasdaq": ["QQQ.US"],
     "dow jones": ["DIA.US"],
-    "hang seng": ["^HSI.HK"],
-    "nikkei": ["^N225.HK"],
 }
 
 
@@ -320,7 +308,7 @@ class GenerateBacktestConfigTool(BaseTool):
                     {
                         "status": "error",
                         "error": "Hypothesis has no universe set",
-                        "hint": "Use update_hypothesis to set a universe (e.g. 'CSI 300').",
+                        "hint": "Use update_hypothesis to set a universe (e.g. 'S&P 500').",
                     },
                     ensure_ascii=False,
                 )

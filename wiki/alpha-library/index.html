@@ -6,7 +6,7 @@
   <script src="/theme-init.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Alpha Library | Vibe-Trading Wiki</title>
-  <meta name="description" content="450+ pre-built quant alphas across four zoos: Qlib158, Kakushadze 101, GTJA191, Academic. One-line CLI to benchmark any zoo on your universe.">
+  <meta name="description" content="300+ pre-built quant alphas across three zoos: Qlib158, Kakushadze 101, Academic. One-line CLI to benchmark any zoo on your universe.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Vibe-Trading Wiki">
@@ -94,7 +94,7 @@
       <div class="alpha-stat">
         <dt>Zoos</dt>
         <dd id="stat-zoos">--</dd>
-        <span class="small">Qlib158 / Kakushadze 101 / GTJA191 / Academic</span>
+        <span class="small">Qlib158 / Kakushadze 101 / Academic</span>
       </div>
       <div class="alpha-stat">
         <dt>Last generated</dt>
@@ -121,12 +121,6 @@
         <p>The 101 short-horizon formulaic alphas from Kakushadze (2015).</p>
         <span class="count" data-zoo="alpha101">--</span>
       </a>
-      <a class="alpha-zoo-card" href="content/gtja191/index.html">
-        <span class="zoo-id">gtja191</span>
-        <h3>GTJA 191</h3>
-        <p>Guotai Junan's 191 alphas — A-share microstructure &amp; volume themes.</p>
-        <span class="count" data-zoo="gtja191">--</span>
-      </a>
       <a class="alpha-zoo-card" href="content/academic/index.html">
         <span class="zoo-id">academic</span>
         <h3>Academic Anomalies</h3>
@@ -141,10 +135,10 @@
 pip install vibe-trading-ai
 
 <span class="comment"># list every alpha in a zoo</span>
-vibe-trading alpha list --zoo gtja191
+vibe-trading alpha list --zoo alpha101
 
 <span class="comment"># benchmark a zoo on your universe and period</span>
-vibe-trading alpha bench --zoo gtja191 --universe csi300 --period 2020-2025</code></pre>
+vibe-trading alpha bench --zoo alpha101 --universe sp500 --period 2020-2025</code></pre>
     </section>
   </main>
 

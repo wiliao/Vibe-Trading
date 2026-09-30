@@ -13,7 +13,7 @@ from src.factors import cli_handlers
 def _ns(**overrides):
     base = dict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2020-2025",
         top=20,
         yes=True,

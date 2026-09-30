@@ -97,7 +97,7 @@ class FakeAlpha:
         self.meta = {
             "name": f"Alpha {alpha_id}",
             "description": f"desc {alpha_id}",
-            "universe": "csi300",
+            "universe": "sp500",
         }
         if meta:
             self.meta.update(meta)

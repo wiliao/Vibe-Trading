@@ -1,4 +1,4 @@
-"""W4.a bench driver: run 4 zoo×universe combinations and emit summary JSON.
+"""W4.a bench driver: run the surviving zoo × SP500 benches and emit summary JSON.
 
 Usage:
     cd agent && python scripts/w4a_run_benches.py
@@ -9,7 +9,7 @@ Output:
     ~/.vibe-trading/reports/bench_summary.json      — aggregate summary
 
 Safe to re-run; each bench result is cached by ``_load_universe_panel`` so the
-expensive Tushare/yfinance fetches only happen once per (universe, period).
+expensive yfinance fetches only happen once per (universe, period).
 """
 
 from __future__ import annotations
@@ -44,10 +44,9 @@ from src.tools.alpha_bench_tool import run_alpha_bench  # noqa: E402
 REPORTS_DIR = Path.home() / ".vibe-trading" / "reports"
 
 BENCHES = [
-    {"key": "gtja191_csi300", "zoo": "gtja191", "universe": "csi300", "period": "2018-2025"},
     {"key": "alpha101_sp500", "zoo": "alpha101", "universe": "sp500", "period": "2020-2025"},
-    {"key": "qlib158_csi300", "zoo": "qlib158", "universe": "csi300", "period": "2020-2025"},
-    {"key": "alpha101_btc", "zoo": "alpha101", "universe": "btc-usdt", "period": "2022-2025"},
+    {"key": "qlib158_sp500", "zoo": "qlib158", "universe": "sp500", "period": "2020-2025"},
+    {"key": "academic_sp500", "zoo": "academic", "universe": "sp500", "period": "2020-2025"},
 ]
 
 
@@ -144,20 +143,7 @@ def main() -> int:
         "zoos": {},
     }
 
-    from src.config.accessor import get_env_config
-
-    tushare_ok = bool(get_env_config().data.tushare_token)
-    if not tushare_ok:
-        logger.warning("TUSHARE_TOKEN unset; csi300 benches will be skipped")
-
     for bench in BENCHES:
-        if bench["universe"] == "csi300" and not tushare_ok:
-            summary["zoos"][bench["key"]] = {
-                **{k: bench[k] for k in ("zoo", "universe", "period")},
-                "status": "skipped",
-                "error": "TUSHARE_TOKEN not set",
-            }
-            continue
         entry = _run_one(bench)
         summary["zoos"][bench["key"]] = entry
 

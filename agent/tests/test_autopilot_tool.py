@@ -29,10 +29,10 @@ def _seed_hypothesis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, univers
     )
 
 
-def test_lookup_codes_matches_chinext_case_insensitively() -> None:
+def test_lookup_codes_matches_sp500_case_insensitively() -> None:
     """Universe lookup should use the same normalized casing as input handling."""
-    assert _lookup_codes("chiNext") == ["399006.SZ"]
-    assert _lookup_codes("Chi-Next") == ["399006.SZ"]
+    assert _lookup_codes("S&P 500") == ["SPY.US"]
+    assert _lookup_codes("s&p-500") == ["SPY.US"]
 
 
 def test_generate_backtest_config_writes_safe_config(
@@ -40,7 +40,7 @@ def test_generate_backtest_config_writes_safe_config(
 ) -> None:
     """The tool should write a config with mapped codes under the run root."""
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="chiNext")
+    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="sp500")
 
     payload = json.loads(
         GenerateBacktestConfigTool().execute(
@@ -51,7 +51,7 @@ def test_generate_backtest_config_writes_safe_config(
     )
 
     assert payload["status"] == "ok"
-    assert payload["config"]["codes"] == ["399006.SZ"]
+    assert payload["config"]["codes"] == ["SPY.US"]
     assert payload["config"]["source"] == "local"
     run_dir = Path(payload["run_dir"])
     assert run_dir.parent == tmp_path / ".vibe-trading" / "runs"
@@ -66,7 +66,7 @@ def test_generate_backtest_config_rejects_invalid_date_before_write(
 ) -> None:
     """Invalid date ranges must fail before run artifacts are created."""
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="CSI 300")
+    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="S&P 500")
 
     payload = json.loads(
         GenerateBacktestConfigTool().execute(
@@ -91,7 +91,7 @@ def test_run_research_autopilot_uses_host_injected_session_id(
     the host-injected default the registry wires in (like the goal tools).
     """
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="CSI 300")
+    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="S&P 500")
 
     registry = build_registry(session_id="sess_autopilot")
     tool = registry.get("run_research_autopilot")
@@ -130,7 +130,7 @@ def test_generate_backtest_config_run_dir_passes_safe_run_dir(
     write_file -> backtest handoff could never execute.
     """
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="CSI 300")
+    hypothesis = _seed_hypothesis(tmp_path, monkeypatch, universe="S&P 500")
 
     payload = json.loads(
         GenerateBacktestConfigTool().execute(
@@ -156,7 +156,7 @@ def test_generate_backtest_config_falls_back_on_unknown_source(
     hypothesis = HypothesisRegistry().create(
         title="Free-text source",
         thesis="Momentum should outperform.",
-        universe="CSI 300",
+        universe="S&P 500",
         signal_definition="Rank by trailing returns.",
         data_sources=["my personal notes"],
     )

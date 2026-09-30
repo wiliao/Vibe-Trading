@@ -75,10 +75,8 @@ from src.factors.registry import Registry, RegistryError
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # Benchmarkable data universes: every name here must have a panel loader in
-# ``src.tools.alpha_bench_tool._UNIVERSE_TAG``. There is no KRX (or NSE/BSE)
-# panel yet, so Korea/India are deliberately absent — ``alpha bench`` would
-# fail at universe load, not produce a Korean benchmark.
-_UNIVERSE_CHOICES = ["csi300", "sp500", "btc-usdt"]
+# ``src.tools.alpha_bench_tool._UNIVERSE_TAG``.
+_UNIVERSE_CHOICES = ["sp500"]
 
 # Per-row fields that only ``bench_runner_strict`` produces. They are the
 # statistics ``categorise_strict`` actually gates on, so a strict run that
@@ -97,16 +95,13 @@ _STRICT_ROW_FIELDS = (
 # ``src.factors.registry.Universe`` and the REST allowlist in
 # ``src.api.alpha_routes._VALID_UNIVERSES``.
 _LIST_UNIVERSE_CHOICES = [
-    "equity_us", "equity_cn", "equity_hk", "equity_in", "equity_kr",
-    "crypto", "futures",
+    "equity_us",
 ]
 # Benchmark universe -> the metadata universe its panel represents, so
-# ``alpha list --universe csi300`` keeps working (it used to filter on a name no
+# ``alpha list --universe sp500`` keeps working (it used to filter on a name no
 # alpha carries and silently listed nothing). Mirrors the REST alias map.
 _LIST_UNIVERSE_ALIASES = {
-    "csi300": "equity_cn",
     "sp500": "equity_us",
-    "btc-usdt": "crypto",
 }
 
 
@@ -256,7 +251,7 @@ def cmd_alpha_list(args: argparse.Namespace) -> int:
             _hint(
                 f"Next: vibe-trading alpha show {example_id}  |  "
                 f"Bench a zoo: vibe-trading alpha bench --zoo {example_zoo} "
-                f"--universe csi300 --period 2020-2025"
+                f"--universe sp500 --period 2020-2025"
             )
         return 0
     except Exception as exc:  # noqa: BLE001
@@ -341,7 +336,7 @@ def cmd_alpha_show(args: argparse.Namespace) -> int:
         if brief:
             _hint(
                 f"Next: vibe-trading alpha bench --zoo {alpha.zoo} "
-                f"--universe csi300 --period 2020-2025 --top 20"
+                f"--universe sp500 --period 2020-2025 --top 20"
             )
             return 0
 
@@ -386,7 +381,7 @@ def cmd_alpha_show(args: argparse.Namespace) -> int:
 
         _hint(
             f"Next: vibe-trading alpha bench --zoo {alpha.zoo} "
-            f"--universe csi300 --period 2020-2025 --top 20"
+            f"--universe sp500 --period 2020-2025 --top 20"
         )
         return 0
     except Exception as exc:  # noqa: BLE001
@@ -540,7 +535,7 @@ def _run_all_zoos_with_progress(
 
 
 def cmd_alpha_bench(args: argparse.Namespace) -> int:
-    """``vibe-trading alpha bench --zoo X --universe csi300 --period Y-Z [--top N]``.
+    """``vibe-trading alpha bench --zoo X --universe sp500 --period Y-Z [--top N]``.
 
     Calls :func:`src.factors.bench_runner.run_bench` for the IC loop so we can
     stream Rich progress, then renders the HTML report via helpers imported
@@ -993,9 +988,9 @@ def add_subparser(subparsers: Any) -> argparse.ArgumentParser:
     p_bench.add_argument("--zoo", default=None, help="Zoo to benchmark (required unless --yes is passed)")
     p_bench.add_argument(
         "--universe",
-        default="csi300",
+        default="sp500",
         choices=_UNIVERSE_CHOICES,
-        help=f"Universe (default: csi300; one of {', '.join(_UNIVERSE_CHOICES)})",
+        help=f"Universe (default: sp500; one of {', '.join(_UNIVERSE_CHOICES)})",
     )
     p_bench.add_argument(
         "--period",
@@ -1041,9 +1036,9 @@ def add_subparser(subparsers: Any) -> argparse.ArgumentParser:
     )
     p_compare.add_argument(
         "--universe",
-        default="csi300",
+        default="sp500",
         choices=_UNIVERSE_CHOICES,
-        help=f"Universe (default: csi300; one of {', '.join(_UNIVERSE_CHOICES)})",
+        help=f"Universe (default: sp500; one of {', '.join(_UNIVERSE_CHOICES)})",
     )
     p_compare.add_argument(
         "--period",

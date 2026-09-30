@@ -169,7 +169,7 @@ class AlphaZooTool(BaseTool):
             },
             "zoo": {
                 "type": "string",
-                "description": "Optional zoo filter for list_alphas (e.g. gtja191, kakushadze101).",
+                "description": "Optional zoo filter for list_alphas (e.g. alpha101, qlib158).",
             },
             "theme": {
                 "type": "string",

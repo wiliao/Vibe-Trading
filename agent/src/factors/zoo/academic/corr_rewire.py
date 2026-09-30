@@ -50,7 +50,7 @@ __alpha_meta__ = {
         r"\rho^{\mathrm{calm}} = \mathrm{corr}(r_{t-139..t-20})"
     ),
     "columns_required": ["close"],
-    "universe": ["equity_us", "equity_cn", "equity_hk", "crypto"],
+    "universe": ["equity_us"],
     "frequency": ["1d"],
     "decay_horizon": 60,
     "min_warmup_bars": 142,

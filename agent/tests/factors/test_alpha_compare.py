@@ -83,7 +83,7 @@ def _stub_panel(monkeypatch: pytest.MonkeyPatch, n_rows: int = 80, n_cols: int =
 def test_run_bench_only_restricts_to_subset(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_panel(monkeypatch)
     result = run_bench(
-        zoo="z", universe="csi300", period="2024-2024",
+        zoo="z", universe="sp500", period="2024-2024",
         only=["a_two", "a_three"], registry=_ThreeAlphaRegistry(),
     )
     assert result["status"] == "ok"
@@ -95,7 +95,7 @@ def test_run_bench_only_restricts_to_subset(monkeypatch: pytest.MonkeyPatch) -> 
 def test_run_bench_only_none_benches_everything(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_panel(monkeypatch)
     result = run_bench(
-        zoo="z", universe="csi300", period="2024-2024",
+        zoo="z", universe="sp500", period="2024-2024",
         only=None, registry=_ThreeAlphaRegistry(),
     )
     assert {r["id"] for r in result["rows"]} == {"a_one", "a_two", "a_three"}
@@ -104,7 +104,7 @@ def test_run_bench_only_none_benches_everything(monkeypatch: pytest.MonkeyPatch)
 def test_run_bench_only_unknown_ids_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_panel(monkeypatch)
     result = run_bench(
-        zoo="z", universe="csi300", period="2024-2024",
+        zoo="z", universe="sp500", period="2024-2024",
         only=["does_not_exist"], registry=_ThreeAlphaRegistry(),
     )
     assert result["status"] == "error"
@@ -158,7 +158,7 @@ def _metrics(ic_mean: float, ic_std: float, ir: float, pos: float = 0.5, n: int 
 def _args(**kw: Any) -> argparse.Namespace:
     base = {
         "alpha_ids": [], "compare_all": False, "zoo": None,
-        "universe": "csi300", "period": "2020-2025", "sort": "ir", "verbose": False,
+        "universe": "sp500", "period": "2020-2025", "sort": "ir", "verbose": False,
     }
     base.update(kw)
     return argparse.Namespace(**base)
@@ -212,8 +212,8 @@ def test_compare_alternate_sort_key_reorders(monkeypatch, capsys) -> None:
 
 
 def test_compare_groups_across_zoos(monkeypatch, capsys) -> None:
-    id_to_zoo = {"alpha101_1": "alpha101", "gtja191_5": "gtja191"}
-    metrics = {"alpha101_1": _metrics(0.02, 0.05, 0.40), "gtja191_5": _metrics(0.03, 0.05, 0.60)}
+    id_to_zoo = {"alpha101_1": "alpha101", "qlib158_5": "qlib158"}
+    metrics = {"alpha101_1": _metrics(0.02, 0.05, 0.40), "qlib158_5": _metrics(0.03, 0.05, 0.60)}
 
     calls: list[tuple[str, tuple[str, ...]]] = []
 
@@ -227,13 +227,13 @@ def test_compare_groups_across_zoos(monkeypatch, capsys) -> None:
         )
 
     _wire(monkeypatch, id_to_zoo, _tracking)
-    rc, env = _run(capsys, _args(alpha_ids=["alpha101_1", "gtja191_5"]))
+    rc, env = _run(capsys, _args(alpha_ids=["alpha101_1", "qlib158_5"]))
 
     assert rc == 0
     # One run_bench call per zoo, each scoped to its own ids.
-    assert sorted(calls) == [("alpha101", ("alpha101_1",)), ("gtja191", ("gtja191_5",))]
-    assert {r["id"] for r in env["ranking"]} == {"alpha101_1", "gtja191_5"}
-    assert env["winner"] == "gtja191_5"
+    assert sorted(calls) == [("alpha101", ("alpha101_1",)), ("qlib158", ("qlib158_5",))]
+    assert {r["id"] for r in env["ranking"]} == {"alpha101_1", "qlib158_5"}
+    assert env["winner"] == "qlib158_5"
 
 
 def test_compare_unknown_id_is_skipped(monkeypatch, capsys) -> None:
@@ -285,7 +285,7 @@ def test_compare_all_evaluations_skipped_errors(monkeypatch, capsys) -> None:
 
 
 def test_compare_all_flag_resolves_every_alpha(monkeypatch, capsys) -> None:
-    id_to_zoo = {"a": "alpha101", "b": "gtja191"}
+    id_to_zoo = {"a": "alpha101", "b": "qlib158"}
     metrics = {"a": _metrics(0.02, 0.05, 0.40), "b": _metrics(0.03, 0.05, 0.60)}
     _wire(monkeypatch, id_to_zoo, _fake_run_bench(metrics))
     rc, env = _run(capsys, _args(compare_all=True))
@@ -295,20 +295,20 @@ def test_compare_all_flag_resolves_every_alpha(monkeypatch, capsys) -> None:
 
 
 def test_compare_zoo_flag_filters_targets(monkeypatch, capsys) -> None:
-    id_to_zoo = {"a": "alpha101", "b": "alpha101", "c": "gtja191"}
+    id_to_zoo = {"a": "alpha101", "b": "alpha101", "c": "qlib158"}
     metrics = {k: _metrics(0.02, 0.05, 0.40 + i * 0.1) for i, k in enumerate(["a", "b", "c"])}
     _wire(monkeypatch, id_to_zoo, _fake_run_bench(metrics))
     rc, env = _run(capsys, _args(zoo="alpha101"))
 
     assert rc == 0
-    assert {r["id"] for r in env["ranking"]} == {"a", "b"}  # c (gtja191) excluded
+    assert {r["id"] for r in env["ranking"]} == {"a", "b"}  # c (qlib158) excluded
 
 
 # ── compare_runner.compare_alphas core (direct) ─────────────────────────────
 
 
 def test_core_progress_counts_globally_across_zoos(monkeypatch) -> None:
-    id_to_zoo = {"a": "alpha101", "b": "alpha101", "c": "gtja191"}
+    id_to_zoo = {"a": "alpha101", "b": "alpha101", "c": "qlib158"}
     metrics = {k: _metrics(0.02, 0.05, 0.40) for k in id_to_zoo}
 
     def _fake(*, zoo, universe, period, top, only, registry, on_progress=None):  # noqa: ANN001, ARG001
@@ -322,19 +322,19 @@ def test_core_progress_counts_globally_across_zoos(monkeypatch) -> None:
     monkeypatch.setattr("src.factors.bench_runner.run_bench", _fake)
     seen: list[tuple[int, int, str]] = []
     env = compare_runner.compare_alphas(
-        ["a", "b", "c"], "csi300", "2020-2025", sort="ir",
+        ["a", "b", "c"], "sp500", "2020-2025", sort="ir",
         registry=_FakeRegistry(id_to_zoo),
         on_progress=lambda nd, nt, aid: seen.append((nd, nt, aid)),
     )
     assert env["status"] == "ok"
-    # alpha101 (a,b) base 0 → 1,2 ; gtja191 (c) base 2 → 3 — global & monotonic.
+    # alpha101 (a,b) base 0 → 1,2 ; qlib158 (c) base 2 → 3 — global & monotonic.
     assert [nd for nd, _, _ in seen] == [1, 2, 3]
     assert {nt for _, nt, _ in seen} == {3}  # total is the whole comparison, not per-zoo
 
 
 def test_core_below_two_returns_error(monkeypatch) -> None:
     env = compare_runner.compare_alphas(
-        ["solo"], "csi300", "2020-2025", registry=_FakeRegistry({"solo": "alpha101"}),
+        ["solo"], "sp500", "2020-2025", registry=_FakeRegistry({"solo": "alpha101"}),
     )
     assert env["status"] == "error"
     assert "at least 2" in env["error"]
@@ -346,7 +346,7 @@ def test_core_invalid_sort_falls_back_to_ir(monkeypatch) -> None:
     metrics = {"a": _metrics(0.01, 0.05, 0.20), "b": _metrics(0.03, 0.05, 0.60)}
     monkeypatch.setattr("src.factors.bench_runner.run_bench", _fake_run_bench(metrics))
     env = compare_runner.compare_alphas(
-        ["a", "b"], "csi300", "2020-2025", sort="bogus", registry=_FakeRegistry(id_to_zoo),
+        ["a", "b"], "sp500", "2020-2025", sort="bogus", registry=_FakeRegistry(id_to_zoo),
     )
     assert env["sort"] == "ir"
     assert env["winner"] == "b"

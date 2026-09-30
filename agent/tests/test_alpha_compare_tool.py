@@ -60,7 +60,7 @@ def test_tool_is_auto_discovered() -> None:
 
 def _ok_envelope() -> dict[str, Any]:
     return {
-        "status": "ok", "universe": "csi300", "period": "2020-2025", "sort": "ir",
+        "status": "ok", "universe": "sp500", "period": "2020-2025", "sort": "ir",
         "n_compared": 2, "n_skipped": 0, "winner": "alpha101_2",
         "ranking": [
             {"rank": 1, "id": "alpha101_2", "zoo": "alpha101", "ir": 0.6, "delta_ir_vs_best": 0.0},
@@ -80,7 +80,7 @@ def test_execute_happy_path(monkeypatch) -> None:
     monkeypatch.setattr("src.tools.alpha_compare_tool.compare_alphas", _fake)
     out = AlphaCompareTool().execute(
         alpha_ids=["alpha101_1", "alpha101_2", "alpha101_1"],  # dup collapses
-        universe="csi300", period="2020-2025", sort="ir",
+        universe="sp500", period="2020-2025", sort="ir",
     )
     env = json.loads(out)
     assert env["status"] == "ok"
@@ -97,7 +97,7 @@ def test_execute_accepts_inline_string_ids(monkeypatch) -> None:
                                     "winner": alpha_ids[0], "ranking": [], "skipped": []},
     )
     env = json.loads(AlphaCompareTool().execute(
-        alpha_ids="alpha101_1, alpha101_2", universe="csi300", period="2020-2025",
+        alpha_ids="alpha101_1, alpha101_2", universe="sp500", period="2020-2025",
     ))
     assert env["status"] == "ok"
     assert env["n_compared"] == 2
@@ -122,7 +122,7 @@ def test_execute_wraps_unexpected_exception(monkeypatch) -> None:
 
     monkeypatch.setattr("src.tools.alpha_compare_tool.compare_alphas", _boom)
     env = json.loads(AlphaCompareTool().execute(
-        alpha_ids=["a", "b"], universe="csi300", period="2020-2025",
+        alpha_ids=["a", "b"], universe="sp500", period="2020-2025",
     ))
     assert env["status"] == "error"
     assert "alpha compare failed" in env["error"]

@@ -23,9 +23,9 @@ def _make_registry(tmp_path: Path) -> tuple[HypothesisRegistry, Path]:
 def _seed(reg: HypothesisRegistry) -> list[str]:
     """Seed three hypotheses spanning multiple statuses; return their ids."""
     a = reg.create(
-        title="Mean-reversion on CSI300",
+        title="Mean-reversion on SP500",
         thesis="Short-horizon dispersion → reversion edge.",
-        universe="csi300",
+        universe="sp500",
         data_sources=["tushare"],
         skills=["factor-research"],
     )
@@ -107,7 +107,7 @@ class TestList:
         rc = dispatch(args)
         out = capsys.readouterr().out
         assert rc == 0
-        assert "Mean-reversion on CSI300" in out
+        assert "Mean-reversion on SP500" in out
         assert "Earnings drift on US large caps" in out
         assert "BTC funding skew" in out
 
@@ -149,7 +149,7 @@ class TestList:
         # Exactly one of the three seeded titles is shown; which one wins
         # depends on updated_at order, which can tie at second resolution.
         seeded_titles = (
-            "Mean-reversion on CSI300",
+            "Mean-reversion on SP500",
             "Earnings drift on US large caps",
             "BTC funding skew",
         )
@@ -172,7 +172,7 @@ class TestList:
         assert isinstance(payload, list)
         assert len(payload) == 3
         titles = {item["title"] for item in payload}
-        assert "Mean-reversion on CSI300" in titles
+        assert "Mean-reversion on SP500" in titles
 
 
 class TestShow:
@@ -190,7 +190,7 @@ class TestShow:
         out = capsys.readouterr().out
         assert rc == 0
         assert ids[0] in out
-        assert "Mean-reversion on CSI300" in out
+        assert "Mean-reversion on SP500" in out
         assert "Short-horizon dispersion" in out
 
     def test_missing_returns_one(

@@ -79,10 +79,6 @@ _ZOO_DISPLAY: dict[str, dict[str, str]] = {
         "name": "Kakushadze 101 Formulaic Alphas",
         "tagline": "The 101 short-horizon formulaic alphas from Kakushadze (2015).",
     },
-    "gtja191": {
-        "name": "GTJA 191",
-        "tagline": "Guotai Junan's 191 alphas — A-share microstructure & volume themes.",
-    },
     "academic": {
         "name": "Academic Anomalies",
         "tagline": "Curated alphas from the academic asset-pricing literature.",
@@ -208,7 +204,7 @@ _ALPHA_PAGE_TEMPLATE = """<!doctype html>
     <h2>Run it</h2>
     <pre class="formula"><code>pip install vibe-trading-ai
 vibe-trading alpha show {{ alpha.id }}
-vibe-trading alpha bench --zoo {{ zoo.zoo_id }} --universe csi300 --period 2020-2025</code></pre>
+vibe-trading alpha bench --zoo {{ zoo.zoo_id }} --universe sp500 --period 2020-2025</code></pre>
   </main>
 </body>
 </html>

@@ -38,7 +38,7 @@ def _clear_compare_jobs():
 
 _OK_ENVELOPE: dict[str, Any] = {
     "status": "ok",
-    "universe": "csi300",
+    "universe": "sp500",
     "period": "2020-2025",
     "sort": "ir",
     "n_compared": 2,
@@ -59,7 +59,7 @@ _OK_ENVELOPE: dict[str, Any] = {
 def _valid_body(**kw: Any) -> dict[str, Any]:
     body = {
         "alpha_ids": ["alpha101_1", "alpha101_2"],
-        "universe": "csi300",
+        "universe": "sp500",
         "period": "2020-2025",
         "sort": "ir",
     }
@@ -124,7 +124,7 @@ def test_compare_post_accepts_and_registers_job(monkeypatch) -> None:
 def test_worker_stores_ok_envelope(monkeypatch) -> None:
     monkeypatch.setattr("src.factors.compare_runner.compare_alphas", lambda *a, **k: dict(_OK_ENVELOPE))
     _seed_job("aaaa1111")
-    alpha_routes._run_compare_blocking("aaaa1111", ["alpha101_1", "alpha101_2"], "csi300", "2020-2025", "ir")
+    alpha_routes._run_compare_blocking("aaaa1111", ["alpha101_1", "alpha101_2"], "sp500", "2020-2025", "ir")
     job = alpha_routes.ALPHA_COMPARE_JOBS["aaaa1111"]
     assert job["status"] == "done"
     assert job["result"]["winner"] == "alpha101_2"
@@ -136,7 +136,7 @@ def test_worker_marks_error_envelope(monkeypatch) -> None:
            "ranking": [], "skipped": [{"id": "x", "reason": "unknown"}]}
     monkeypatch.setattr("src.factors.compare_runner.compare_alphas", lambda *a, **k: err)
     _seed_job("bbbb2222")
-    alpha_routes._run_compare_blocking("bbbb2222", ["x", "y"], "csi300", "2020-2025", "ir")
+    alpha_routes._run_compare_blocking("bbbb2222", ["x", "y"], "sp500", "2020-2025", "ir")
     job = alpha_routes.ALPHA_COMPARE_JOBS["bbbb2222"]
     assert job["status"] == "error"
     assert "evaluated" in job["error"]
@@ -148,7 +148,7 @@ def test_worker_sanitises_unexpected_exception(monkeypatch) -> None:
 
     monkeypatch.setattr("src.factors.compare_runner.compare_alphas", _boom)
     _seed_job("cccc3333")
-    alpha_routes._run_compare_blocking("cccc3333", ["x", "y"], "csi300", "2020-2025", "ir")
+    alpha_routes._run_compare_blocking("cccc3333", ["x", "y"], "sp500", "2020-2025", "ir")
     job = alpha_routes.ALPHA_COMPARE_JOBS["cccc3333"]
     assert job["status"] == "error"
     # No raw message / path leaks to the client-facing error string.

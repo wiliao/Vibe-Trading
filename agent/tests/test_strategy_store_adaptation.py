@@ -69,7 +69,7 @@ def _strategy(
     *,
     artifact_id: str = "art_parent",
     name: str = "momentum",
-    universe: str = "CSI300",
+    universe: str = "TSX60",
     artifact_type: ArtifactType = ArtifactType.STRATEGY,
     **overrides,
 ) -> Artifact:
@@ -228,7 +228,7 @@ class TestChildDoesNotInheritAttestation:
             validation_status=ValidationStatus.VALIDATED,
             validation_date="2026-01-05T00:00:00+00:00",
             model_tier=None,
-            intended_use="CSI300 momentum sleeve",
+            intended_use="TSX60 momentum sleeve",
             limitations="thin coverage before 2015",
         )
 

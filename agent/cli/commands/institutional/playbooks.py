@@ -546,10 +546,10 @@ _EARNINGS = Playbook(
 _SCREEN = Playbook(
     slug="screen",
     summary="Systematic idea screen — hypothesis, funnel, survivor queue",
-    usage="/screen <hypothesis or criteria> [--universe sp500|csi300|...]",
+    usage="/screen <hypothesis or criteria> [--universe sp500|tsx60|...]",
     examples=(
         "/screen quality compounders trading below 15x FCF --universe sp500",
-        "/screen ROIC > 12% and net debt/EBITDA < 2 --universe csi300",
+        "/screen ROIC > 12% and net debt/EBITDA < 2 --universe tsx60",
         "/screen oversold industrials with rising order books",
     ),
     ask="What should I screen for? Give me the economic hypothesis or the hard criteria, e.g. /screen quality compounders below 15x FCF --universe sp500",

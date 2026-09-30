@@ -29,7 +29,7 @@ __alpha_meta__ = {
     'theme': ['volatility'],
     'formula_latex': r'\mathrm{zscore}_{x}\bigl(-\mathrm{skew}_{60}(r_t)\bigr)',
     'columns_required': ['close'],
-    'universe': ['equity_us', 'equity_cn', 'equity_hk'],
+    'universe': ['equity_us'],
     'frequency': ['1d'],
     'decay_horizon': 60,
     'min_warmup_bars': 61,

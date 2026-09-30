@@ -49,7 +49,7 @@ def _reset_store(tmp_path):
 def _make_artifact(
     *,
     name: str = "test_factor",
-    universe: str = "CSI300",
+    universe: str = "TSX60",
     artifact_type: ArtifactType = ArtifactType.FACTOR,
     status: ArtifactStatus = ArtifactStatus.CREATED,
 ) -> Artifact:
@@ -66,7 +66,7 @@ def _register_active_artifact(
     store: InMemoryStrategyStore,
     *,
     name: str = "test_factor",
-    universe: str = "CSI300",
+    universe: str = "TSX60",
     artifact_type: ArtifactType = ArtifactType.FACTOR,
 ) -> str:
     """Register an artifact and transition it to ACTIVE."""
@@ -88,7 +88,7 @@ class TestModels:
             id="art_001",
             type=ArtifactType.FACTOR,
             name="momentum_20d",
-            universe="CSI300",
+            universe="TSX60",
         )
         assert art.id == "art_001"
         assert art.type == ArtifactType.FACTOR
@@ -104,7 +104,7 @@ class TestModels:
             id="art_001",
             type=ArtifactType.FACTOR,
             name="momentum_20d",
-            universe="CSI300",
+            universe="TSX60",
         )
         with pytest.raises(AttributeError):
             art.name = "changed"  # type: ignore[misc]
@@ -210,11 +210,11 @@ class TestInMemoryStore:
 
     def test_list_artifacts_filter_universe(self):
         store = InMemoryStrategyStore()
-        store.register_artifact(_make_artifact(name="f1", universe="CSI300"))
+        store.register_artifact(_make_artifact(name="f1", universe="TSX60"))
         store.register_artifact(_make_artifact(name="f2", universe="SP500"))
-        result = store.list_artifacts(universe="CSI300")
+        result = store.list_artifacts(universe="TSX60")
         assert len(result) == 1
-        assert result[0].universe == "CSI300"
+        assert result[0].universe == "TSX60"
 
     def test_update_status(self):
         store = InMemoryStrategyStore()
@@ -377,7 +377,7 @@ class TestSdmTools:
             tool.execute(
                 artifact_type="factor",
                 name="momentum_20d",
-                universe="CSI300",
+                universe="TSX60",
                 formula_latex=r"\\frac{P_{t}}{P_{t-20}}-1",
                 theme=["momentum"],
                 columns_required=["close"],
@@ -414,7 +414,7 @@ class TestSdmTools:
         from src.tools.sdm_status_tool import SdmStatusTool
 
         SdmRegisterTool().execute(
-            artifact_type="factor", name="f1", universe="CSI300"
+            artifact_type="factor", name="f1", universe="TSX60"
         )
         result = json.loads(SdmStatusTool().execute(action="list"))
         assert result["status"] == "ok"
@@ -426,7 +426,7 @@ class TestSdmTools:
 
         reg_result = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="f1", universe="CSI300"
+                artifact_type="factor", name="f1", universe="TSX60"
             )
         )
         aid = reg_result["artifact"]["id"]
@@ -442,7 +442,7 @@ class TestSdmTools:
 
         reg = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="f1", universe="CSI300"
+                artifact_type="factor", name="f1", universe="TSX60"
             )
         )
         aid = reg["artifact"]["id"]
@@ -469,7 +469,7 @@ class TestSdmTools:
 
         reg = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="f1", universe="CSI300"
+                artifact_type="factor", name="f1", universe="TSX60"
             )
         )
         aid = reg["artifact"]["id"]
@@ -493,7 +493,7 @@ class TestSdmTools:
         # Register an ACTIVE factor with bench history
         reg = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="f1", universe="CSI300"
+                artifact_type="factor", name="f1", universe="TSX60"
             )
         )
         aid = reg["artifact"]["id"]
@@ -522,13 +522,13 @@ class TestSdmTools:
 
         first = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="dup_tool", universe="CSI300"
+                artifact_type="factor", name="dup_tool", universe="TSX60"
             )
         )
         assert first["status"] == "ok"
         second = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="dup_tool", universe="CSI300"
+                artifact_type="factor", name="dup_tool", universe="TSX60"
             )
         )
         assert second["status"] == "error"
@@ -541,7 +541,7 @@ class TestSdmTools:
 
         reg = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="metricless", universe="CSI300"
+                artifact_type="factor", name="metricless", universe="TSX60"
             )
         )
         aid = reg["artifact"]["id"]
@@ -566,7 +566,7 @@ class TestSdmTools:
 
         reg = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="metricless2", universe="CSI300"
+                artifact_type="factor", name="metricless2", universe="TSX60"
             )
         )
         aid = reg["artifact"]["id"]
@@ -591,7 +591,7 @@ class TestSdmTools:
 
         reg = json.loads(
             SdmRegisterTool().execute(
-                artifact_type="factor", name="decay_factor", universe="CSI300"
+                artifact_type="factor", name="decay_factor", universe="TSX60"
             )
         )
         aid = reg["artifact"]["id"]
@@ -659,7 +659,7 @@ class TestSqliteStore:
         assert fetched is not None
         assert fetched.name == "sqlite_factor"
         assert fetched.type == ArtifactType.FACTOR
-        assert fetched.universe == "CSI300"
+        assert fetched.universe == "TSX60"
         assert fetched.status == ArtifactStatus.CREATED
 
     def test_register_auto_id(self):
@@ -691,7 +691,7 @@ class TestSqliteStore:
     def test_list_with_filters(self):
         """List with type/status/universe filters."""
         self.store.register_artifact(
-            _make_artifact(name="f1", artifact_type=ArtifactType.FACTOR, universe="CSI300")
+            _make_artifact(name="f1", artifact_type=ArtifactType.FACTOR, universe="TSX60")
         )
         self.store.register_artifact(
             _make_artifact(name="s1", artifact_type=ArtifactType.STRATEGY, universe="SP500")
@@ -705,7 +705,7 @@ class TestSqliteStore:
         assert len(factors) == 2
 
         # Filter by universe
-        csi = self.store.list_artifacts(universe="CSI300")
+        csi = self.store.list_artifacts(universe="TSX60")
         assert len(csi) == 1
         assert csi[0].name == "f1"
 
@@ -774,7 +774,7 @@ class TestSqliteStore:
             id="nonexistent",
             type=ArtifactType.FACTOR,
             name="ghost",
-            universe="CSI300",
+            universe="TSX60",
         )
         result = self.store.update_artifact(art)
         assert result is None
@@ -863,7 +863,7 @@ class TestSqliteStore:
             id="",
             type=ArtifactType.FACTOR,
             name="json_factor",
-            universe="CSI300",
+            universe="TSX60",
             theme=("momentum", "reversal"),
             columns_required=("close", "volume", "high"),
         )
@@ -991,7 +991,7 @@ class TestModelGovernance:
         art = Artifact(
             **{
                 **art.__dict__,
-                "intended_use": "Daily rebalance signal for CSI300 longs",
+                "intended_use": "Daily rebalance signal for TSX60 longs",
                 "limitations": "Not validated out-of-sample post-2024",
             }
         )
@@ -1062,7 +1062,7 @@ class TestModelGovernanceStore:
             "model_version": "1.0.0",
             "artifact_version": "art-v3",
             "model_tier": ModelTier.TIER_2_SIGNIFICANT,
-            "intended_use": "Daily rebalance signal for CSI300 longs",
+            "intended_use": "Daily rebalance signal for TSX60 longs",
             "limitations": "Not validated out-of-sample post-2024",
             "validation_status": ValidationStatus.VALIDATED,
             "validation_date": "2026-08-01",
@@ -1089,7 +1089,7 @@ class TestModelGovernanceStore:
         assert fetched.model_version == "1.0.0"
         assert fetched.artifact_version == "art-v3"
         assert fetched.model_tier == ModelTier.TIER_2_SIGNIFICANT
-        assert fetched.intended_use == "Daily rebalance signal for CSI300 longs"
+        assert fetched.intended_use == "Daily rebalance signal for TSX60 longs"
         assert fetched.limitations == "Not validated out-of-sample post-2024"
         assert fetched.validation_status == ValidationStatus.VALIDATED
         assert fetched.validation_date == "2026-08-01"
@@ -1266,7 +1266,7 @@ def _build_legacy_db(db_path) -> None:
         ) VALUES (
             'art_legacy001', 'factor', 'legacy_momentum', NULL, NULL, NULL,
             '[]', '[]', 20, NULL,
-            NULL, NULL, NULL, 'CSI300',
+            NULL, NULL, NULL, 'TSX60',
             NULL, NULL, NULL, 'active',
             '2025-01-01T00:00:00+00:00', '2025-01-01T00:00:00+00:00', NULL, NULL
         )
@@ -1292,7 +1292,7 @@ class TestSchemaMigration:
 
         assert fetched is not None
         assert fetched.name == "legacy_momentum"
-        assert fetched.universe == "CSI300"
+        assert fetched.universe == "TSX60"
         assert fetched.status == ArtifactStatus.ACTIVE
         # New governance columns default sanely for pre-existing rows.
         assert fetched.developer is None
@@ -1321,7 +1321,7 @@ class TestSchemaMigration:
                 id="",
                 type=ArtifactType.FACTOR,
                 name="post_migration_factor",
-                universe="CSI300",
+                universe="TSX60",
                 developer="Alice",
                 intended_use="Signal for post-migration coverage",
                 limitations="Untested pre-2020",

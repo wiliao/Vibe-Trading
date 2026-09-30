@@ -33,7 +33,7 @@ __alpha_meta__ = {
     'theme': ['volatility'],
     'formula_latex': r'\mathrm{zscore}_{x}\bigl(-\,\mathrm{ts\_cov}(r_i, r_m, 252) / \mathrm{ts\_std}(r_m, 252)^2\bigr)',
     'columns_required': ['close'],
-    'universe': ['equity_us', 'equity_cn', 'equity_hk'],
+    'universe': ['equity_us'],
     'frequency': ['1d'],
     'decay_horizon': 252,
     'min_warmup_bars': 253,

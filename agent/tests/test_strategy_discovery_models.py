@@ -182,7 +182,7 @@ class TestStrategySummary:
             source="sdm",
             description="d",
             status="active",
-            universe="csi300",
+            universe="sp500",
             has_evidence=True,
             regimes_with_evidence=("bear_market",),
         )

@@ -13,17 +13,16 @@ dyadic (prices in sixteenths, integer volume) and differences are compared with 
 tight tolerance, so pandas' online rolling sums carry no rounding residue that
 would read as a dependence.
 
-The recursive smoothers are held to a different rule, decided on #1463: a
-statistic that carries state — the GTJA ``SMA(A, n, m)`` written as
-``.ewm(alpha=m/n, adjust=False)``, a running product — skips the missing
-observation and continues from its last state, so the bars after a gap carry a
-value computed from the observations it saw. ``test_a_smoother_skips_the_gap``
-pins that: the gap bar itself is NaN (the registry masks it), the next bar is
-not, and the later values are not the gap-free ones.
+A stateful statistic (``.ewm(alpha=m/n, adjust=False)``, a running product) is
+held to a different rule, decided on #1463: it skips the missing observation and
+continues from its last state, so the bars after a gap carry a value computed
+from the observations it saw. No shipped alpha uses one in this build — the
+A-share smoothers that did are gone — so the rule lives in ``src.factors.base``'s
+NaN policy rather than in a test here.
 
-Four alphas the sweep still flags — ``alpha101_013``, ``alpha101_016``,
-``gtja191_083``, ``gtja191_099``, all ``rank(ts_cov(rank(x), rank(y), 5))`` —
-are the oracle's own artifact, not a dependence: their flagged cells sit 10 to
+Two alphas the sweep still flags — ``alpha101_013`` and ``alpha101_016``, both
+``rank(ts_cov(rank(x), rank(y), 5))`` — are the oracle's own artifact, not a
+dependence: their flagged cells sit 10 to
 241 bars past a 5-bar window, every one is a cross-sectional rank moving by
 exactly 1/48 or 1/24, and the covariances agree to twelve decimals between the
 two perturbed runs. Percentile ranks (k/24) are not dyadic, so the rolling
@@ -35,8 +34,8 @@ moves by a tick, so a gate that reads a missing operand as "not less" looked
 independent of the bar while it emitted a constant for the whole window. The
 second oracle compares the gapped run with the gap-free one instead: a cell after
 the gap that is finite and differs from its gap-free value was computed from the
-gap. It found 22 more alphas; three more flagged cells (``alpha101_094``,
-``alpha101_098``, ``gtja191_121``) sit 70 to 210 bars past every window and
+gap. It found more alphas still; two flagged cells (``alpha101_094``,
+``alpha101_098``) sit 70 to 210 bars past every window and
 come from correlations that differ by 1e-15 to 1e-12 between the two runs, the
 same tie-breaking residue as the four above.
 
@@ -62,19 +61,6 @@ FIXED = [
     "alpha101_082",
     "alpha101_087",
     "alpha101_092",
-    "gtja191_043",
-    "gtja191_049",
-    "gtja191_050",
-    "gtja191_051",
-    "gtja191_053",
-    "gtja191_058",
-    "gtja191_084",
-    "gtja191_094",
-    "gtja191_098",
-    "gtja191_112",
-    "gtja191_128",
-    "gtja191_129",
-    "gtja191_148",
 ]
 
 # 24 symbols: with fewer, a one-tick perturbation rarely flips a cross-sectional
@@ -133,7 +119,7 @@ def test_no_value_after_a_missing_bar_depends_on_it(alpha_id: str) -> None:
     moved = np.isfinite(out["up"]) != np.isfinite(out["down"])
     both = np.isfinite(out["up"]) & np.isfinite(out["down"])
     # A tolerance, not !=: a typical price divided by 3 is not dyadic, so a rolling
-    # sum still carries a rounding residue far past the window (gtja191_128).
+    # sum still carries a rounding residue far past the window.
     moved[both] = ~np.isclose(out["up"][both], out["down"][both], rtol=1e-9, atol=1e-12)
     fabricated = np.flatnonzero(moved & np.isfinite(out["missing"]))
 
@@ -141,86 +127,26 @@ def test_no_value_after_a_missing_bar_depends_on_it(alpha_id: str) -> None:
     assert fabricated.size == 0, f"bars after the gap computed from it: {fabricated.tolist()}"
 
 
-# The recursive statistics: 32 GTJA SMA(A, n, m) / EMA smoothers and one running product.
-SMOOTHERS = [
-    "gtja191_009",
-    "gtja191_022",
-    "gtja191_023",
-    "gtja191_024",
-    "gtja191_028",
-    "gtja191_047",
-    "gtja191_057",
-    "gtja191_063",
-    "gtja191_067",
-    "gtja191_068",
-    "gtja191_072",
-    "gtja191_079",
-    "gtja191_081",
-    "gtja191_082",
-    "gtja191_089",
-    "gtja191_096",
-    "gtja191_102",
-    "gtja191_109",
-    "gtja191_111",
-    "gtja191_122",
-    "gtja191_135",
-    "gtja191_143",
-    "gtja191_146",
-    "gtja191_151",
-    "gtja191_152",
-    "gtja191_155",
-    "gtja191_160",
-    "gtja191_162",
-    "gtja191_164",
-    "gtja191_169",
-    "gtja191_173",
-    "gtja191_174",
-    "gtja191_188",
-]
-
-
-@pytest.mark.parametrize("alpha_id", SMOOTHERS)
-def test_a_smoother_skips_the_gap(alpha_id: str) -> None:
-    """Skip and continue, not NaN until rewarmed: the policy set on #1463."""
-    registry = get_default_registry()
-    deps = set(registry.get(alpha_id).meta.get("columns_required", []))
-    base = _base()
-    clean = registry.compute(alpha_id, _panel(base, deps, "base")).iloc[:, _SYMBOL].to_numpy(dtype=float)
-    gapped = registry.compute(alpha_id, _panel(base, deps, "missing")).iloc[:, _SYMBOL].to_numpy(dtype=float)
-
-    assert np.isnan(gapped[_GAP]), "the registry masks the bar whose input is missing"
-    # gtja191_146 averages the smoothed residual over a full 20-bar window, which
-    # is NaN while it holds the gap; the smoother underneath it never stops.
-    first = _GAP + (21 if alpha_id == "gtja191_146" else 1)
-    assert np.isfinite(gapped[first:]).all(), "the smoother continued from its last state"
-    both = np.isfinite(clean[first:]) & np.isfinite(gapped[first:])
-    assert not np.allclose(clean[first:][both], gapped[first:][both], rtol=1e-9, atol=1e-12), (
-        "the values after the gap were computed from the observations the smoother saw, not copied"
-    )
-
-
 # Flagged by the value oracle for a reason other than the gap: a rounding residue
 # in a correlation of ranks that breaks a later rank tie differently, or (the
-# alpha101_021 / gtja191_004 twins, 37 bars past a 20-bar reach) a rolling mean
-# minus a rolling std that equals the 2-bar mean exactly on the gap-free run and
-# misses it by 1e-14 on the gapped one.
+# alpha101_021, 37 bars past a 20-bar reach) a rolling mean minus a rolling std
+# that equals the 2-bar mean exactly on the gap-free run and misses it by 1e-14 on
+# the gapped one.
 RESIDUE_ARTIFACTS = {
     "alpha101_013",
     "alpha101_016",
     "alpha101_021",
     "alpha101_094",
     "alpha101_098",
-    "gtja191_004",
-    "gtja191_083",
-    "gtja191_099",
-    "gtja191_121",
 }
-# Declared partial windows: rolling(60, min_periods=20/30) and a >=90% coverage rule.
-PARTIAL_WINDOWS = {"gtja191_025", "gtja191_033", "academic_corr_rewire"}
+# Declared partial windows: a >=90% coverage rule (the academic rewire alpha).
+PARTIAL_WINDOWS = {"academic_corr_rewire"}
 # The fallback benchmark is the cross-sectional mean of the closes present that day,
 # so one symbol's missing close moves every symbol's "benchmark down" flag on the
 # next bar. The symbol's own inputs are masked; the benchmark is left as it is.
-BENCHMARK_FROM_THE_PANEL = {"gtja191_075", "gtja191_182"}
+# No surviving alpha takes its benchmark from the panel, so this set is empty —
+# kept so the exemption plumbing (and its "are real alphas" check) stays honest.
+BENCHMARK_FROM_THE_PANEL: set[str] = set()
 
 
 _VALUE_ORACLE_SYMBOLS = (_SYMBOL, 16)
@@ -233,8 +159,8 @@ def _all_alpha_ids() -> list[str]:
 @pytest.mark.parametrize("alpha_id", _all_alpha_ids())
 def test_no_finite_value_after_a_gap_differs_from_the_gap_free_one(alpha_id: str) -> None:
     """The value oracle: sees comparison gates the perturbation oracle cannot."""
-    if alpha_id in set(SMOOTHERS) | RESIDUE_ARTIFACTS | PARTIAL_WINDOWS | BENCHMARK_FROM_THE_PANEL:
-        pytest.skip("classified above: smoother, residue artifact, partial window or panel benchmark")
+    if alpha_id in RESIDUE_ARTIFACTS | PARTIAL_WINDOWS | BENCHMARK_FROM_THE_PANEL:
+        pytest.skip("classified above: residue artifact, partial window or panel benchmark")
     registry = get_default_registry()
     deps = set(registry.get(alpha_id).meta.get("columns_required", []))
     base = _base()
@@ -255,7 +181,7 @@ def test_no_finite_value_after_a_gap_differs_from_the_gap_free_one(alpha_id: str
 
 def test_the_value_oracle_exemptions_are_real_alphas() -> None:
     known = set(_all_alpha_ids())
-    assert (RESIDUE_ARTIFACTS | PARTIAL_WINDOWS | BENCHMARK_FROM_THE_PANEL | set(SMOOTHERS)) <= known
+    assert (RESIDUE_ARTIFACTS | PARTIAL_WINDOWS | BENCHMARK_FROM_THE_PANEL) <= known
 
 
 # Each gate's longest input reach in bars (see the comment above its mask).
@@ -271,10 +197,6 @@ GATE_REACH = {
     "alpha101_086": 58,
     "alpha101_095": 81,
     "alpha101_099": 87,
-    "gtja191_056": 60,
-    "gtja191_101": 80,
-    "gtja191_123": 87,
-    "gtja191_154": 197,
 }
 
 

@@ -49,7 +49,7 @@ class SdmRegisterTool(BaseTool):
             },
             "universe": {
                 "type": "string",
-                "description": "Target market universe (e.g. CSI300, SP500, BTC)",
+                "description": "Target market universe (e.g. SP500)",
             },
             "source_paper": {
                 "type": "string",

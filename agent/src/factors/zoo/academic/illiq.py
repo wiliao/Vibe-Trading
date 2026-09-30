@@ -29,7 +29,7 @@ __alpha_meta__ = {
     'theme': ['liquidity'],
     'formula_latex': r'\mathrm{zscore}_{x}\bigl(\mathrm{ts\_mean}(|r_t| / (\mathrm{close}_t \cdot \mathrm{volume}_t),\,21)\bigr)',
     'columns_required': ['close', 'volume'],
-    'universe': ['equity_us', 'equity_cn', 'equity_hk'],
+    'universe': ['equity_us'],
     'frequency': ['1d'],
     'decay_horizon': 21,
     'min_warmup_bars': 22,

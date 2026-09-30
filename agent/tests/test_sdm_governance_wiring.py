@@ -30,7 +30,7 @@ def tools(monkeypatch):
 
 
 def _register(reg, **kwargs):
-    base = {"artifact_type": "factor", "universe": "csi300"}
+    base = {"artifact_type": "factor", "universe": "sp500"}
     base.update(kwargs)
     return json.loads(reg.execute(**base))
 
@@ -90,7 +90,7 @@ def test_a_complete_registration_is_accepted_and_stored(tools):
         validator="carol",
         approver="dave",
         model_tier="tier_2_significant",
-        intended_use="CSI300 cross-sectional stock selection",
+        intended_use="SP500 cross-sectional stock selection",
         limitations="not valid below 50m average daily turnover",
     )
     assert result["status"] == "ok"
