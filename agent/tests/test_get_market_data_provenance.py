@@ -34,34 +34,34 @@ def _df():
     return df
 
 
-class _ALotsLoader:
-    """Declares its A-share volume unit, like the real tencent/eastmoney loaders."""
+class _ASharesLoader:
+    """Declares its US-equity volume unit, like the real yahoo loader."""
 
-    volume_units = {"a_share": "lots"}
+    volume_units = {"us_equity": "shares"}
 
     def fetch(self, codes, start, end, interval="1D"):
-        return {"600519.SH": _df()}
+        return {"AAPL.US": _df()}
 
 
-def _call(codes, source="tencent"):
+def _call(codes, source="yahoo"):
     return json.loads(
         _gmd(codes=codes, start_date="2026-05-01", end_date="2026-05-02", source=source)
     )
 
 
 def test_mcp_get_market_data_carries_provenance(monkeypatch):
-    monkeypatch.setattr(mcp_server, "_get_loader", lambda src: _ALotsLoader)
-    out = _call(["600519.SH"])
+    monkeypatch.setattr(mcp_server, "_get_loader", lambda src: _ASharesLoader)
+    out = _call(["AAPL.US"])
     assert "_provenance" in out
-    assert out["_provenance"]["600519.SH"]["volume_unit"] == "lots"
+    assert out["_provenance"]["AAPL.US"]["volume_unit"] == "shares"
 
 
 def test_mcp_get_market_data_row_shape_unchanged(monkeypatch):
     """The fix must not alter the per-symbol row payload itself, only add
     the additive _provenance key alongside it."""
-    monkeypatch.setattr(mcp_server, "_get_loader", lambda src: _ALotsLoader)
-    out = _call(["600519.SH"])
-    assert out["600519.SH"] == [
+    monkeypatch.setattr(mcp_server, "_get_loader", lambda src: _ASharesLoader)
+    out = _call(["AAPL.US"])
+    assert out["AAPL.US"] == [
         {
             "trade_date": "2026-05-01T00:00:00",
             "open": 1.0,

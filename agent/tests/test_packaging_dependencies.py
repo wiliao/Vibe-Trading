@@ -46,7 +46,7 @@ def test_harmonic_backend_is_available_as_an_optional_extra() -> None:
     assert "pyharmonics" in harmonic_extra
 
 
-def test_longbridge_sdk_is_optional_and_available_as_an_extra() -> None:
+def test_ibkr_sdk_is_optional_and_available_as_an_extra() -> None:
     """Broker SDK dependencies must not perturb every baseline installation."""
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
 
@@ -59,14 +59,14 @@ def test_longbridge_sdk_is_optional_and_available_as_an_extra() -> None:
         for line in (ROOT / "agent" / "requirements.txt").read_text().splitlines()
         if line and not line.startswith("#")
     }
-    longbridge_extra = {
+    ibkr_extra = {
         _normalized_requirement_name(requirement)
-        for requirement in pyproject["project"]["optional-dependencies"]["longbridge"]
+        for requirement in pyproject["project"]["optional-dependencies"]["ibkr"]
     }
 
-    assert "longbridge" not in core_dependencies
-    assert "longbridge" not in requirements_txt
-    assert "longbridge" in longbridge_extra
+    assert "ib_async" not in core_dependencies
+    assert "ib_async" not in requirements_txt
+    assert "ib_async" in ibkr_extra
 
 
 def test_channel_core_websocket_dependency_is_declared_for_baseline_installs() -> None:

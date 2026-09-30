@@ -11,14 +11,15 @@ from src.swarm.worker import build_worker_prompt
 from src.tools import build_swarm_registry
 
 
-def test_market_data_tool_exposes_longbridge_source():
+def test_market_data_tool_exposes_surviving_sources():
     from src.tools.market_data_tool import MarketDataTool
 
     source_schema = MarketDataTool.parameters["properties"]["source"]
-    assert "longbridge" in source_schema["enum"]
+    for source in ("yahoo", "yfinance", "stooq", "sina", "eastmoney", "local", "auto"):
+        assert source in source_schema["enum"]
 
 
-def test_market_data_json_accepts_explicit_longbridge_source():
+def test_market_data_json_accepts_explicit_source():
     idx = pd.date_range("2026-01-01", periods=1, freq="D")
     idx.name = "trade_date"
     df = pd.DataFrame(
@@ -33,7 +34,7 @@ def test_market_data_json_accepts_explicit_longbridge_source():
     )
     seen = []
 
-    class _LongbridgeLoader:
+    class _ExplicitLoader:
         def fetch(self, codes, start, end, interval="1D"):
             seen.append((codes, start, end, interval))
             return {codes[0]: df}
@@ -42,8 +43,8 @@ def test_market_data_json_accepts_explicit_longbridge_source():
         codes=["AAPL.US"],
         start_date="2026-01-01",
         end_date="2026-01-02",
-        source="longbridge",
-        loader_resolver=lambda source: _LongbridgeLoader,
+        source="yahoo",
+        loader_resolver=lambda source: _ExplicitLoader,
     )
 
     payload = json.loads(text)
@@ -114,79 +115,23 @@ def test_market_data_provenance_exposes_declared_volume_unit():
     )
 
     class _UnitAwareLoader:
-        volume_units = {"a_share": "lots", "hk_equity": "shares"}
+        volume_units = {"us_equity": "shares"}
 
         def fetch(self, codes, start, end, interval="1D"):
             return {code: df for code in codes}
 
     payload = json.loads(
         fetch_market_data_json(
-            codes=["600519.SH", "0700.HK"],
+            codes=["AAPL.US"],
             start_date="2026-01-01",
             end_date="2026-01-02",
-            source="tencent",
+            source="yahoo",
             loader_resolver=lambda source: _UnitAwareLoader,
             include_provenance=True,
         )
     )
 
-    assert payload["_provenance"]["600519.SH"]["volume_unit"] == "lots"
-    assert payload["_provenance"]["0700.HK"]["volume_unit"] == "shares"
-
-
-def test_market_data_provenance_uses_per_symbol_currency_conversion():
-    """Conversion provenance follows the frame, not the ``.L`` suffix."""
-    idx = pd.date_range("2026-01-01", periods=1, freq="D")
-    idx.name = "trade_date"
-    df = pd.DataFrame(
-        {
-            "open": [1.17],
-            "high": [1.18],
-            "low": [1.16],
-            "close": [1.175],
-            "volume": [100],
-        },
-        index=idx,
-    )
-
-    class _UKAwareLoader:
-        volume_units = {"uk_equity": "shares"}
-
-        def fetch(self, codes, start, end, interval="1D"):
-            result = {}
-            for code in codes:
-                frame = df.copy()
-                if code == "VOD.L":
-                    frame.attrs.update(
-                        quote_currency="GBP",
-                        currency_conversion="GBp→GBP (÷100)",
-                    )
-                elif code == "VUSA.L":
-                    frame.attrs.update(
-                        quote_currency="GBP",
-                        currency_conversion="none",
-                    )
-                result[code] = frame
-            return result
-
-    payload = json.loads(
-        fetch_market_data_json(
-            codes=["VOD.L", "VUSA.L", "AAPL.US"],
-            start_date="2026-01-01",
-            end_date="2026-01-02",
-            source="yahoo",
-            loader_resolver=lambda source: _UKAwareLoader,
-            include_provenance=True,
-        )
-    )
-
-    assert payload["_provenance"]["VOD.L"]["currency_conversion"] == "GBp→GBP (÷100)"
-    assert payload["_provenance"]["VOD.L"]["quote_currency"] == "GBP"
-    assert payload["_provenance"]["VOD.L"]["volume_unit"] == "shares"
-    assert payload["_provenance"]["VUSA.L"]["currency_conversion"] == "none"
-    assert payload["_provenance"]["VUSA.L"]["quote_currency"] == "GBP"
-    # Non-LSE symbols without frame metadata keep the neutral default.
-    assert payload["_provenance"]["AAPL.US"]["currency_conversion"] == "none"
+    assert payload["_provenance"]["AAPL.US"]["volume_unit"] == "shares"
 
 
 def test_market_data_provenance_volume_unit_follows_serving_loader():
@@ -205,34 +150,34 @@ def test_market_data_provenance_volume_unit_follows_serving_loader():
     )
 
     class _PrimaryLoader:
-        volume_units = {"a_share": "lots"}
+        volume_units = {"us_equity": "lots"}
 
         def fetch(self, codes, start, end, interval="1D"):
             raise RuntimeError("primary unavailable")
 
     class _FallbackLoader:
-        volume_units = {"a_share": "shares"}
+        volume_units = {"us_equity": "shares"}
 
         def fetch(self, codes, start, end, interval="1D"):
             return {codes[0]: df}
 
     def _resolver(source: str):
-        return _PrimaryLoader if source == "tencent" else _FallbackLoader
+        return _PrimaryLoader if source == "yahoo" else _FallbackLoader
 
     payload = json.loads(
         fetch_market_data_json(
-            codes=["600519.SH"],
+            codes=["AAPL.US"],
             start_date="2026-01-01",
             end_date="2026-01-02",
-            source="tencent",
+            source="yahoo",
             loader_resolver=_resolver,
-            fallback_chain_provider=lambda source: ["tencent", "baostock"],
+            fallback_chain_provider=lambda source: ["yahoo", "stooq"],
             include_provenance=True,
         )
     )
 
-    prov = payload["_provenance"]["600519.SH"]
-    assert prov["source"] == "baostock"
+    prov = payload["_provenance"]["AAPL.US"]
+    assert prov["source"] == "stooq"
     assert prov["fallback_used"] is True
     assert prov["volume_unit"] == "shares"
 
@@ -277,7 +222,7 @@ def test_swarm_registry_can_expose_local_get_market_data_tool():
 
 def test_every_market_data_worker_has_get_market_data_tool():
     """Workers with OHLCV-capable skills must expose the loader-backed tool (#198)."""
-    market_data_skills = {"tushare", "yfinance", "okx-market"}
+    market_data_skills = {"yfinance"}
     missing = []
     for summary in list_presets():
         preset = load_preset(summary["name"])
@@ -392,7 +337,7 @@ def test_market_data_tool_accepts_every_registered_source():
     ):
         for source in sorted(VALID_SOURCES):
             out = mod.MarketDataTool().execute(
-                codes=["BTC-USDT"],
+                codes=["AAPL.US"],
                 start_date="2026-08-20",
                 end_date="2026-08-21",
                 source=source,

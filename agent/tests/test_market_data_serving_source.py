@@ -14,15 +14,15 @@ def _bars():
     )
 
 
-@pytest.mark.parametrize("requested", ["baostock", "sina"])
+@pytest.mark.parametrize("requested", ["tiingo", "sina"])
 @pytest.mark.parametrize("availability", ["unavailable", "constructor_error", "available"])
 def test_real_registry_substitution_reports_serving_source(monkeypatch, requested, availability):
     """Exercise the real resolver, including unavailable optional SDKs."""
 
     class Requested:
         name = requested
-        markets = {"a_share"}
-        volume_units = {"a_share": "lots"}
+        markets = {"us_equity"}
+        volume_units = {"us_equity": "shares"}
 
         def __init__(self):
             if availability == "constructor_error":
@@ -36,9 +36,9 @@ def test_real_registry_substitution_reports_serving_source(monkeypatch, requeste
             return {code: _bars() for code in codes}
 
     class Serving:
-        name = "tencent"
-        markets = {"a_share"}
-        volume_units = {"a_share": "shares"}
+        name = "yahoo"
+        markets = {"us_equity"}
+        volume_units = {"us_equity": "shares"}
 
         def is_available(self):
             return True
@@ -47,26 +47,26 @@ def test_real_registry_substitution_reports_serving_source(monkeypatch, requeste
             return {code: _bars() for code in codes}
 
     monkeypatch.setattr(registry, "_ensure_registered", lambda: None)
-    monkeypatch.setattr(registry, "LOADER_REGISTRY", {requested: Requested, "tencent": Serving})
-    monkeypatch.setattr(registry, "FALLBACK_CHAINS", {"a_share": ["tencent", requested]})
+    monkeypatch.setattr(registry, "LOADER_REGISTRY", {requested: Requested, "yahoo": Serving})
+    monkeypatch.setattr(registry, "FALLBACK_CHAINS", {"us_equity": ["yahoo", requested]})
     out = fetch_market_data(
-        codes=["600519.SH"],
+        codes=["AAPL.US"],
         start_date="2026-09-01",
         end_date="2026-09-02",
         source=requested,
         include_provenance=True,
     )
-    provenance = out["_provenance"]["600519.SH"]
+    provenance = out["_provenance"]["AAPL.US"]
     available = availability == "available"
-    assert provenance["source"] == (requested if available else "tencent")
+    assert provenance["source"] == (requested if available else "yahoo")
     assert provenance["requested_source"] == requested
     assert provenance["fallback_used"] is (not available)
-    assert provenance["volume_unit"] == ("lots" if available else "shares")
+    assert provenance["volume_unit"] == "shares"
     # The caliber follows the source that actually served, not the one requested.
     caliber_by_source = {
         "sina": "raw",
-        "baostock": "split_dividend",
-        "tencent": "split_dividend_additive",
+        "tiingo": "split_dividend",
+        "yahoo": "split_dividend",
     }
     assert provenance["adjustment"] == caliber_by_source[provenance["source"]]
 
@@ -75,12 +75,12 @@ def test_substituted_partial_batch_keeps_each_serving_source():
     """A resolver substitution and later fetch fallback both retain identity."""
     calls = []
 
-    class Tencent:
-        name = "tencent"
+    class Yahoo:
+        name = "yahoo"
 
         def fetch(self, codes, start, end, interval="1D"):
             calls.append((self.name, codes))
-            return {"600519.SH": _bars()}
+            return {"AAPL.US": _bars()}
 
     class Sina:
         name = "sina"
@@ -90,19 +90,19 @@ def test_substituted_partial_batch_keeps_each_serving_source():
             return {code: _bars() for code in codes}
 
     out = fetch_market_data(
-        codes=["600519.SH", "000001.SZ"],
+        codes=["AAPL.US", "MSFT.US"],
         start_date="2026-09-01",
         end_date="2026-09-02",
-        source="baostock",
+        source="tiingo",
         include_provenance=True,
-        loader_resolver=lambda source: Tencent if source == "baostock" else Sina,
+        loader_resolver=lambda source: Yahoo if source == "tiingo" else Sina,
         fallback_chain_provider=lambda source: ["sina"],
     )
-    assert calls == [("tencent", ["600519.SH", "000001.SZ"]), ("sina", ["000001.SZ"])]
-    first, second = (out["_provenance"][code] for code in ["600519.SH", "000001.SZ"])
+    assert calls == [("yahoo", ["AAPL.US", "MSFT.US"]), ("sina", ["MSFT.US"])]
+    first, second = (out["_provenance"][code] for code in ["AAPL.US", "MSFT.US"])
     assert (first["source"], first["adjustment"], first["fallback_used"]) == (
-        "tencent",
-        "split_dividend_additive",
+        "yahoo",
+        "split_dividend",
         True,
     )
     assert (second["source"], second["adjustment"], second["fallback_used"]) == ("sina", "raw", True)

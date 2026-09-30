@@ -688,20 +688,16 @@ def test_get_data_source_settings_lists_default_source_orders(
     assert response.status_code == 200
     entries = response.json()["source_orders"]
     orders = {entry["market"]: entry for entry in entries}
-    assert set(orders) == {
-        "a_share", "us_equity", "hk_equity", "india_equity", "kr_equity",
-        "ca_equity", "ar_equity", "vietnam_equity", "uk_equity", "crypto", "futures",
-        "fund", "macro", "forex", "index",
-    }
-    a_share = orders["a_share"]
-    assert a_share["env_var"] == "MARKET_DATA_ORDER_A_SHARE"
-    assert a_share["override"] is None
-    assert a_share["override_invalid"] is False
-    assert a_share["effective_order"] == a_share["default_order"]
-    assert a_share["default_order"][0] == "tencent"
-    uk_equity = orders["uk_equity"]
-    assert uk_equity["env_var"] == "MARKET_DATA_ORDER_UK_EQUITY"
-    assert uk_equity["default_order"][0] == "yahoo"
+    assert set(orders) == {"us_equity", "ca_equity", "index"}
+    us_equity = orders["us_equity"]
+    assert us_equity["env_var"] == "MARKET_DATA_ORDER_US_EQUITY"
+    assert us_equity["override"] is None
+    assert us_equity["override_invalid"] is False
+    assert us_equity["effective_order"] == us_equity["default_order"]
+    assert us_equity["default_order"][0] == "yahoo"
+    ca_equity = orders["ca_equity"]
+    assert ca_equity["env_var"] == "MARKET_DATA_ORDER_CA_EQUITY"
+    assert ca_equity["default_order"][0] == "yahoo"
 
 
 def test_update_source_orders_persists_and_hot_applies(
@@ -716,10 +712,10 @@ def test_update_source_orders_persists_and_hot_applies(
         json={
             "source_orders": [
                 {
-                    "market": "a_share",
+                    "market": "us_equity",
                     "order": [
-                        "tushare", "tencent", "mootdx", "eastmoney",
-                        "baostock", "akshare", "gildata", "local",
+                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
+                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
                     ],
                 },
             ],
@@ -728,19 +724,19 @@ def test_update_source_orders_persists_and_hot_applies(
 
     assert response.status_code == 200
     entry = next(
-        e for e in response.json()["source_orders"] if e["market"] == "a_share"
+        e for e in response.json()["source_orders"] if e["market"] == "us_equity"
     )
     # Response reports the new effective order...
-    assert entry["effective_order"][0] == "tushare"
+    assert entry["effective_order"][0] == "stooq"
     assert entry["override"] is not None
-    assert entry["override"][0] == "tushare"
+    assert entry["override"][0] == "stooq"
     # ...persisted to the dotenv...
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "MARKET_DATA_ORDER_A_SHARE=tushare,tencent,mootdx" in env_text
+    assert "MARKET_DATA_ORDER_US_EQUITY=stooq,yahoo,sina" in env_text
     # ...synced into the running process env...
-    assert os.environ.get("MARKET_DATA_ORDER_A_SHARE", "").startswith("tushare,")
+    assert os.environ.get("MARKET_DATA_ORDER_US_EQUITY", "").startswith("stooq,")
     # ...and hot-applied to the live registry chain.
-    assert registry.FALLBACK_CHAINS["a_share"][0] == "tushare"
+    assert registry.FALLBACK_CHAINS["us_equity"][0] == "stooq"
 
 
 def test_update_source_orders_reset_clears_override(
@@ -755,10 +751,10 @@ def test_update_source_orders_reset_clears_override(
         json={
             "source_orders": [
                 {
-                    "market": "a_share",
+                    "market": "us_equity",
                     "order": [
-                        "tushare", "tencent", "mootdx", "eastmoney",
-                        "baostock", "akshare", "gildata", "local",
+                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
+                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
                     ],
                 },
             ],
@@ -768,18 +764,18 @@ def test_update_source_orders_reset_clears_override(
 
     reset = client.put(
         "/settings/data-sources",
-        json={"source_orders": [{"market": "a_share", "order": None}]},
+        json={"source_orders": [{"market": "us_equity", "order": None}]},
     )
 
     assert reset.status_code == 200
     entry = next(
-        e for e in reset.json()["source_orders"] if e["market"] == "a_share"
+        e for e in reset.json()["source_orders"] if e["market"] == "us_equity"
     )
     assert entry["override"] is None
     assert entry["effective_order"] == entry["default_order"]
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "MARKET_DATA_ORDER_A_SHARE=\n" in env_text  # cleared, not deleted
-    assert registry.FALLBACK_CHAINS["a_share"] == entry["default_order"]
+    assert "MARKET_DATA_ORDER_US_EQUITY=\n" in env_text  # cleared, not deleted
+    assert registry.FALLBACK_CHAINS["us_equity"] == entry["default_order"]
 
 
 def test_update_source_orders_rejects_non_permutation(
@@ -789,7 +785,7 @@ def test_update_source_orders_rejects_non_permutation(
 ) -> None:
     response = client.put(
         "/settings/data-sources",
-        json={"source_orders": [{"market": "crypto", "order": ["okx", "binance"]}]},
+        json={"source_orders": [{"market": "us_equity", "order": ["yahoo", "stooq"]}]},
     )
 
     assert response.status_code == 400

@@ -18,19 +18,13 @@ from src.tools.symbol_search_tool import _from_yahoo_symbol
 
 # market -> (project symbol, Yahoo's spelling of it, symbol-search label)
 _SAMPLES: dict[str, tuple[str, str, str]] = {
-    "a_share": ("600519.SH", "600519.SS", "cn"),
     "us_equity": ("AAPL.US", "AAPL", "us"),
-    "hk_equity": ("00700.HK", "0700.HK", "hk"),
-    "india_equity": ("RELIANCE.NS", "RELIANCE.NS", "in"),
-    "kr_equity": ("005930.KS", "005930.KS", "kr"),
     "ca_equity": ("TD.TO", "TD.TO", "ca"),
-    "ar_equity": ("GGAL.BA", "GGAL.BA", "ar"),
-    "uk_equity": ("VOD.L", "VOD.L", "uk"),
-    "vietnam_equity": ("VIC.VN", "VIC.VN", "vn"),
 }
 
-# Crypto has a currency row but no listing suffix: its pairs carry the quote.
-_NOT_A_LISTING_MARKET = {"crypto"}
+# Index levels have a currency row but no listing suffix / venue: they carry no
+# canonical-symbol scan of their own.
+_NOT_A_LISTING_MARKET = {"index"}
 
 
 def test_every_currency_market_has_a_sample() -> None:
