@@ -23,13 +23,13 @@ applied to a *long* candidate as a quality screen, not to short anything.
 
 ## Market-fit note
 
-- Depends on filing quality. US filings support the full procedure; A-share and HK
-  disclosure supports much of it but with fewer segment and related-party details,
-  and audit-quality dispersion is wider.
+- Depends on filing quality. US and Canadian filings (SEC EDGAR, SEDAR+) support the
+  full procedure, but Canadian disclosure can carry fewer segment and related-party
+  details and audit-quality dispersion is wider in small caps.
 - Structural constraints matter and are part of the analysis, not an afterthought:
-  in A-shares securities lending is limited and mechanically constrained; in HK
-  borrow exists but can be recalled; single-name shorting may be restricted or
-  impossible. A thesis that cannot be expressed is still useful as a *warning*, and
+  borrow exists for most large caps but can be recalled and is expensive in crowded
+  shorts; for a Canada-only listing, borrow may be thin or unavailable, so check it
+  before sizing. A thesis that cannot be expressed is still useful as a *warning*, and
   must be labelled as such.
 
 ## Priority signals (walk in this order)

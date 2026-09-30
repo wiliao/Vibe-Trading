@@ -246,13 +246,13 @@ def _detect_patterns_fallback(
 
 def _detect_patterns_pyharmonics(
     df: pd.DataFrame,
-    is_stock: bool = False,
+    is_stock: bool = True,
 ) -> List[Dict]:
     """使用 pyharmonics 库检测谐波形态。
 
     Args:
         df: OHLCV DataFrame，需含 open/high/low/close/volume 列。
-        is_stock: 是否为股票标的。
+        is_stock: 是否为股票标的（美股 / 加股均为股票，默认 True）。
 
     Returns:
         检测到的形态列表，格式与 _detect_patterns_fallback 一致。
@@ -319,27 +319,27 @@ class SignalEngine:
     优先使用 pyharmonics 库，若不可用则回退到内置检测器。
 
     Attributes:
-        is_stock: 是否为股票标的。
+        is_stock: 是否为股票标的（美股 / 加股均为股票，默认 True）。
         swing_window: 摆动点检测窗口（仅内置检测器使用）。
         tol: Fibonacci 比率容差（仅内置检测器使用）。
         use_pyharmonics: 运行时确定是否使用 pyharmonics。
 
     Example:
         >>> engine = SignalEngine()
-        >>> signals = engine.generate({"BTC-USDT": df})
-        >>> signals["BTC-USDT"].value_counts()
+        >>> signals = engine.generate({"AAPL": df})
+        >>> signals["AAPL"].value_counts()
     """
 
     def __init__(
         self,
-        is_stock: bool = False,
+        is_stock: bool = True,
         swing_window: int = 10,
         tol: float = 0.12,
     ):
         """初始化谐波形态信号引擎。
 
         Args:
-            is_stock: 是否为股票（影响 pyharmonics 参数）。
+            is_stock: 是否为股票（美股 / 加股均为股票，默认 True；影响 pyharmonics 参数）。
             swing_window: 摆动点检测半窗口大小。
             tol: Fibonacci 比率匹配容差。
         """
@@ -420,18 +420,18 @@ class SignalEngine:
         return result
 
 
-# ========================== OKX 数据获取 ====================================
+# ========================== Yahoo Finance 数据获取 ==========================
 
 
-def _fetch_okx(
-    inst_id: str, bar: str = "1D", limit: int = 300
+def _fetch_yahoo(
+    symbol: str, interval: str = "1d", range_: str = "2y"
 ) -> pd.DataFrame:
-    """从 OKX API 获取K线数据。
+    """从 Yahoo Finance 获取K线数据。
 
     Args:
-        inst_id: 交易对标识，如 "BTC-USDT"。
-        bar: K线周期，默认 "1D"。
-        limit: 获取数量，默认 300。
+        symbol: 美股 / 加股代码，如 "AAPL" 或 "SHOP.TO"。
+        interval: K线周期，默认 "1d"；分钟级可传 "5m"。
+        range_: 回看区间，默认 "2y"。
 
     Returns:
         OHLCV DataFrame，index 为 datetime。
@@ -442,41 +442,44 @@ def _fetch_okx(
     import requests
 
     resp = requests.get(
-        "https://www.okx.com/api/v5/market/candles",
-        params={"instId": inst_id, "bar": bar, "limit": str(limit)},
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+        params={"range": range_, "interval": interval},
+        headers={"User-Agent": "Mozilla/5.0"},
     )
-    candles = resp.json()["data"]
-    columns = [
-        "ts", "open", "high", "low", "close",
-        "vol", "volCcy", "volCcyQuote", "confirm",
-    ]
-    df = pd.DataFrame(reversed(candles), columns=columns)
-    df["ts"] = pd.to_datetime(df["ts"].astype("int64"), unit="ms")
-    df = df.set_index("ts")
-    for col in ["open", "high", "low", "close"]:
-        df[col] = df[col].astype(float)
-    df["volume"] = df["vol"].astype(float)
-    return df
+    result = resp.json()["chart"]["result"][0]
+    quote = result["indicators"]["quote"][0]
+    df = pd.DataFrame(
+        {
+            "open": quote["open"],
+            "high": quote["high"],
+            "low": quote["low"],
+            "close": quote["close"],
+            "volume": quote["volume"],
+        },
+        index=pd.to_datetime(result["timestamp"], unit="s"),
+    )
+    df.index.name = "ts"
+    return df.dropna(subset=["open", "high", "low", "close"])
 
 
 # ========================== 主入口 ==========================================
 
 if __name__ == "__main__":
-    symbols = ["BTC-USDT", "ETH-USDT", "SOL-USDT"]
+    symbols = ["AAPL", "MSFT", "SPY"]
     data_map = {}
 
     print("=== 谐波形态信号引擎 ===\n")
 
     for sym in symbols:
         print(f"获取 {sym} 数据...")
-        data_map[sym] = _fetch_okx(sym, bar="1D", limit=300)
+        data_map[sym] = _fetch_yahoo(sym)
         print(
             f"  {len(data_map[sym])} 根K线, "
             f"{data_map[sym].index[0]:%Y-%m-%d} ~ "
             f"{data_map[sym].index[-1]:%Y-%m-%d}"
         )
 
-    engine = SignalEngine(is_stock=False)
+    engine = SignalEngine(is_stock=True)
     backend = "pyharmonics" if engine.use_pyharmonics else "内置检测器"
     print(f"\n检测后端: {backend}")
 

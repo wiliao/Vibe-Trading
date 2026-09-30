@@ -143,7 +143,7 @@ Decision criteria:
 
 ```
 Based on cycle position and policy direction:
-- Overweight / neutral / underweight: China A-shares / Hong Kong stocks / US equities / bonds / commodities / cash
+- Overweight / neutral / underweight: US equities / Canadian equities / bonds / commodity-linked equities / cash
 - Style tilt: growth vs value, large cap vs small cap
 - Sector preference: cyclical / defensive / growth
 ```
@@ -156,7 +156,7 @@ Based on cycle position and policy direction:
 ### Snapshot of Core Data
 | Indicator | Latest | Previous | Trend |
 |------|--------|------|------|
-| China PMI | 50.2 | 49.8 | ↑ |
+| US ISM Manufacturing PMI | 50.2 | 49.8 | ↑ |
 | ... | ... | ... | ... |
 
 ### Economic Cycle Positioning
@@ -165,16 +165,16 @@ Based on cycle position and policy direction:
 - **Estimated remaining duration**: expected to last another X months
 
 ### Central Bank Policy Analysis
-- **PBOC**: easing bias, likely another 25bp RRR cut in Q2
-- **Fed**: hiking pause, watch the June dot plot
+- **Fed**: easing bias, likely another 25bp cut in Q2
+- **Bank of Canada**: policy rate path, watch the next fixed announcement date
 - **Policy conflicts**: whether there are conflicting policy signals worth attention
 
 ### Major Asset Allocation Tilt
 | Asset | Recommendation | Logic |
 |------|------|------|
-| China A-shares | Overweight | Policy bottom confirmed + loose liquidity |
-| Bonds | Neutral | Limited room for rates to fall further |
-| Commodities | Underweight | Weak demand |
+| US equities | Overweight | Earnings revision breadth improving + easing liquidity |
+| Canadian equities | Neutral | Commodity terms of trade mixed; CAD is the swing factor |
+| Duration | Neutral | Limited room for rates to fall further |
 | Cash | Underweight | High opportunity cost |
 
 ### Risk Warnings

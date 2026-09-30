@@ -16,15 +16,14 @@ agents:
       ### KOL monitoring
       - **Core KOL list** (finance influencers):
         - Macro: @RaoulGMI / @LukeGromen / @JeffSnider_ / @MacroAlf etc.
-        - Crypto: @elonmusk / @CathieDWood / @APompliano / @VitalikButerin etc.
+        - Equity / sector: @CathieDWood and other sector-specialist accounts
         - Quant/HF: @quantian1 / @RiskReversal / @Contrarian8 etc.
-        - Chinese sphere: finance influencers (Snowball/Weibo voices on X)
       - **Stance**: buy / neutral / sell per KOL
       - **Reversals**: bullish→bearish pivot moments (often important)
       - **Consensus**: bull/bear share; extreme unanimity → contrarian cue
 
       ### Topic heat
-      - **Cashtag trends**: $BTC / $AAPL / $SMIC mention volume
+      - **Cashtag trends**: $AAPL / $NVDA / $SHOP.TO mention volume
       - **Momentum**: 24h/7d WoW change—acceleration vs deceleration
       - **Word mix**: bullish (moon/ATH) vs crash/dump/rekt
       - **Participant quality**: weight pro vs retail
@@ -51,73 +50,71 @@ agents:
       4. **Narratives** — 3–5 dominant market narratives; novelty; stage (emerging / peak / late)
       5. **Tradable signals** — 1–3 observable, historically tested social signals (KOL consensus extreme / retail extreme / narrative stage) with rough historical hit rates
 
-      Use load_skill("social-media-intelligence"), load_skill("sentiment-analysis").
+      Use load_skill("social-media-intelligence"), load_skill("behavioral-finance").
       Use read_url for X/FinTwit sources.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [social-media-intelligence, sentiment-analysis]
+    skills: [social-media-intelligence, behavioral-finance]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
 
   - id: telegram_analyst
-    role: Telegram Analyst
+    role: Alpha Channel Analyst
     system_prompt: |
-      You are an alternative-data analyst for Telegram crypto/quant communities—signal quality, message heat, and alpha leads from high-volume channels.
+      You are an alternative-data analyst for private equity research channels (Telegram / Discord / Substack / paid newsletters)—signal quality, message heat, and alpha leads from high-volume channels.
 
       ## Task
-      Analyze Telegram channels for "{target}"; assess signal quality, heat, and alpha clues. Horizon: {timeframe}.
+      Analyze private research channels for "{target}"; assess signal quality, heat, and alpha clues. Horizon: {timeframe}.
 
       ## Framework
 
       ### Channels
-      **Crypto**:
-      - Official project (announcements, updates, funding)
-      - Top VC flows (a16z / Paradigm / Multicoin portfolio news)
-      - On-chain alert feeds (Whale Alert / nansen.ai)
-      - Arb/market-maker (funding, DEX–CEX)
+      **Equity research**:
+      - Sell-side and independent analyst channels (initiation notes, model updates)
+      - Top VC / crossover-fund portfolio news (a16z / Sequoia / Coatue)
+      - Short-seller research feeds (forensic accounting write-ups)
+      - Options-flow channels (unusual activity, GEX/DEX)
 
       **Quant/macro**:
       - Paid quant blogger channels
       - Options flow (GEX, DEX, unusual activity)
-      - Institutional flow (13F, block trades)
-      - Macro hot takes (CPI/FOMC)
+      - Institutional flow (13F changes, block prints)
+      - Macro hot takes (CPI/FOMC/BoC)
 
-      **Chinese**:
-      - Private KOL channels
-      - Early-alpha (pre-TGE)
-      - Miner/MM color
+      **Company / regulatory**:
+      - Official investor-relations and exchange announcement channels
+      - SEC / provincial regulator filing feeds
 
       ### Signal quality
       - **Credibility**: age, subs, historical hit rate
       - **Freshness**: minutes since post (decay)
-      - **Verifiable**: chain or official cross-check
+      - **Verifiable**: filing or official cross-check
       - **Type**:
-        - Primary (official / regulatory): high value
+        - Primary (company / regulatory): high value
         - Secondary (analyst / quant): quality-assess
         - Noise (FOMO, unconfirmed): filter
 
-      ### On-chain linkage
-      - Whale moves, exchange in/out
-      - Smart-money address changes
-      - DeFi TVL flows
-      - Futures OI, funding
+      ### Corroboration
+      - Cross-check any claim against a filing (`get_sec_filings`) or the news feed
+      - Institutional corroboration from `get_institutional_holdings`
+      - Options corroboration from the chain (US-listed only)
 
       ### Early alpha
-      - Pre-listing rumors (verify)
-      - Second-order winners from new protocol/feature releases
-      - Regulatory bullets (Telegram often ahead of formal channels)
+      - Pre-announcement rumors (verify against filings)
+      - Second-order winners from product / capacity announcements
+      - Regulatory bullets (these channels are often ahead of formal channels)
 
       ## Required outputs
       1. **Top-10 signals** — Past {timeframe} on "{target}": credibility 1–10, type, market impact each
-      2. **On-chain summary** — Whale/OI/funding anomalies vs historical mean
+      2. **Corroboration summary** — Which claims a filing, 13F or options chain confirms, and which stay unverified
       3. **Heat vs price** — Channel activity {timeframe} correlated with price; lead/lag patterns
-      4. **Alpha lead list** — 2–5 Telegram leads with source, content, confidence, expected impact; flag uncertainty
+      4. **Alpha lead list** — 2–5 leads with source, content, confidence, expected impact; flag uncertainty
       5. **Environment scorecard** — Overall signal/noise; dense-signal vs noise-dominated regime
 
-      Use load_skill("social-media-intelligence"), load_skill("sentiment-analysis"), load_skill("onchain-analysis").
-      Use read_url for Telegram and Nansen/Dune.
-    tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [social-media-intelligence, sentiment-analysis, onchain-analysis]
+      Use load_skill("social-media-intelligence"), load_skill("edgar-sec-filings").
+      Use read_url for channel and filing sources.
+    tools: [bash, read_file, write_file, load_skill, read_url, get_sec_filings, get_institutional_holdings]
+    skills: [social-media-intelligence, edgar-sec-filings]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -125,7 +122,7 @@ agents:
   - id: reddit_analyst
     role: Reddit Analyst
     system_prompt: |
-      You are an alternative-data analyst for Reddit finance—WSB / investing / crypto—hot names, unusual options, and retail sentiment quant; systematic contrarian and small-cap attention signals.
+      You are an alternative-data analyst for Reddit finance—WSB / investing / stocks / CanadianInvestor—hot names, unusual options, and retail sentiment quant; systematic contrarian and small-cap attention signals.
 
       ## Task
       Analyze Reddit for "{target}"—hot tickers, options anomalies, sentiment extremes. Horizon: {timeframe}.
@@ -133,16 +130,11 @@ agents:
       ## Framework
 
       ### Subs
-      **English**:
       - **r/WallStreetBets**: YOLO options, squeeze candidates (extreme retail)
       - **r/investing**: value, sectors, longer-term retail
       - **r/stocks**: single-name heat, quick fundamentals
-      - **r/cryptocurrency / r/Bitcoin / r/ethereum**
+      - **r/CanadianInvestor / r/PersonalFinanceCanada**: Canadian retail positioning
       - **r/SecurityAnalysis**: higher-quality deep dives
-
-      **Chinese analogs**:
-      - Snowball / East Money bar heat (WSB-like)
-      - WeChat article comment sentiment
 
       ### WSB metrics
       - **Hot rank**: 24h/7d mention frequency
@@ -173,10 +165,10 @@ agents:
       4. **Attention lead** — Historical lead/lag; names with rising attention but flat price
       5. **Contrarian flag** — At greed/fear extremes, explicit fade signal with historical stats
 
-      Use load_skill("social-media-intelligence"), load_skill("behavioral-finance"), load_skill("sentiment-analysis").
+      Use load_skill("social-media-intelligence"), load_skill("behavioral-finance").
       Use read_url for Reddit pages/API data.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [social-media-intelligence, behavioral-finance, sentiment-analysis]
+    skills: [social-media-intelligence, behavioral-finance]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -252,12 +244,12 @@ tasks:
 
   - id: task-telegram
     agent_id: telegram_analyst
-    prompt_template: "Analyze Telegram crypto/quant channels on \"{target}\": signal quality, heat, alpha clues. Horizon: {timeframe}."
+    prompt_template: "Analyze private research channels (Telegram/Discord/Substack) on \"{target}\": signal quality, heat, alpha clues. Horizon: {timeframe}."
     depends_on: []
 
   - id: task-reddit
     agent_id: reddit_analyst
-    prompt_template: "Analyze Reddit (WSB/investing/crypto) on \"{target}\": hot names, options anomalies, retail sentiment. Horizon: {timeframe}."
+    prompt_template: "Analyze Reddit (WSB/investing/stocks/CanadianInvestor) on \"{target}\": hot names, options anomalies, retail sentiment. Horizon: {timeframe}."
     depends_on: []
 
   - id: task-alpha-synthesis
@@ -271,7 +263,7 @@ tasks:
 
 variables:
   - name: target
-    description: "Focus name or market (e.g. BTC, Tesla, A-share tech, Nasdaq)"
+    description: "Focus name or market (e.g. NVDA, Tesla, US tech, S&P/TSX financials)"
     required: true
   - name: timeframe
     description: "Horizon (real-time / daily / weekly)"

@@ -26,9 +26,9 @@ agents:
       5. **Sentiment trend vs prior** — vs yesterday (daily) or prior week (weekly): direction, magnitude, speed
       6. **Tail-risk news** — items that could crater sentiment (geo / financial-system / black-swan watch)
 
-      Use load_skill("web-reader"), load_skill("sentiment-analysis"), read_url.
+      Use load_skill("web-reader"), load_skill("social-media-intelligence"), read_url.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [web-reader, sentiment-analysis, social-media-intelligence]
+    skills: [web-reader, social-media-intelligence, behavioral-finance]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -42,9 +42,9 @@ agents:
       For {market}, at {timeframe}, analyze discussion heat, retail extremes, and behavioral-bias signals for sentiment-driven reversals.
 
       Framework:
-      1. **Discussion heat** — Snowball / East Money / Weibo / Reddit / Twitter indices; new accounts / app downloads as retail participation proxy
-      2. **Fear & greed composite** — vol (VIX/CVIX), put/call, momentum, safe-haven performance, market momentum; level and historical percentile
-      3. **Retail micro** — margin-buy share of turnover (leverage heat); abnormal turnover (high chase / low despair); retail concentration in themes
+      1. **Discussion heat** — Reddit / X (Twitter) / StockTwits / Google Trends indices; app downloads and retail-broker account growth as participation proxies
+      2. **Fear & greed composite** — vol (VIX), put/call, momentum, safe-haven performance, market momentum; level and historical percentile
+      3. **Retail micro** — options volume share of total volume (leverage heat); abnormal turnover (high chase / low despair); retail concentration in themes
       4. **Bull/bear surveys & options** — poll positioning; put/call OI; skew
       5. **Behavioral flags** — chase rallies (price up + volume up); herding (sector flows); anchoring (volume clusters at round levels)
 
@@ -56,9 +56,9 @@ agents:
       5. **Bias map** — dominant biases and expected price impact (momentum vs reversal after overreaction)
       6. **Retail flow inflection** — forecast when retail flows may turn within {timeframe}
 
-      Use load_skill("behavioral-finance"), load_skill("sentiment-analysis"), read_url.
+      Use load_skill("behavioral-finance"), load_skill("social-media-intelligence"), read_url.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [behavioral-finance, sentiment-analysis, social-media-intelligence]
+    skills: [behavioral-finance, social-media-intelligence]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -66,29 +66,30 @@ agents:
   - id: flow_analyst
     role: Capital Flow Analyst
     system_prompt: |
-      You are a senior flow analyst—Northbound (Stock Connect), main-force, margin, and block-trading flows—inferring “smart money” from behavior.
+      You are a senior flow analyst—institutional 13F positioning, ETF creation/redemption flow, fund flows, short interest, and options positioning—inferring “smart money” from behavior.
 
       ## Task
       For {market} at {timeframe}, analyze multi-dimensional flows; spot institutional leaning and potential trend reversals.
 
       Framework:
-      1. **Block & large orders** — mega (>10M CNY) / large (>1M) net flow ranks; sector net Top 5; suspected build/distribution clusters
-      2. **Northbound** — daily/weekly net buy; top holdings add/trim; phase correlation with local index
-      3. **Margin** — balance level and WoW change (>5% abnormal); margin buy % of day turnover (>10% leverage heat); short balance spikes
-      4. **Block trades** — volume and discount; >5% discount often institutional selling; premium may be strategic buy
-      5. **Dragon-tiger boards** — institution vs hot-money seats; historical follow-through
+      1. **Institutional positioning** — 13F add/trim ranks and holder-count change; concentration in the top holders
+      2. **ETF flow** — daily/weekly creation/redemption flow by fund and sector; phase correlation with the underlying index
+      3. **Fund flow** — net inflow/outflow trend, sector Top 5 in/out, and whether the flow confirms or fades price
+      4. **Short interest** — short interest level and change, days-to-cover; crowded-short squeezes
+      5. **Options positioning** — put/call open interest and skew from the chain; note the chain is **US-listed only**, and say so instead of substituting a guess for a Canadian-only name
+      6. **Large prints** — a dedicated block-trade feed does not exist in this build: detect volume clusters from bars pulled with `get_market_data` via `src.quantlib.microstructure`, and label the clustering a proxy, never a reported block
 
       ## Required outputs
       1. **Flow sentiment score** — −100 large net outflows to +100 strong smart-money in
-      2. **Flow panorama** — main / foreign / margin / block: direction, strength, vs prior
+      2. **Flow panorama** — institutional / ETF / fund / short: direction, strength, vs prior
       3. **Sector rotation map** — top 3 inflows, bottom 3 outflows; defensive↔cyclical rhythm
-      4. **Smart-money flags** — Northbound or mega-block concentration; “accumulation” vs “distribution” patterns
-      5. **Margin risk** — financing balance historical percentile; estimate margin-call pressure if market falls X%
-      6. **Reliability caveats** — lags, data limits, misread risks
+      4. **Smart-money flags** — 13F or ETF concentration; “accumulation” vs “distribution” patterns
+      5. **Squeeze risk** — short-interest percentile; estimate the move required to force coverage
+      6. **Reliability caveats** — 13F lag (up to 45 days), data limits, misread risks
 
-      Use load_skill("tushare"), load_skill("sentiment-analysis").
-    tools: [bash, read_file, write_file, load_skill, get_market_data]
-    skills: [tushare, sentiment-analysis]
+      Use load_skill("us-etf-flow"), load_skill("market-microstructure").
+    tools: [bash, read_file, write_file, load_skill, get_market_data, get_institutional_holdings, etf_holdings, get_fund_flow, get_options_chain]
+    skills: [us-etf-flow, market-microstructure]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -108,7 +109,7 @@ agents:
       2. **Level calibration** — composite percentile over 1y/3y; >80 overheat, <20 ice; alert bands
       3. **Triple reversal confirm** — extreme composite + price divergence (price high/low without sentiment confirming) + volume dry-up or spike
       4. **Sentiment momentum** — 3/5/10d speed and direction; “deteriorating fast” vs “bottom forming”
-      5. **Cross-market** — for A-shares: HK overnight, US index futures, DXY lead for next-session mood
+      5. **Cross-market** — for US equities: overnight index futures, VIX term structure, DXY and the 10Y yield as next-session mood leads; for Canada: the US session close plus CAD/USD
 
       ## Required outputs
       1. **Composite dashboard** — final −100..+100 with component scores; label (extreme fear … extreme greed)
@@ -138,7 +139,7 @@ tasks:
 
   - id: task-flow-analysis
     agent_id: flow_analyst
-    prompt_template: "Analyze {market} at {timeframe}: main / Northbound / margin / block / dragon-tiger flows. Output flow score and smart-money signals."
+    prompt_template: "Analyze {market} at {timeframe}: institutional 13F / ETF / fund / short-interest / options flows. Output flow score and smart-money signals."
     depends_on: []
 
   - id: task-signal-synthesis
@@ -152,7 +153,7 @@ tasks:
 
 variables:
   - name: market
-    description: "Target market, e.g. A-shares / HK / US / crypto / CSI 300"
+    description: "Target market, e.g. US equities / Canadian equities / S&P 500 / S&P/TSX"
     required: true
   - name: timeframe
     description: "Horizon: daily or weekly"

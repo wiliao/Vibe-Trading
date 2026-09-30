@@ -95,7 +95,7 @@ agents:
       - Event shocks (earnings season, index rebalance)
 
       ## Required outputs
-      1. **Liquidity score matrix** — Score each name 1–10 on turnover / stability / depth; flag illiquid (e.g. ADV < 50M CNY)
+      1. **Liquidity score matrix** — Score each name 1–10 on turnover / stability / depth; flag illiquid (e.g. ADV < USD 50M)
       2. **Trading-cost table** — Per pair: round-trip cost incl. impact vs expected spread edge; cost coverage ratio
       3. **Max feasible position** — Per pair, cap using “≤ X% of ADV” rule
       4. **Best intraday windows** — When to open/close per name
@@ -261,10 +261,10 @@ tasks:
 
 variables:
   - name: market
-    description: "Target market (e.g. A-shares, Hong Kong, crypto)"
+    description: "Target market (US or Canada equity)"
     required: true
   - name: goal
-    description: "Research focus (e.g. CSI 300 pair book, crypto arb ideas)"
+    description: "Research focus (e.g. S&P 500 pair book, TSX relative-value ideas)"
     required: true
   - name: sector
     description: "Sector filter (e.g. banks, consumer); empty = full market"

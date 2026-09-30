@@ -1,4 +1,9 @@
-"""Context-aware identity resolution without rewriting the user request."""
+"""Context-aware identity resolution without rewriting the user request.
+
+The surviving markets are US and Canada, so the dual-listing scenarios here use
+issuers that really do trade on both (Ballard Power, Shopify) instead of the
+removed A-share / Hong Kong pair.
+"""
 
 from __future__ import annotations
 
@@ -17,26 +22,43 @@ def _resolver_payload(query: str, candidates: list[dict[str, Any]]) -> str:
             "data": {
                 "query": query,
                 "candidates": candidates,
-                "sources": {"eastmoney": "ok", "yahoo": "ok"},
+                "sources": {"yahoo": "ok", "stooq": "ok"},
             },
         },
         ensure_ascii=False,
     )
 
 
-def _hengrui_candidates() -> list[dict[str, Any]]:
+def _ballard_candidates() -> list[dict[str, Any]]:
     return [
         {
-            "symbol": "600276.SH",
-            "name": "恒瑞医药",
-            "market": "cn",
-            "source": "eastmoney",
+            "symbol": "BLDP.US",
+            "name": "Ballard Power",
+            "market": "us",
+            "source": "yahoo",
         },
         {
-            "symbol": "01276.HK",
-            "name": "恒瑞医药",
-            "market": "hk",
-            "source": "eastmoney",
+            "symbol": "BLDP.TO",
+            "name": "Ballard Power",
+            "market": "ca",
+            "source": "yahoo",
+        },
+    ]
+
+
+def _shopify_candidates() -> list[dict[str, Any]]:
+    return [
+        {
+            "symbol": "SHOP.US",
+            "name": "Shopify",
+            "market": "us",
+            "source": "yahoo",
+        },
+        {
+            "symbol": "SHOP.TO",
+            "name": "Shopify",
+            "market": "ca",
+            "source": "yahoo",
         },
     ]
 
@@ -56,20 +78,20 @@ def _ingest(
     )
 
 
-def test_explicit_a_share_context_locks_the_a_share_candidate(tmp_path: Path) -> None:
-    message = "请分析A股恒瑞医药的最新财务情况"
+def test_explicit_canada_context_locks_the_canada_candidate(tmp_path: Path) -> None:
+    message = "请分析加股BLDP的最新财务情况"
     ledger = GroundingLedger(run_dir=tmp_path, user_message=message)
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.resolution_context.raw_user_message == message
-    assert ledger.authorized_symbols == {"600276.SH"}
+    assert ledger.authorized_symbols == {"BLDP.TO"}
     record = ledger.identity_summary()["records"][0]
     assert record["status"] == "locked"
     assert record["resolution_constraints"] == [
         {
             "dimension": "market",
-            "value": "cn",
+            "value": "ca",
             "source_message_id": "current_user_message",
             "source_span": [3, 5],
             "explicit": True,
@@ -80,24 +102,24 @@ def test_explicit_a_share_context_locks_the_a_share_candidate(tmp_path: Path) ->
     assert message not in artifact
 
 
-def test_explicit_a_h_comparison_keeps_both_candidates(tmp_path: Path) -> None:
+def test_explicit_us_canada_comparison_keeps_both_candidates(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="比较恒瑞医药 A/H 两地上市表现",
+        user_message="比较BLDP 美股/加股 两地上市表现",
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()
     constraints = ledger.identity_summary()["records"][0]["resolution_constraints"]
-    assert {item["value"] for item in constraints} == {"cn", "hk"}
+    assert {item["value"] for item in constraints} == {"us", "ca"}
 
 
 def test_no_explicit_market_remains_fail_closed(tmp_path: Path) -> None:
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="分析恒瑞医药")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="分析BLDP")
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()
@@ -111,10 +133,10 @@ def test_explicit_us_market_in_english_locks_the_us_candidate(tmp_path: Path) ->
     candidates = [
         {"symbol": "ABC.US", "name": "ABC", "market": "us", "source": "yahoo"},
         {
-            "symbol": "00123.HK",
+            "symbol": "ABC.TO",
             "name": "ABC",
-            "market": "hk",
-            "source": "eastmoney",
+            "market": "ca",
+            "source": "yahoo",
         },
     ]
 
@@ -126,19 +148,19 @@ def test_explicit_us_market_in_english_locks_the_us_candidate(tmp_path: Path) ->
 def test_negated_market_is_not_used_as_positive_authorization(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="不要看港股恒瑞医药",
+        user_message="不要看加股BLDP",
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()
 
 
 def test_constraint_mismatch_stays_fail_closed(tmp_path: Path) -> None:
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="只看A股恒瑞医药")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="只看加股BLDP")
 
-    _ingest(ledger, "恒瑞医药", [_hengrui_candidates()[1]])
+    _ingest(ledger, "BLDP", [_ballard_candidates()[0]])
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()
@@ -147,21 +169,17 @@ def test_constraint_mismatch_stays_fail_closed(tmp_path: Path) -> None:
 def test_one_ambiguous_entity_does_not_retract_another_lock(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="A股恒瑞医药；比较 ABC A/H",
+        user_message="加股BLDP；比较 SHOP 美股/加股",
     )
-    abc_candidates = [
-        {"symbol": "600123.SH", "name": "ABC", "market": "cn", "source": "eastmoney"},
-        {"symbol": "00123.HK", "name": "ABC", "market": "hk", "source": "eastmoney"},
-    ]
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates(), "hengrui")
-    _ingest(ledger, "ABC", abc_candidates, "abc")
+    _ingest(ledger, "BLDP", _ballard_candidates(), "ballard")
+    _ingest(ledger, "SHOP", _shopify_candidates(), "shopify")
 
-    assert ledger.authorized_symbols == {"600276.SH"}
+    assert ledger.authorized_symbols == {"BLDP.TO"}
     assert (
         ledger.authorize_tool_call(
             "get_market_data",
-            {"codes": ["600276.SH"]},
+            {"codes": ["BLDP.TO"]},
             batch_authorized_symbols=ledger.authorized_symbols,
             batch_identity_status=ledger.identity_status,
             call_id="prices",
@@ -173,82 +191,50 @@ def test_one_ambiguous_entity_does_not_retract_another_lock(tmp_path: Path) -> N
 def test_market_constraints_stay_attached_to_their_named_clause(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="我的持仓包括A股恒瑞医药，港股腾讯",
+        user_message="我的持仓包括加股BLDP，美股SHOP",
     )
-    tencent_candidates = [
-        {
-            "symbol": "00700.HK",
-            "name": "腾讯",
-            "market": "hk",
-            "source": "eastmoney",
-        },
-        {
-            "symbol": "TCEHY.US",
-            "name": "腾讯",
-            "market": "us",
-            "source": "yahoo",
-        },
-    ]
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates(), "hengrui")
-    _ingest(ledger, "腾讯", tencent_candidates, "tencent")
+    _ingest(ledger, "BLDP", _ballard_candidates(), "ballard")
+    _ingest(ledger, "SHOP", _shopify_candidates(), "shopify")
 
-    assert ledger.authorized_symbols == {"600276.SH", "00700.HK"}
+    assert ledger.authorized_symbols == {"BLDP.TO", "SHOP.US"}
 
 
 def test_current_follow_up_constraint_applies_to_prior_subjects(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="都只看 A 股",
+        user_message="都只看 加股",
         history=[
-            {"role": "user", "content": "比较恒瑞医药和药明康德"},
+            {"role": "user", "content": "比较BLDP和SHOP"},
             {"role": "assistant", "content": "你希望看哪个市场？"},
         ],
     )
-    wuxi_candidates = [
-        {
-            "symbol": "603259.SH",
-            "name": "药明康德",
-            "market": "cn",
-            "source": "eastmoney",
-        },
-        {
-            "symbol": "02359.HK",
-            "name": "药明康德",
-            "market": "hk",
-            "source": "eastmoney",
-        },
-    ]
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates(), "hengrui")
-    _ingest(ledger, "药明康德", wuxi_candidates, "wuxi")
+    _ingest(ledger, "BLDP", _ballard_candidates(), "ballard")
+    _ingest(ledger, "SHOP", _shopify_candidates(), "shopify")
 
-    assert ledger.authorized_symbols == {"600276.SH", "603259.SH"}
+    assert ledger.authorized_symbols == {"BLDP.TO", "SHOP.TO"}
 
 
 def test_named_constraint_overrides_current_global_constraint(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="都只看A股，腾讯看港股",
+        user_message="都只看加股，SHOP看美股",
     )
-    candidates = [
-        {"symbol": "00700.HK", "name": "腾讯", "market": "hk", "source": "eastmoney"},
-        {"symbol": "TCEHY.US", "name": "腾讯", "market": "us", "source": "yahoo"},
-    ]
 
-    _ingest(ledger, "腾讯", candidates)
+    _ingest(ledger, "SHOP", _shopify_candidates())
 
-    assert ledger.authorized_symbols == {"00700.HK"}
+    assert ledger.authorized_symbols == {"SHOP.US"}
 
 
 def test_stale_global_history_does_not_authorize_a_new_turn(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="分析恒瑞医药",
-        history=[{"role": "user", "content": "都只看港股"}],
+        user_message="分析BLDP",
+        history=[{"role": "user", "content": "都只看加股"}],
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()
@@ -258,38 +244,38 @@ def test_named_history_constraint_can_follow_its_subject(tmp_path: Path) -> None
     ledger = GroundingLedger(
         run_dir=tmp_path,
         user_message="继续分析",
-        history=[{"role": "user", "content": "只看A股恒瑞医药"}],
+        history=[{"role": "user", "content": "只看加股BLDP"}],
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
-    assert ledger.authorized_symbols == {"600276.SH"}
+    assert ledger.authorized_symbols == {"BLDP.TO"}
 
 
 def test_latest_named_history_constraint_wins(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="继续分析恒瑞医药",
+        user_message="继续分析BLDP",
         history=[
-            {"role": "user", "content": "只看港股恒瑞医药"},
+            {"role": "user", "content": "只看美股BLDP"},
             {"role": "assistant", "content": "好的"},
-            {"role": "user", "content": "改为A股恒瑞医药"},
+            {"role": "user", "content": "改为加股BLDP"},
         ],
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
-    assert ledger.authorized_symbols == {"600276.SH"}
+    assert ledger.authorized_symbols == {"BLDP.TO"}
 
 
 def test_current_reset_discards_history_constraints(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="忽略之前的市场限制，分析恒瑞医药",
-        history=[{"role": "user", "content": "只看港股恒瑞医药"}],
+        user_message="忽略之前的市场限制，分析BLDP",
+        history=[{"role": "user", "content": "只看加股BLDP"}],
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()
@@ -298,11 +284,11 @@ def test_current_reset_discards_history_constraints(tmp_path: Path) -> None:
 def test_feature_flag_can_restore_previous_resolution_behavior(tmp_path: Path) -> None:
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="只看A股恒瑞医药",
+        user_message="只看加股BLDP",
         contextual_identity_constraints=False,
     )
 
-    _ingest(ledger, "恒瑞医药", _hengrui_candidates())
+    _ingest(ledger, "BLDP", _ballard_candidates())
 
     assert ledger.identity_status == "ambiguous"
     assert ledger.authorized_symbols == set()

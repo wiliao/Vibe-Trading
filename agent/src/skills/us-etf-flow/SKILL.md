@@ -140,11 +140,9 @@ ratio = cyclical_flow / (cyclical_flow + defensive_flow + 1e-10)
 | Clean Energy | ICLN, TAN, QCLN | Energy transition spend |
 | Biotech | XBI, IBB | Pharma pipeline / M&A cycle |
 | Cybersecurity | CIBR, HACK | Security spending cycle |
-| China Internet | KWEB, FXI | China tech sentiment |
-| India | INDA, SMIN | India growth allocation |
-| Emerging Markets | EEM, VWO | EM risk appetite |
 | Gold Miners | GDX, GDXJ | Gold price leverage play |
-| Bitcoin | IBIT, FBTC | Crypto institutional adoption |
+| Canada Broad Market | XIC.TO, ZCN.TO | Canadian allocation flows |
+| Canada Energy / Financials | XEG.TO, XFN.TO | TSX sector rotation |
 
 **Thematic flow interpretation:**
 - Sustained 4-week+ inflows into a theme = institutional conviction, not just hot money

@@ -12,23 +12,10 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 _CLAUSE_BOUNDARY_RE = re.compile(r"[,，;；。.!！?？\n]")
+# Literal market words for the two surviving markets: US and Canada. A word
+# for a market this build no longer routes is not a constraint at all — it is
+# just text, so it must not be read as one.
 _MARKET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    (
-        "cn",
-        re.compile(
-            r"A\s*股|沪深(?:市场)?|上交所|深交所|上海证券交易所|深圳证券交易所|"
-            r"\bA[- ]?shares?\b|\bmainland China (?:stock|listing|market)s?\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "hk",
-        re.compile(
-            r"港股|港交所|香港(?:市场|上市)|\bHK[- ]?(?:listed|stocks?|shares?)\b|"
-            r"\bHong Kong (?:stock|listing|market)s?\b",
-            re.IGNORECASE,
-        ),
-    ),
     (
         "us",
         re.compile(
@@ -37,9 +24,24 @@ _MARKET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             re.IGNORECASE,
         ),
     ),
+    (
+        "ca",
+        re.compile(
+            r"加股|加拿大(?:市场|上市)|多伦多(?:证券交易所)?|"
+            r"\bTSX(?:[-\s]?V(?:enture)?)?\b|"
+            r"\bCanadian (?:stock|listing|market)s?\b|\bToronto\b",
+            re.IGNORECASE,
+        ),
+    ),
 )
+# A dual-listing comparison names both surviving venues at once, so neither
+# word alone may be read as a single-market constraint.
 _CROSS_LISTING_RE = re.compile(
-    r"(?:A\s*股?\s*[/／和与、]\s*H\s*股?|H\s*股?\s*[/／和与、]\s*A\s*股?|A\s*H\s*股)",
+    r"(?:美股?|美国)\s*[/／和与、]\s*(?:加股?|加拿大)|"
+    r"(?:加股?|加拿大)\s*[/／和与、]\s*(?:美股?|美国)|"
+    r"美加两地|美加双重上市|"
+    r"\bU\.?S\.?\s*[/／]\s*(?:CA|Canada)\b|"
+    r"\b(?:CA|Canada)\s*[/／]\s*U\.?S\.?\b",
     re.IGNORECASE,
 )
 _NEGATED_RE = re.compile(
@@ -145,29 +147,26 @@ class ResolutionContext:
 def candidate_market(candidate: Mapping[str, Any]) -> str | None:
     """Normalize a resolver candidate's market without provider coupling."""
     symbol = str(candidate.get("symbol") or "").strip().upper()
-    if symbol.endswith(".SS"):
-        symbol = f"{symbol[:-3]}.SH"
     suffix = symbol.rsplit(".", 1)[-1] if "." in symbol else ""
-    if suffix in {"SH", "SZ", "BJ"}:
-        return "cn"
-    if suffix == "HK":
-        return "hk"
     if suffix == "US":
         return "us"
+    if suffix in {"TO", "V"}:
+        return "ca"
     raw = (
         str(candidate.get("market") or candidate.get("exchange") or "")
         .strip()
         .casefold()
     )
     return {
-        "cn": "cn",
-        "china": "cn",
-        "a": "cn",
-        "a-share": "cn",
-        "hk": "hk",
-        "hong kong": "hk",
         "us": "us",
         "usa": "us",
+        "ca": "ca",
+        "canada": "ca",
+        "canadian": "ca",
+        "toronto": "ca",
+        "tsx": "ca",
+        "tsx-v": "ca",
+        "tsx_venture": "ca",
     }.get(raw)
 
 
@@ -232,7 +231,7 @@ def _extract_market_constraints(
                 source_message_id=source_message_id,
                 source_span=match.span(),
             )
-            for value in ("cn", "hk")
+            for value in ("us", "ca")
         )
     for value, pattern in _MARKET_PATTERNS:
         for match in pattern.finditer(text or ""):

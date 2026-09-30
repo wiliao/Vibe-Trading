@@ -162,7 +162,7 @@ agents:
       ### I. First-Order Greeks (Linear Risk)
       - **Delta (δ)**: Linear sensitivity to underlying price changes
         - Delta-neutral assessment: |portfolio Delta| < threshold is considered delta-neutral
-        - Delta hedge cost: if delta-neutral is desired, compute how much underlying / futures hedge is needed
+        - Delta hedge cost: if delta-neutral is desired, compute how much of the underlying share position is needed as a hedge
         - Delta evolution: how Delta changes when the underlying rises / falls 10% (Gamma effect)
       - **Vega (ν)**: Sensitivity to implied volatility changes
         - Vega risk quantification: portfolio value change per 1% IV move
@@ -246,7 +246,7 @@ tasks:
 
 variables:
   - name: target
-    description: "Underlying (e.g.: BTC, CSI 300 ETF, AAPL)"
+    description: "Underlying (e.g.: AAPL, SPY, SHOP.TO)"
     required: true
   - name: view
     description: "Market view (bullish / bearish / neutral / long volatility / short volatility)"

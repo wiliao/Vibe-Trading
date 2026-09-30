@@ -25,7 +25,7 @@ On the same time cross-section, compute multiple factor values for many stocks, 
 | volatility | Standard deviation of returns over the past N days | Negative (lower is better) |
 | volume_ratio | Today's volume / N-day average volume | Positive |
 
-If `extra_fields` are available (China A-shares), you can also add:
+If fundamental inputs are available (from `get_fundamentals` / `get_financial_statements`), you can also add:
 - `pe_factor`: 1/PE (the larger, the cheaper)
 - `pb_factor`: 1/PB
 - `roe_factor`: ROE (the larger, the better)

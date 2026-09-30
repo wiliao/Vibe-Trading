@@ -44,10 +44,10 @@ agents:
       4. **Crisis escalation probability matrix** — Over the next 3 months: probability distribution across paths (hold / ease / escalate / lose control), with core assumptions for each
       5. **Financial market transmission map** — Chains from geopolitical events to asset-class prices, tagging transmission speed (hourly / daily / weekly) and magnitude estimates
 
-      Use load_skill("geopolitical-risk") for the geopolitical risk framework, load_skill("web-reader") for latest news and research, load_skill("global-macro") for macro transmission analysis.
+      Use load_skill("geopolitical-risk") for the geopolitical risk framework, load_skill("web-reader") for latest news and research, load_skill("macro-analysis") for macro transmission analysis.
       Use read_url for GPR Index data and real-time geopolitical news.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [geopolitical-risk, web-reader, global-macro]
+    skills: [geopolitical-risk, web-reader, macro-analysis]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -85,7 +85,7 @@ agents:
       ### Energy → inflation passthrough
       - Global CPI effect per 10% rise in oil (historically ~+0.1–0.3 ppt)
       - Cost shock to energy-intensive sectors (airlines / chemicals / transport / power)
-      - Economic impact on high energy-import regions (Europe / Japan / India)
+      - Economic impact on high energy-import economies
 
       ### Energy equities & commodities logic
       - Beta patterns of upstream energy (producer ETFs / majors)
@@ -97,12 +97,12 @@ agents:
       2. **War risk premium estimate** — Geopolitical wedge in current oil ($/bbl); vs history; rich / fair / cheap
       3. **Three-scenario oil paths** — Base / escalation / tail: oil range forecasts at 3 / 6 / 12 months with probability weights
       4. **Energy inflation quantification** — Under each oil scenario, passthrough to major-economy CPI/PPI; central bank policy response risk
-      5. **Energy-related asset signals** — Long/short direction for energy stocks, commodity ETFs, petro-currencies, with reference performance in past shocks
+      5. **Energy-related asset signals** — Long/short direction for energy stocks and energy ETFs, with reference performance in past shocks
 
-      Use load_skill("commodity-analysis") for commodity methods, load_skill("geopolitical-risk") for geopolitical-energy quant framing.
+      Use load_skill("macro-analysis") for the transmission framework, load_skill("geopolitical-risk") for geopolitical-energy quant framing.
       Use read_url for latest EIA/IEA/OPEC data and reports.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [commodity-analysis, geopolitical-risk]
+    skills: [macro-analysis, geopolitical-risk, factor-research]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -145,9 +145,9 @@ agents:
       - Indirect exposure (medium): autos / consumer electronics / aerospace
       - Beneficiaries: domestic substitution / local supply chains / supply-chain security themes
 
-      ### A-share / HK / US names
+      ### US / Canada listed names
       - Names with largest supply-chain exposure (e.g. revenue share from high-risk regions)
-      - Names benefiting from substitution (local / friend-shoring)
+      - Names benefiting from substitution (local / friend-shoring manufacturing)
 
       ## Required outputs
       1. **Four-chain vulnerability scores** — For semis / rare earths / shipping / food: score 1–10, key risks, disruption probability; present as heatmap
@@ -156,10 +156,10 @@ agents:
       4. **Winner industry / stock list** — Industries benefiting from reshoring (domestic substitution / friend-shoring / supply security); representative tickers
       5. **Resilience & policy risk** — Pace of government supply-chain policy (IRA / EU Critical Raw Materials / China industrial policy); durability of structural trends
 
-      Use load_skill("geopolitical-risk") for supply-chain geopolitical frame, load_skill("sector-rotation") for rotation logic, load_skill("event-driven") for event-driven opportunities.
+      Use load_skill("geopolitical-risk") for supply-chain geopolitical frame, load_skill("factor-research") for rotation logic, load_skill("event-driven") for event-driven opportunities.
       Use read_url for shipping data, semi industry reports, and supply-chain research.
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [geopolitical-risk, sector-rotation, event-driven]
+    skills: [geopolitical-risk, factor-research, event-driven]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -186,34 +186,32 @@ agents:
 
       **Safe havens** (add on escalation):
       - Gold: ultimate hedge for geopolitical uncertainty
-      - US Treasuries / German bunds: flight-to-quality flows
-      - JPY: traditional haven (note Japan’s energy import dependence)
-      - CHF: neutral haven currency
+      - US Treasuries: flight-to-quality flows
+      - USD: crisis bid, and the funding currency for a Canadian sleeve
 
       **Geopolitical beneficiaries** (crisis-type dependent):
-      - Energy: oil/gas stocks, commodity ETFs (Hormuz / Russia–Ukraine type)
+      - Energy: oil/gas equities and energy ETFs (Hormuz / Russia–Ukraine type) — note that direct futures exposure is not tradeable in this build, so express it through listed equities/ETFs
       - Defense names: benefit from escalation
       - Domestic substitution stocks: benefit from supply-chain deglobalization
 
       **Geopolitical losers** (trim on escalation):
-      - EM equities: risk-off
       - High-beta growth: de-risking
       - Industries hit by supply chains (per supply-chain workstream)
 
       ### Hedging design
       - **Tail risk**: buy S&P 500 puts / VIX calls
-      - **Energy hedge**: long crude futures / energy ETFs vs portfolio energy exposure
-      - **FX hedge**: long USD/JPY vs EM book exposure
-      - **Sector hedge**: short fragile supply-chain sectors vs long domestic substitution
+      - **Energy hedge**: long energy-sector ETFs or integrated majors against the portfolio's energy exposure
+      - **Currency note**: quantify the CAD/USD exposure of the Canadian sleeve; FX execution is not available in this build, so state the exposure rather than claiming an FX trade
+      - **Sector hedge**: short fragile supply-chain sectors vs long domestic substitution, via US/Canada-listed equities and ETFs
 
       ### Dynamic adjustment
       - Early-warning indicators for escalation (monitoring list)
-      - Rebalance triggers (e.g. oil >$100 / GPR above historical 95th / Taiwan Strait exercise escalation)
+      - Rebalance triggers (e.g. oil >$100 / GPR above historical 95th / fresh naval mobilization in a chokepoint)
       - Contingency: fast de-risking path if scenario spins out of control
 
       ## Required outputs
       1. **Integrated geopolitical assessment** — Combine three dimensions: severity score 1–10, ranked drivers, most likely path
-      2. **Emergency allocation recommendations** — For base and escalation cases: concrete under/overweights across equity/bond/commodity/FX/alternatives; suggested position changes (%)
+      2. **Emergency allocation recommendations** — For base and escalation cases: concrete under/overweights across equity / duration / commodity-linked equities and ETFs / cash; suggested position changes (%)
       3. **Hedge toolkit** — 3–5 executable hedges (instrument / direction / notional % / cost estimate), prioritized
       4. **Scenario monitoring checklist** — ~10 indicators (prices/news/diplomacy) with thresholds that trigger allocation changes
       5. **Risk/reward & timetable** — Risk/reward of proposals; sequencing and timing (immediate/this week/this month); estimate of max drawdown under stress
@@ -252,8 +250,8 @@ tasks:
 
 variables:
   - name: crisis
-    description: "Crisis narrative (e.g., Taiwan Strait escalation, Hormuz blockade, full Red Sea Houthi disruption)"
+    description: "Crisis narrative (e.g., Strait of Hormuz blockade, Russia–Ukraine escalation, full Red Sea disruption)"
     required: true
   - name: market
-    description: "Focus market (e.g., A-shares, Hong Kong, global multi-asset)"
+    description: "Focus market (e.g., US equities, Canada / S&P/TSX, US + Canada multi-asset)"
     required: true

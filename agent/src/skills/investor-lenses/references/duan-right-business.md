@@ -3,7 +3,7 @@ name: duan-right-business
 lens: Right Business, Right People
 attributed_to: Duan Yongping (段永平)
 style: quality
-markets: A-share, HK and US-listed China names; founder- or owner-operator-led companies
+markets: US and Canadian listed names; founder- or owner-operator-led companies
 description: Ask whether the business is one you would want to own outright, whether the people running it can be trusted with a decade of your capital, and then concentrate rather than diversify.
 ---
 
@@ -23,13 +23,12 @@ on the candidate.
 
 ## Market-fit note
 
-- Built around founder- and owner-operator-led companies, which is a large share of
-  the A-share, HK and US-listed China universe. It has little to say about
+- Built around founder- and owner-operator-led companies. It has little to say about
   professionally-managed, widely-held companies with no identifiable steward.
 - Governance evidence in these markets is concrete and available: share pledges by
-  the controlling holder, related-party transactions, guarantee obligations to
-  affiliates, placement history, and the pattern of promises made and kept in
-  earnings communications. Use those, not reputation.
+  a controlling holder, dual-class share structures, related-party transactions,
+  guarantee obligations to affiliates, shelf/placement history, and the pattern of
+  promises made and kept in earnings communications. Use those, not reputation.
 - The "do the right thing" standard is a behavioural test, and behaviour is only
   observable over time. A company with two years of listed history cannot clear it.
 

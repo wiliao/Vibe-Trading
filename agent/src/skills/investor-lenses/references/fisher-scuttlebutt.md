@@ -23,13 +23,13 @@ the evidence is gathered from people around the company, not from the company.
 
 ## Market-fit note
 
-- Channel evidence in A-shares is frequently available and frequently unreliable:
+- Channel evidence is frequently available and frequently unreliable:
   distributor commentary is affected by channel-stuffing incentives near
   period-ends. Weight end-customer and ex-employee evidence above distributor
   evidence.
-- In HK-listed China operations, on-the-ground evidence and reported segment data
-  can diverge for long periods; treat a persistent divergence as a finding, not
-  noise.
+- For a Canadian issuer whose US-listed twin reports on a different schedule,
+  on-the-ground evidence and reported segment data can diverge for long periods;
+  treat a persistent divergence as a finding, not noise.
 - For businesses with no reachable ecosystem (holding companies, opaque B2B
   intermediaries), this lens simply cannot be run. Say so rather than substituting
   desk research and calling it scuttlebutt.

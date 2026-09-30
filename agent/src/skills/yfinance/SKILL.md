@@ -238,12 +238,12 @@ eurusd = yf.download("EURUSD=X", start="2025-01-01", end="2026-01-01", progress=
 }
 ```
 
-### Cross-Market Auto Mode
+### Multi-Listing Auto Mode
 
 ```json
 {
   "source": "auto",
-  "codes": ["000001.SZ", "AAPL.US", "700.HK", "BTC-USDT"],
+  "codes": ["AAPL", "SHOP.TO", "RY.TO", "^GSPC"],
   "start_date": "2024-01-01",
   "end_date": "2026-03-30",
   "initial_cash": 1000000,
@@ -252,15 +252,14 @@ eurusd = yf.download("EURUSD=X", start="2025-01-01", end="2026-01-01", progress=
 }
 ```
 
-`source: "auto"` routes automatically by ticker format: A-shares → the China fallback chain, HK stocks → the HK chain, Canadian `.TO`/`.V` stocks → Yahoo/yfinance, and crypto → OKX.
+`source: "auto"` routes automatically by ticker format: plain US tickers → the US chain, Canadian `.TO`/`.V` tickers → Yahoo/yfinance, and `^`-prefixed symbols → the index chain.
 
 ## Notes
 
 - **Free, no API key**: yfinance scrapes Yahoo Finance public data — no registration needed
 - **Rate limits**: high-frequency requests may trigger temporary Yahoo bans — prefer batch downloads over per-ticker loops
 - **Minute data range**: limited by Yahoo Finance (see table above)
-- **HK tickers**: Yahoo Finance uses 4-digit numbers + `.HK`; pad with leading zeros where needed
+- **Canadian tickers**: TSX listings use the `.TO` suffix and TSXV listings `.V` (e.g. `SHOP.TO`, `PNG.V`); a Canada-only name may have thinner history and more gaps than a US peer
 - **Adjustment**: `auto_adjust=True` (default) returns forward-adjusted prices; the project loader uses `auto_adjust=False`
 - **Timezone**: returned data includes timezone info; the DataLoader strips it automatically
-- **extra_fields not supported**: yfinance via the backtest loader returns OHLCV only; PE/PB and other fundamentals require separate `yf.Ticker().info` calls
-- **Comparison with Tushare**: Tushare covers deep A-share data (financials, fund flows, block trades, etc.); yfinance covers global markets but with less depth
+- **extra_fields not supported**: yfinance via the backtest loader returns OHLCV only; PE/PB and other fundamentals require separate `yf.Ticker().info` calls or the dedicated fundamental tools

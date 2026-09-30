@@ -7,7 +7,7 @@ category: strategy
 
 ## Purpose
 
-Select two highly correlated instruments (such as stocks from the same industry or BTC/ETH), monitor how far their price ratio (or spread) deviates from the mean, and trade against extreme deviations while waiting for mean reversion.
+Select two highly correlated instruments (such as two stocks from the same industry, a US and a Canadian line of the same issuer, or a commodity-producer pair), monitor how far their price ratio (or spread) deviates from the mean, and trade against extreme deviations while waiting for mean reversion.
 
 ## Signal Logic
 
@@ -38,8 +38,8 @@ Select two highly correlated instruments (such as stocks from the same industry 
 
 ```json
 {
-  "source": "tushare",
-  "codes": ["601318.SH", "601628.SH"],
+  "source": "yfinance",
+  "codes": ["KO", "PEP"],
   "start_date": "2023-01-01",
   "end_date": "2024-12-31",
   "initial_cash": 1000000,
@@ -48,12 +48,12 @@ Select two highly correlated instruments (such as stocks from the same industry 
 }
 ```
 
-Cryptocurrency version:
+Canadian version (note the `.TO` suffix and the CAD denomination of both legs):
 ```json
 {
-  "source": "okx",
-  "codes": ["BTC-USDT", "ETH-USDT"],
-  "start_date": "2024-01-01",
+  "source": "yfinance",
+  "codes": ["RY.TO", "TD.TO"],
+  "start_date": "2023-01-01",
   "end_date": "2024-12-31",
   "initial_cash": 1000000,
   "commission": 0.001,

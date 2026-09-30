@@ -45,11 +45,11 @@ class SignalEngine:
             {
                 "date": "2024-01-15",        # Trading date
                 "action": "open" / "close",  # Open or close position
-                "underlying": "BTC-USDT",    # Underlying code
+                "underlying": "AAPL",        # Underlying code
                 "legs": [                    # List of option legs
                     {
                         "type": "call" / "put",  # Option type
-                        "strike": 50000,          # Strike price
+                        "strike": 250,            # Strike price
                         "expiry": "2024-02-15",   # Expiration date
                         "qty": 1                  # Quantity (positive = long, negative = short)
                     }
@@ -66,12 +66,12 @@ Iron Condor opening signal:
 {
     "date": "2024-01-15",
     "action": "open",
-    "underlying": "000300.SH",
+    "underlying": "AAPL",
     "legs": [
-        {"type": "put",  "strike": 3800, "expiry": "2024-02-15", "qty": -1},  # Sell put
-        {"type": "put",  "strike": 3700, "expiry": "2024-02-15", "qty":  1},  # Buy protective put
-        {"type": "call", "strike": 4200, "expiry": "2024-02-15", "qty": -1},  # Sell call
-        {"type": "call", "strike": 4300, "expiry": "2024-02-15", "qty":  1},  # Buy protective call
+        {"type": "put",  "strike": 220, "expiry": "2024-02-15", "qty": -1},  # Sell put
+        {"type": "put",  "strike": 215, "expiry": "2024-02-15", "qty":  1},  # Buy protective put
+        {"type": "call", "strike": 260, "expiry": "2024-02-15", "qty": -1},  # Sell call
+        {"type": "call", "strike": 265, "expiry": "2024-02-15", "qty":  1},  # Buy protective call
     ]
 }
 ```
@@ -80,10 +80,10 @@ Iron Condor opening signal:
 
 ```json
 {
-    "codes": ["000300.SH"],
+    "codes": ["AAPL"],
     "start_date": "2020-01-01",
     "end_date": "2024-12-31",
-    "source": "tushare",
+    "source": "yfinance",
     "engine": "options",
     "initial_cash": 1000000,
     "commission": 0.001,
@@ -152,7 +152,7 @@ In synthetic-data mode there are no bid-ask spreads or liquidity constraints. In
 
 ### Contract Multiplier
 
-Option contract multipliers differ across markets (for example, China A-share ETF options often use a 10,000 multiplier, while crypto is typically 1). Make sure `options_config.contract_multiplier` is set correctly.
+Option contract multipliers differ across markets (US and Canadian listed equity and ETF options are standardized at 100 shares per contract — the US and Canadian OCC/CDS conventions — while some non-equity instruments differ). Make sure `options_config.contract_multiplier` is set correctly.
 
 ## Artifact Description
 

@@ -232,7 +232,7 @@ tasks:
 
 variables:
   - name: portfolio
-    description: "Portfolio name or description (e.g., value-growth blend, CSI 300 enhanced)"
+    description: "Portfolio name or description (e.g., value-growth blend, S&P 500 enhanced)"
     required: true
   - name: review_period
     description: "Review cadence (monthly / quarterly)"

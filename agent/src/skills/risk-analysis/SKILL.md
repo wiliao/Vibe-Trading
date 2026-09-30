@@ -147,13 +147,16 @@ summary["worst_5pct_return"], summary["best_5pct_return"]   # signed returns
 
 ### Historical Scenario Stress Tests
 
-| Scenario | Period | China A-share Drawdown | US Equity Drawdown | BTC Drawdown | 10Y Government Bonds |
-|------|--------|---------|---------|---------|---------|
-| 2008 financial crisis | 2008.01-2008.10 | -65% | -50% | N/A | yield ↓ 100bp |
-| 2015 China equity crash | 2015.06-2015.08 | -45% | -10% | -20% | yield ↓ 50bp |
-| 2018 trade war | 2018.01-2018.12 | -25% | -20% | -80% | yield ↓ 30bp |
-| 2020 COVID shock | 2020.01-2020.03 | -15% | -35% | -50% | yield ↓ 80bp |
-| 2022 hiking cycle | 2022.01-2022.10 | -20% | -25% | -65% | yield ↑ 200bp |
+| Scenario | Period | US Equity Drawdown | Canada (TSX) Drawdown | 10Y Government Bonds |
+|------|--------|---------|---------|---------|
+| 2008 financial crisis | 2008.01-2008.10 | about -50% | about -45% | yield ↓ 100bp+ |
+| 2011 euro crisis / US downgrade | 2011.07-2011.10 | about -20% | about -20% | yield ↓ 100bp |
+| 2018 trade war / Q4 selloff | 2018.10-2018.12 | about -20% | about -15% | yield ↓ 30bp |
+| 2020 COVID shock | 2020.01-2020.03 | about -35% | about -35% | yield ↓ 80bp |
+| 2022 hiking cycle | 2022.01-2022.10 | about -25% | about -15% | yield ↑ 200bp+ |
+
+Pull each window with `get_market_data` and report the realised drawdown over the
+dates you actually retrieved; the figures above are orientation only.
 
 ### Hypothetical Scenario Design
 
@@ -164,20 +167,20 @@ STRESS_SCENARIOS = {
         'bond_10y': -0.08,  # 10-year bonds down 8%
         'bond_2y': -0.02,   # short bonds down 2%
         'gold': +0.05,      # gold up 5%
-        'btc': -0.15,       # BTC down 15%
+        'cad': -0.03,       # CAD down 3% vs USD
     },
     'credit_crisis': {
         'equity': -0.25,
         'bond_10y': +0.05,  # government bonds act as a safe haven
         'credit_bond': -0.15,
         'gold': +0.10,
-        'btc': -0.30,
+        'small_cap': -0.35, # small caps de-rate hardest
     },
     'liquidity_dry_up': {
         'equity': -0.20,
         'bond_10y': -0.05,  # when liquidity is poor, everything falls
         'gold': -0.05,
-        'btc': -0.40,
+        'small_cap': -0.30,
         'cash': 0.0,
     },
     'geopolitical_conflict': {
@@ -185,7 +188,7 @@ STRESS_SCENARIOS = {
         'bond_10y': +0.03,
         'gold': +0.15,
         'oil': +0.30,
-        'btc': -0.20,
+        'energy_equity': +0.10,
     },
 }
 ```
@@ -220,7 +223,7 @@ Threshold choice is the real judgement call: too high and there is nothing left 
 
 | Metric | Calculation | Meaning |
 |------|------|------|
-| Kurtosis | `returns.kurtosis()` | >3 indicates fat tails; China A-shares are often in the 4-8 range |
+| Kurtosis | `returns.kurtosis()` | >3 indicates fat tails; single-name US/Canada equity returns are often in the 4-8 range |
 | Skewness | `returns.skew()` | <0 means left-skewed (large drops are more common than large rallies) |
 | Tail ratio | worst 5% / best 5% | >1 means larger downside risk |
 | Hill estimator | Tail index | `α<2` implies extremely fat tails |

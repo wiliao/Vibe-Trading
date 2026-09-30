@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from importlib.util import find_spec
 from typing import List, Optional
 
 from rich.console import Console
@@ -153,34 +152,6 @@ def _check_llm_provider() -> CheckResult:
         )
 
 
-def _check_okx() -> CheckResult:
-    """Check OKX public API reachability."""
-    try:
-        import requests
-
-        resp = requests.get(
-            "https://www.okx.com/api/v5/market/candles",
-            params={"instId": "BTC-USDT", "bar": "1D", "limit": "1"},
-            timeout=10,
-        )
-        data = resp.json()
-        if data.get("code") == "0":
-            return CheckResult(name="OKX API", status="ready", message="reachable", impact="")
-        return CheckResult(
-            name="OKX API",
-            status="error",
-            message=f"API returned code={data.get('code')}: {data.get('msg', '')}",
-            impact="crypto backtest unavailable",
-        )
-    except Exception as exc:
-        return CheckResult(
-            name="OKX API",
-            status="error",
-            message=f"{type(exc).__name__}: {exc}",
-            impact="crypto backtest unavailable",
-        )
-
-
 def _check_yfinance() -> CheckResult:
     """Check yfinance availability."""
     try:
@@ -190,7 +161,7 @@ def _check_yfinance() -> CheckResult:
             name="yfinance",
             status="skipped",
             message="package not installed",
-            impact="US/HK equity backtest unavailable",
+            impact="US/Canada equity backtest unavailable",
         )
 
     try:
@@ -206,44 +177,8 @@ def _check_yfinance() -> CheckResult:
             name="yfinance",
             status="error",
             message=f"{type(exc).__name__}: {exc}",
-            impact="US/HK equity backtest unavailable",
+            impact="US/Canada equity backtest unavailable",
         )
-
-
-def _check_tushare() -> CheckResult:
-    """Check Tushare token configuration."""
-    token = get_env_config().data.tushare_token.strip()
-    if not token or token == "your-tushare-token":
-        return CheckResult(
-            name="Tushare",
-            status="not_configured",
-            message="TUSHARE_TOKEN not set (optional)",
-            impact="A-share data unavailable",
-        )
-
-    try:
-        import tushare  # noqa: F401
-    except ImportError:
-        return CheckResult(
-            name="Tushare",
-            status="skipped",
-            message="package not installed",
-            impact="A-share data unavailable",
-        )
-
-    return CheckResult(name="Tushare", status="ready", message="token configured", impact="")
-
-
-def _check_akshare() -> CheckResult:
-    """Check akshare availability."""
-    if find_spec("akshare") is None:
-        return CheckResult(
-            name="akshare",
-            status="skipped",
-            message="package not installed",
-            impact="A-share/forex fallback unavailable",
-        )
-    return CheckResult(name="akshare", status="ready", message="installed", impact="")
 
 
 def _check_content_filter_threshold() -> CheckResult:
@@ -255,20 +190,6 @@ def _check_content_filter_threshold() -> CheckResult:
         message=f"{threshold:.0%} (set via CONTENT_FILTER_WARNING_THRESHOLD)",
         impact="",
     )
-
-
-def _check_ccxt() -> CheckResult:
-    """Check ccxt availability."""
-    try:
-        import ccxt  # noqa: F401
-    except ImportError:
-        return CheckResult(
-            name="ccxt",
-            status="skipped",
-            message="package not installed",
-            impact="crypto fallback unavailable",
-        )
-    return CheckResult(name="ccxt", status="ready", message="installed", impact="")
 
 
 # -- Status icons and colors --------------------------------------------------
@@ -295,11 +216,7 @@ def run_preflight(console: Optional[Console] = None) -> List[CheckResult]:
 
     checks = [
         _check_llm_provider,
-        _check_okx,
         _check_yfinance,
-        _check_tushare,
-        _check_akshare,
-        _check_ccxt,
         _check_content_filter_threshold,
     ]
 

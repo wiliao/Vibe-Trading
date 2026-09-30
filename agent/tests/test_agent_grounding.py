@@ -162,9 +162,10 @@ def _tool_call(call_id: str, tool_name: str, **arguments: Any) -> SimpleNamespac
 def _build_direct_agent(
     tmp_path: Path,
     resolver_result: str,
+    symbol: str = "562500.SS",
 ) -> tuple[AgentLoop, _ResolverTool, _MarketTool, _PrivateCompanySkillTool, TraceWriter]:
     resolver = _ResolverTool(resolver_result)
-    market = _MarketTool(_market_payload())
+    market = _MarketTool(_market_payload(symbol))
     private_skill = _PrivateCompanySkillTool("private company workflow")
     registry = ToolRegistry()
     for tool in (resolver, market, private_skill):
@@ -203,18 +204,31 @@ def test_resolver_and_consumer_in_same_batch_cannot_race(
     """A consumer sees the identity snapshot from before its whole LLM batch."""
     agent, resolver, market, _, trace = _build_direct_agent(
         tmp_path,
-        _resolver_payload(),
+        _resolver_payload(
+            candidates=[
+                {
+                    "symbol": "AAPL.US",
+                    "name": "Apple",
+                    "market": "us",
+                    "type": "equity",
+                    "source": "yahoo",
+                    "also_from": ["stooq"],
+                }
+            ],
+            query="Apple",
+        ),
+        symbol="AAPL.US",
     )
     messages: list[dict[str, Any]] = []
     react_trace: list[dict[str, Any]] = []
 
     agent._process_tool_calls(
         [
-            _tool_call("resolve", "search_symbol", query="机器人ETF"),
+            _tool_call("resolve", "search_symbol", query="Apple"),
             _tool_call(
                 "prices-too-early",
                 "get_market_data",
-                codes=["562500.SH"],
+                codes=["AAPL"],
                 start_date="2026-06-23",
                 end_date="2026-06-24",
             ),
@@ -228,7 +242,7 @@ def test_resolver_and_consumer_in_same_batch_cannot_race(
 
     assert resolver.calls == 1
     assert market.calls == 0
-    assert agent._grounding.authorized_symbols == {"562500.SH"}
+    assert agent._grounding.authorized_symbols == {"AAPL.US"}
     blocked = [json.loads(message["content"]) for message in messages]
     assert any(item.get("error_code") == "identity_required" for item in blocked)
 
@@ -237,7 +251,7 @@ def test_resolver_and_consumer_in_same_batch_cannot_race(
             _tool_call(
                 "prices-after-lock",
                 "get_market_data",
-                codes=["562500.SS"],
+                codes=["AAPL.US"],
                 start_date="2026-06-23",
                 end_date="2026-06-24",
                 source="auto",
@@ -262,7 +276,7 @@ def test_resolver_and_consumer_in_same_batch_cannot_race(
         record["field"] == "close"
         and record["value"] == 1.137
         and record["source"] == "yahoo"
-        and record["currency"] == "CNY"
+        and record["currency"] == "USD"
         and record["currency_conversion"] == "none"
         for record in artifact["evidence"]
     )
@@ -303,19 +317,6 @@ def test_market_sensitive_skill_waits_for_prior_identity_batch(
     trace.close()
 
     assert skill.calls == 1
-
-
-def test_argentina_symbols_have_grounding_identity() -> None:
-    """Buenos Aires symbols retain venue and ARS identity."""
-    assert _scan_symbols("Check GOOGL.BA price") == {"GOOGL.BA"}
-    assert _infer_venue("GGAL.BA") == "buenos_aires"
-    assert _infer_currency("GGAL.BA") == "ARS"
-
-
-def test_argentina_symbol_is_seeded_with_market_identity(tmp_path: Path) -> None:
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="Check GOOGL.BA price")
-
-    assert ledger.authorized_symbols == {"GOOGL.BA"}
 
 
 @pytest.mark.parametrize(
@@ -652,53 +653,33 @@ def test_explicit_symbol_and_resolver_suffix_alias_are_one_identity(
 
 
 @pytest.mark.parametrize(
-    ("symbol", "expected_venue", "expected_type"),
+    ("symbol", "expected_type"),
     [
-        # Spot gold: bare 6-letter, dashed, slashed, Yahoo forex notation.
-        # Before this fix, the shape-based fallback in _infer_venue / _infer_instrument_type
-        # mis-classified any dashed / slashed symbol as crypto_or_fx / crypto.
-        ("XAUUSD", "forex", "forex"),
-        ("XAU-USD", "forex", "forex"),
-        ("XAU/USD", "forex", "forex"),
-        ("XAUUSD=X", "forex", "forex"),
-        # COMEX gold futures via Yahoo continuous-front-month notation.
-        ("GC=F", "futures", "future"),
-        # Tokenized gold stays crypto.
-        ("XAUT-USDT", "crypto_or_fx", "crypto"),
-        ("PAXG-USDT", "crypto_or_fx", "crypto"),
         # Regression: existing crypto / US equity behavior unchanged.
-        ("BTC-USDT", "crypto_or_fx", "crypto"),
-        ("GLD", None, "listed_security"),
-        ("AAPL.US", "us", "listed_security"),
+        ("BTC-USDT", "crypto"),
+        ("GLD", "listed_security"),
+        ("AAPL.US", "listed_security"),
     ],
 )
-def test_runtime_registry_classifies_gold_fx_futures_consistently(
-    symbol, expected_venue, expected_type
+def test_runtime_registry_classifies_crypto_and_us_shapes_consistently(
+    symbol, expected_type
 ) -> None:
-    """The runtime registry must agree with the engine classifier for gold / FX / futures.
+    """A dashed crypto pair and a US venue still normalize their declared type.
 
-    PR #1280 added the metal/FX/futures patterns to the engine
-    ``_MARKET_PATTERNS`` and the correlation helper. This test pins the
-    third copy (the shape-based fallback in
-    ``_infer_venue`` / ``_infer_instrument_type``) to the same
-    whitelist. Without this, a bare ``XAUUSD`` query would surface in
-    the registry as ``venue=None, type=listed_security`` and a dashed
-    ``XAU-USD`` would surface as ``venue=crypto_or_fx, type=crypto``,
-    contradicting the engine's actual classification. The user observed
-    this exact runtime state in the agent before the fix.
+    Spot metals, FX and futures were removed from this build, so
+    ``_infer_venue`` no longer classifies them; the surviving symbol shapes are
+    pinned here so that removal cannot silently take the US arm with it.
     """
-    assert _infer_venue(symbol) == expected_venue
     assert _infer_instrument_type(symbol) == expected_type
-    # Quote currency is non-None only for dashed / slashed shapes.
-    if "-" in symbol or "/" in symbol:
-        # Whitelist-based ``USD`` leg: only metals/FX/forex (not crypto).
-        if symbol.endswith("-USD") and symbol not in {"XAUT-USD", "PAXG-USD"}:
-            assert _infer_currency(symbol) == "USD"
-        # Otherwise the trailing 3-5 letter leg is the quote currency.
-        elif symbol.endswith("-USDT") or symbol.endswith("-USDC") or \
-             symbol.endswith("-BUSD") or symbol.endswith("-TUSD") or \
-             symbol.endswith("-FDUSD"):
-            assert _infer_currency(symbol) in {"USDT", "USDC", "BUSD", "TUSD", "FDUSD"}
+
+
+def test_venue_inference_covers_only_the_surviving_markets() -> None:
+    """Every surviving suffix gets a venue; a removed market's suffix gets none."""
+    assert _infer_venue("AAPL.US") == "us"
+    assert _infer_venue("TD.TO") == "toronto"
+    assert _infer_venue("PNG.V") == "tsx_venture"
+    assert _infer_venue("BTC-USDT") is None
+    assert _infer_venue("GC=F") is None
 
 
 def test_resolver_answering_a_different_venue_is_still_conflicting(
@@ -1075,24 +1056,24 @@ def test_numeric_gate_validates_derived_formula_and_provenance(tmp_path: Path) -
     """A derived entry level must calculate correctly from observed evidence."""
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="请分析 562500.SS 并给出买入价",
+        user_message="请分析 AAPL.US 并给出买入价",
     )
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["562500.SS"], "source": "auto"},
-        result=_market_payload(),
+        arguments={"codes": ["AAPL.US"], "source": "auto"},
+        result=_market_payload("AAPL.US"),
         call_id="prices",
         success=True,
     )
 
     bad_math = ledger.validate_final_answer(
-        "562500.SS（Yahoo，CNY）的推导买入价：(1.141 + 1.137) / 2 = 0.881。"
+        "AAPL.US（Yahoo，USD）的推导买入价：(1.141 + 1.137) / 2 = 0.881。"
     )
     no_observed_input = ledger.validate_final_answer(
-        "562500.SS（Yahoo，CNY）的推导买入价：(0.88 + 0.90) / 2 = 0.89。"
+        "AAPL.US（Yahoo，USD）的推导买入价：(0.88 + 0.90) / 2 = 0.89。"
     )
     good = ledger.validate_final_answer(
-        "562500.SS（Yahoo，CNY）的推导买入价：(1.141 + 1.137) / 2 = 1.139。"
+        "AAPL.US（Yahoo，USD）的推导买入价：(1.141 + 1.137) / 2 = 1.139。"
     )
     missing_provenance = ledger.validate_final_answer(
         "2026-06-23 的已观测收盘价为 1.137。"
@@ -1971,13 +1952,13 @@ def test_a_conflict_outranks_a_lock_from_another_query(tmp_path: Path) -> None:
     assert ledger.identity_status == "conflicting"
 
 
-def _cny_ledger(tmp_path: Path) -> GroundingLedger:
-    """A ledger holding one Shanghai quote sourced from yahoo, priced in CNY."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="562500.SH 现价多少")
+def _usd_ledger(tmp_path: Path) -> GroundingLedger:
+    """A ledger holding one US quote sourced from yahoo, priced in USD."""
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="AAPL.US 现价多少")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["562500.SH"]},
-        result=_market_payload(),
+        arguments={"codes": ["AAPL.US"]},
+        result=_market_payload("AAPL.US"),
         call_id="prices",
         success=True,
     )
@@ -1988,19 +1969,19 @@ def test_a_chinese_answer_may_name_its_source_and_currency_in_chinese(
     tmp_path: Path,
 ) -> None:
     """The answer follows the user's language; the gate must read that language."""
-    result = _cny_ledger(tmp_path).validate_final_answer(
-        "562500.SH 最新收盘价 1.171 元，数据来源：雅虎财经。"
+    result = _usd_ledger(tmp_path).validate_final_answer(
+        "AAPL.US 最新收盘价 1.171 美元，数据来源：雅虎财经。"
     )
 
     assert result.valid is True, result.issues
 
 
-def test_another_currencys_yuan_does_not_satisfy_a_cny_requirement(
+def test_another_currencys_name_does_not_satisfy_a_usd_requirement(
     tmp_path: Path,
 ) -> None:
-    """A bare 元 counts for CNY only when no other currency's character owns it."""
-    result = _cny_ledger(tmp_path).validate_final_answer(
-        "562500.SH 最新收盘价 1.171 港元，数据来源：雅虎财经。"
+    """A quote that names CAD does not satisfy a USD requirement."""
+    result = _usd_ledger(tmp_path).validate_final_answer(
+        "AAPL.US 最新收盘价 1.171 加元，数据来源：雅虎财经。"
     )
 
     assert result.valid is False
@@ -2009,7 +1990,7 @@ def test_another_currencys_yuan_does_not_satisfy_a_cny_requirement(
 
 def test_an_unnamed_source_is_still_reported(tmp_path: Path) -> None:
     """Accepting a localized provider name is not accepting no provider name."""
-    result = _cny_ledger(tmp_path).validate_final_answer("562500.SH 最新收盘价 1.171 元。")
+    result = _usd_ledger(tmp_path).validate_final_answer("AAPL.US 最新收盘价 1.171 美元。")
 
     assert result.valid is False
     assert "data_source_not_surfaced" in {issue["code"] for issue in result.issues}
@@ -2277,13 +2258,13 @@ def test_a_shortlist_answers_the_user_but_still_cannot_fetch_a_quote(
 
 def _large_cap_ledger(tmp_path: Path) -> GroundingLedger:
     """A ledger holding a quote large enough to be written with separators."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="600519.SH 收盘价多少")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="AAPL.US 收盘价多少")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["600519.SH"]},
+        arguments={"codes": ["AAPL.US"]},
         result=json.dumps(
             {
-                "600519.SH": [
+                "AAPL.US": [
                     {
                         "trade_date": "2026-08-07",
                         "open": 1308.66,
@@ -2294,8 +2275,8 @@ def _large_cap_ledger(tmp_path: Path) -> GroundingLedger:
                     }
                 ],
                 "_provenance": {
-                    "600519.SH": {
-                        "source": "tencent",
+                    "AAPL.US": {
+                        "source": "yahoo",
                         "requested_source": "auto",
                         "currency_conversion": "none",
                     }
@@ -2309,15 +2290,15 @@ def _large_cap_ledger(tmp_path: Path) -> GroundingLedger:
 
 
 def test_a_grouped_price_is_not_split_into_a_bogus_claim(tmp_path: Path) -> None:
-    """"¥1,309.22" must stay one number when the clause is split.
+    """"US$1,309.22" must stay one number when the clause is split.
 
     The comma is both a clause separator and a thousands separator, and the
-    split ran first, leaving a clause ending in "¥1". That 1 was compared
+    split ran first, leaving a clause ending in "US$1". That 1 was compared
     against the observed 1300.01–1363.35 range and rejected — which is every
     price above 999 written the ordinary way.
     """
     result = _large_cap_ledger(tmp_path).validate_final_answer(
-        "贵州茅台 600519.SH 最近一个交易日的收盘价为 ¥1,309.22，数据来源：腾讯行情。"
+        "苹果 AAPL.US 最近一个交易日的收盘价为 US$1,309.22，数据来源：雅虎财经。"
     )
 
     assert result.valid is True, result.issues
@@ -2328,7 +2309,7 @@ def test_a_grouped_price_that_contradicts_evidence_is_still_rejected(
 ) -> None:
     """Keeping the group together is not the same as skipping the check."""
     result = _large_cap_ledger(tmp_path).validate_final_answer(
-        "贵州茅台 600519.SH 最近一个交易日的收盘价为 ¥1,888.88，数据来源：腾讯行情。"
+        "苹果 AAPL.US 最近一个交易日的收盘价为 US$1,888.88，数据来源：雅虎财经。"
     )
 
     assert result.valid is False
@@ -2338,7 +2319,7 @@ def test_a_grouped_price_that_contradicts_evidence_is_still_rejected(
 def test_a_clause_comma_still_separates_clauses(tmp_path: Path) -> None:
     """Only a real thousands group is protected, not every comma."""
     result = _large_cap_ledger(tmp_path).validate_final_answer(
-        "600519.SH 数据来源：腾讯行情, 收盘价 ¥1,888.88 元。"
+        "AAPL.US 数据来源：雅虎财经, 收盘价 US$1,888.88。"
     )
 
     assert result.valid is False
@@ -2537,7 +2518,10 @@ class TestFiatPairAndIndexNormalization:
         assert _scan_symbols("quote ^SPX") == {"^SPX"}
         assert _infer_instrument_type("^SPX", "INDEX") == "index"
         assert _infer_instrument_type("^SPX") == "index"
-        assert _infer_currency("GBPUSD=X") == "USD"
+        assert _infer_currency("AAPL.US") == "USD"
+        assert _infer_currency("TD.TO") == "CAD"
+        # A removed market's FX notation infers no quote currency.
+        assert _infer_currency("GBPUSD=X") is None
 
     def test_ingest_search_symbol_does_not_create_conflicting_identity(self) -> None:
         """The flagship regression: ingest('GBP/USD') must lock, never conflict."""
@@ -3345,36 +3329,26 @@ def test_a_table_cell_and_the_same_prose_figure_get_one_verdict(
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        # Futu writes the venue as a prefix; every one of them must land on
-        # the same identity the market-data chain uses.
-        ("HK.06693", "06693.HK"),
-        ("HK.00700", "00700.HK"),
-        ("HK.700", "00700.HK"),  # zero-padded like the suffix spelling
+        # The connector writes the surviving US venue as a prefix; it must land
+        # on the same identity the market-data chain uses.
         ("US.AAPL", "AAPL.US"),
         ("US.BRK-B", "BRK-B.US"),
-        ("SH.600519", "600519.SH"),
-        ("SS.600519", "600519.SH"),  # Yahoo's Shanghai alias folds onto .SH
-        ("SZ.000001", "000001.SZ"),
-        ("BJ.430047", "430047.BJ"),
-        # Negatives: a non-numeric venue code is not a listing (HK.HSI is an
-        # index feed), and the suffix spellings stay untouched.
-        ("HK.HSI", "HK.HSI"),
-        ("06693.HK", "06693.HK"),
+        # Negatives: the suffix spellings stay untouched, and a removed
+        # market's prefix is no longer rewritten onto a venue suffix.
+        ("HK.06693", "HK.06693"),
         ("AAPL.US", "AAPL.US"),
-        ("600519.SH", "600519.SH"),
+        ("TD.TO", "TD.TO"),
     ],
 )
 def test_normalize_venue_prefixed_symbols(raw: str, expected: str) -> None:
-    """A Futu-style venue prefix normalizes onto the canonical suffix form."""
+    """A connector-style US venue prefix normalizes onto the canonical suffix form."""
     assert _normalize_symbol(raw) == expected
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("分析港股 HK.06693 的走势", {"06693.HK"}),
-        ("持仓 US.AAPL 与 HK.00700", {"AAPL.US", "00700.HK"}),
-        ("对比 SH.600519 和 SZ.000001", {"600519.SH", "000001.SZ"}),
+        ("持仓 US.AAPL 与 TD.TO", {"AAPL.US", "TD.TO"}),
         # Negatives: prose and URLs must not become symbols. The US branch is
         # case-sensitive precisely so a "…/us.reuters/…" host cannot.
         ("Revenue grew in the US. Apple led the pack.", set()),

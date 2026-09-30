@@ -174,21 +174,21 @@ earnings_quality = {
 - Consensus: Bloomberg, Refinitiv, FactSet, Visible Alpha
 - Via yfinance: `ticker.earnings_dates`, `ticker.earnings_history`
 
-### Hong Kong Equities
-- Earnings season: Mar-Apr (annual), Aug-Sep (interim)
-- Many HK-listed companies report semi-annually, not quarterly
-- Dual-listed (A+H): compare A-share analyst estimates vs HK analyst estimates for arbitrage
-- Via yfinance: `yf.Ticker("0700.HK").financials`
+### Canadian Equities
+- Earnings season: Jan-Apr (annual and Q1), Jul-Aug (Q2), Oct-Nov (Q3); TSX reporting cadence mirrors the US
+- Many TSX-listed issuers report quarterly with 45-60 day filing deadlines; TSXV names may report semi-annually or with longer lags
+- Dual-listed (US + Canada): compare the analyst estimates attached to each line — a persistent gap against a stable CAD/USD rate is a coverage or liquidity artefact, not free arbitrage
+- Via yfinance: `yf.Ticker("SHOP.TO").financials`
 
 ### Key Differences
 
-| Dimension | US | HK |
+| Dimension | US | Canada (TSX) |
 |-----------|----|----|
-| Reporting frequency | Quarterly | Semi-annual (most) |
-| Guidance practice | Common | Rare |
+| Reporting frequency | Quarterly | Quarterly (most); semi-annual for some TSXV names |
+| Guidance practice | Common | Less common than the US |
 | Analyst coverage | Deep (>20 for large caps) | Thinner (5-15 for large caps) |
-| Pre-announcement | Regulated (Reg FD) | Less regulated |
-| Earnings call | Standard | Less common for mid/small caps |
+| Pre-announcement | Regulated (Reg FD) | Regulated, but selective disclosure rules differ by province |
+| Earnings call | Standard | Common for large caps; less so for mid/small caps |
 
 ## Output Format
 

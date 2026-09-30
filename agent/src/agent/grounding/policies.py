@@ -49,42 +49,29 @@ _PRIVATE_ASSERTION_RE = re.compile(
 )
 
 # Loader ids are ASCII but the answer follows the user's language, so a source
-# is surfaced by any alias ("数据来源：腾讯财经" for ``tencent``).
+# is surfaced by any alias ("数据来源：新浪财经" for ``sina``). Only the
+# surviving US/Canada sources appear here.
 _SOURCE_ALIASES = {
-    "akshare": ("akshare", "ak share"),
-    "baostock": ("baostock",),
-    "binance": ("binance", "币安"),
-    "ccxt": ("ccxt",),
+    "alphavantage": ("alphavantage", "alpha vantage"),
     "eastmoney": ("eastmoney", "东方财富", "东财"),
-    "futu": ("futu", "富途"),
-    "mootdx": ("mootdx", "通达信"),
-    "okx": ("okx", "欧易"),
-    "pykrx": ("pykrx", "krx"),
+    "finnhub": ("finnhub",),
+    "fmp": ("fmp", "financial modeling prep"),
+    "local": ("local", "本地"),
     "sina": ("sina", "新浪"),
     "stooq": ("stooq",),
-    "tencent": ("tencent", "腾讯"),
-    "tushare": ("tushare",),
+    "tiingo": ("tiingo",),
     "yahoo": ("yahoo", "雅虎"),
     "yfinance": ("yfinance", "yahoo", "雅虎"),
 }
 
 _CURRENCY_ALIASES = {
-    "USD": ("usd", "us$", "美元", "美金"),
-    # ¥ is also the yen sign, but ``_infer_currency`` maps no venue to JPY;
-    # adding a JPY venue means revisiting this entry.
-    "CNY": ("cny", "cnh", "rmb", "人民币", "¥", "￥"),
-    "HKD": ("hkd", "hk$", "港元", "港币"),
-    "KRW": ("krw", "韩元", "韩圜"),
-    "INR": ("inr", "印度卢比", "卢比"),
-    "CAD": ("cad", "c$", "加元", "加拿大元"),
-    "GBP": ("gbp", "£", "英镑"),
-    "VND": ("vnd", "₫", "越南盾"),
-    "ARS": ("ars", "ar$", "阿根廷比索"),
+    "USD": ("usd", "us$", "$", "美元", "美金"),
+    "CAD": ("cad", "c$", "ca$", "加元", "加拿大元"),
 }
 
-# "元" counts as CNY only when no other currency's character precedes it
-# (港元/美元/日元), or a Hong Kong listing would satisfy a CNY requirement.
-_OTHER_CURRENCY_PREFIXES = "港美日欧韩台新加澳"
+# "元" counts as a foreign-currency unit only when another currency's character
+# precedes it (美元/加元), so a bare "元" is never read as a quote currency.
+_OTHER_CURRENCY_PREFIXES = "美加"
 
 #: Relative band a value must fall in to count as matching evidence.
 _TOLERANCE = 0.005

@@ -15,7 +15,7 @@ agents:
 
       ### Phase 1: Initial candidate pool
       - **Universe**: all tradable names in {market} (pre-screen by market cap / liquidity)
-      - **Liquidity pre-screen**: average daily turnover > 50M CNY (A-shares) / > USD 50M (US); drop illiquid names
+      - **Liquidity pre-screen**: average daily turnover > USD 20M (US) / > CAD 10M (Canada); drop illiquid names
       - **Sector filter**: {sector}—if set, scan pairs inside the sector only; if empty, scan within-sector and cross-sector
 
       ### Phase 2: Correlation matrix
@@ -172,7 +172,7 @@ agents:
       - **Thresholds**: |z| > 1.5 (aggressive) / 2.0 (standard) / 2.5 (conservative)—pick from validation
       - **Dynamic adjustment**:
         - High vol (VIX/ATR > 75th hist): raise threshold ~0.5σ
-        - Strong trend (e.g. CSI 500 5-day one-way move): pause pairs (trend breaks MR)
+        - Strong trend (e.g. S&P 500 5-day one-way move): pause pairs (trend breaks MR)
       - **Direction confirmation**: optional 2-day move toward mean before entry
       - **Event filters**:
         - Exclude ±5 trading days around earnings
@@ -261,7 +261,7 @@ agents:
       - Slippage between leg timestamps
       - Intraday slip: market vs limit from minute history
       - Order-type guidance
-      - **Best intraday window** (A-shares: first/last 30 min often highest liquidity)
+      - **Best intraday window** (US and Canadian equities: first/last 30 min often highest liquidity)
 
       ### Capacity
       - Per-pair AUM before moving price
@@ -269,9 +269,9 @@ agents:
       - Capacity decay curve (size vs Sharpe)
 
       ## Required outputs
-      1. **Liquidity scorecard** — Per name: ADV / stability / max position; flag ADV < 100M CNY; feasible / conditional / not feasible
+      1. **Liquidity scorecard** — Per name: ADV / stability / max position; flag ADV < USD 20M; feasible / conditional / not feasible
       2. **Cost table** — Per selected pair: spread / impact / rebalance / tax—single cycle bps and ann. % vs expected return
-      3. **Max capacity & caps CNY/USD** — Book theoretical max + decay sketch
+      3. **Max capacity & caps (USD / CAD)** — Book theoretical max + decay sketch
       4. **Execution playbook** — TWAP/VWAP/limit per type; best windows; clip vs single-shot cost delta
       5. **Overall micro verdict** — Grade A/B/C/D; binding limits; pre-live execution checklist
 
@@ -312,7 +312,7 @@ tasks:
 
 variables:
   - name: market
-    description: "Target market (e.g. A-shares, Hong Kong, US, crypto)"
+    description: "Target market (US or Canada equity)"
     required: true
   - name: sector
     description: "Sector filter (e.g. banks, consumer, semis); empty = full market"

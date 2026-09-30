@@ -47,15 +47,15 @@ FCFF ≈ operating cash flow - capex
 WACC = E/(D+E) × Ke + D/(D+E) × Kd × (1-T)
 
 Ke (cost of equity) = Rf + β × (Rm - Rf)
-  - Rf: 10-year government bond yield (about 2.5% for China A-shares)
+  - Rf: 10-year government bond yield (retrieve the current US Treasury or Government of Canada yield; do not hard-code it)
   - β: industry average or company beta (1.0-1.5)
-  - Rm-Rf: equity risk premium (about 5-7% for China A-shares)
+  - Rm-Rf: equity risk premium (a common US/Canada assumption is 4-6%; state the source you used)
 
-Kd: cost of debt (loan rate, about 4-5%)
-T: income tax rate (25%)
+Kd: cost of debt (issuer's borrowing rate or the yield on its outstanding debt, about 4-5%)
+T: marginal income tax rate (US federal + state, or Canadian federal + provincial)
 ```
 
-**Reference WACC ranges for China A-shares**:
+**Reference WACC ranges for US / Canada large caps**:
 
 | Industry | WACC Range | Reference β |
 |------|---------|------|
@@ -170,7 +170,7 @@ Advantages:
 - Removes depreciation-policy differences
 - Suitable for asset-heavy industries (telecom / energy / infrastructure)
 
-Reference EV/EBITDA ranges by China A-share industry:
+Reference EV/EBITDA ranges by US / Canada industry:
 | Industry | Median | Undervalued | Overvalued |
 |------|--------|------|------|
 | Consumer | 15-20x | <12x | >25x |
@@ -254,7 +254,7 @@ Target price ¥30.8, current price ¥25.0, upside 23%
 
 1. **DCF is highly sensitive to assumptions**: a 1% change in WACC can move valuation by 20%+, so sensitivity analysis is mandatory
 2. **Comparable companies must truly be comparable**: same industry + same scale + same stage; do not apply leader PE multiples to small companies
-3. **China A-share valuation system is unique**: shell value / liquidity premium / policy premium mean US-equity standards cannot be copied directly
+3. **Multiples are not portable**: US and Canadian markets differ in sector mix, tax and dividend policy, so do not copy a US peer multiple onto a TSX name (or the reverse) without adjusting for the differences
 4. **Valuation is not a target price**: markets can remain irrational for a long time, and valuation is an anchor, not a trading signal
 5. **Special handling for cyclicals**: use normalized earnings (mid-cycle earnings), not current earnings
-6. **Not suitable for cryptocurrencies**: traditional valuation frameworks do not apply to BTC / ETH; use on-chain metrics instead (see `onchain-analysis`)
+6. **Equity valuation only**: this framework does not cover non-equity instruments; if a requested subject is not an operating company, say the framework does not apply rather than forcing a multiple onto it

@@ -600,7 +600,7 @@ LONGBRIDGE_ACCESS_TOKEN=...
 </details>
 
 <details>
-<summary><b>فرق تداول جاهزة</b> <sub>30 إعداد سرب مسبق</sub></summary>
+<summary><b>فرق تداول جاهزة</b> <sub>25 إعداد سرب مسبق</sub></summary>
 
 - 🏢 30 فريق وكلاء جاهزاً للاستخدام
 - ⚡ تدفقات مالية مهيأة مسبقاً

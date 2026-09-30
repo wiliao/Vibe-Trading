@@ -166,5 +166,5 @@ tasks:
 
 variables:
   - name: goal
-    description: "Audit target (e.g., BTC position risk, CSI 300 strategy risk)"
+    description: "Audit target (e.g., single-name position risk, S&P 500 strategy risk)"
     required: true

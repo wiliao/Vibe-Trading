@@ -764,7 +764,7 @@ Pemisahan paper-vs-live adalah **guard runtime struktural per broker** (format a
 </details>
 
 <details>
-<summary><b>Preset Tim Trading</b> <sub>30 preset swarm</sub></summary>
+<summary><b>Preset Tim Trading</b> <sub>25 preset swarm</sub></summary>
 
 - 🏢 30 tim agent siap pakai
 - ⚡ Workflow finansial yang sudah dikonfigurasi

@@ -4,6 +4,11 @@ The identity half of the gate. Symbol normalisation and venue/currency/type
 inference live here as free functions because they are pure text-to-text; the
 mixin holds the run-scoped state machine that locks an identity and decides
 which tool call may use it.
+
+Venue and currency inference cover the surviving settlement markets only —
+US equities (``.US``) and Canadian equities (``.TO`` / ``.V``). A symbol for a
+market this build no longer routes infers no venue and no currency, so the gate
+fails closed instead of lending it a plausible-looking identity.
 """
 
 from __future__ import annotations
@@ -69,15 +74,18 @@ _JOINED_CRYPTO_QUOTE_SUFFIXES = ("USDT", "USDC", "BUSD", "TUSD")
 
 
 # A dashed / slashed pair is crypto when its quote leg is unambiguously a
-# crypto quote asset, or when a USD quote sits on one of these bases. Both
-# sets MUST agree with ``_CRYPTO_QUOTE_ASSETS`` / ``_CRYPTO_USD_BASES`` in
-# ``src.tools.symbol_search_tool`` — that module is the resolver, and a venue
-# inferred here that disagrees with the identity it locks is a contradictory
-# identity, which outranks every later lock and blocks all market tools. The
-# tool imports this module, so the sets are duplicated rather than imported;
-# ``test_crypto_pair_tables_match_the_resolver`` fails if they drift. ``USD``
-# is the one quote the resolver accepts that is NOT unambiguous, so it is
-# excluded here and decided by the base whitelist below instead.
+# crypto quote asset, or when a USD quote sits on one of these bases. These
+# sets are read only by ``_infer_instrument_type`` (a symbol shape typed by the
+# provider contract), not by venue inference, which covers the surviving US /
+# Canada markets only. Both sets MUST agree with ``_CRYPTO_QUOTE_ASSETS`` /
+# ``_CRYPTO_USD_BASES`` in ``src.tools.symbol_search_tool`` — that module is
+# the resolver, and a type inferred here that disagrees with the identity it
+# locks is a contradictory identity, which outranks every later lock and blocks
+# all market tools. The tool imports this module, so the sets are duplicated
+# rather than imported; ``test_crypto_pair_tables_match_the_resolver`` fails if
+# they drift. ``USD`` is the one quote the resolver accepts that is NOT
+# unambiguous, so it is excluded here and decided by the base whitelist below
+# instead.
 _CRYPTO_QUOTE_ASSETS = frozenset(
     {"USDT", "USDC", "BUSD", "TUSD", "FDUSD", "BTC", "ETH", "BNB"}
 )
@@ -140,22 +148,19 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-# Provider spellings that denote one instrument. Shanghai is quoted as ``.SH``
-# by Eastmoney and ``.SS`` by Yahoo, A-share tools also accept an exchange
-# prefix (``sh600519``), Hong Kong codes are zero-padded to five digits, and
-# ccxt writes a crypto pair with a slash. Every one of these is a spelling, not
-# an identity: ``_infer_venue`` and ``_infer_currency`` below already map ``.SS``
-# and ``.SH`` to the same venue and the same currency. Treating them as
-# different identities made ``search_symbol("600519")`` return two candidates
-# for one listing, which no tie-break could resolve, so every Shanghai listing
-# resolved ``ambiguous`` and no market tool could run for the rest of the run.
+# Provider spellings that denote one instrument. The Shanghai-family exchange
+# prefix (``sh600519``) is folded onto the suffix spelling, and a crypto pair
+# may be written with a slash. Every one of these is a spelling, not an
+# identity: the canonical spelling is what the identity state machine compares.
+# Removed markets no longer get a venue or a currency here, so this block is
+# spelling normalisation only.
 _EXCHANGE_PREFIXED_RE = re.compile(r"^(SH|SZ|BJ)(\d{6})$")
 
 
-# The dotted form of the same idea, as the Futu connector spells it
-# (``HK.00700`` / ``US.AAPL``). ``SS`` is Yahoo's Shanghai alias and folds
-# onto ``SH`` exactly as the suffix spelling does.
-_VENUE_PREFIXES = frozenset({"HK", "SH", "SZ", "BJ", "SS", "US"})
+# The dotted form of the same idea, as the connector spells it (``US.AAPL``).
+# Only the surviving US venue is rewritten; the removed markets' prefixes
+# (``HK`` / ``SH`` / ``SZ`` / ``BJ`` / ``SS``) are no longer recognized here.
+_VENUE_PREFIXES = frozenset({"US"})
 
 
 _US_TICKER_RE = re.compile(r"[A-Z][A-Z0-9&-]{0,19}")
@@ -205,19 +210,12 @@ def _normalize_symbol(value: Any) -> str:
                     if base_part.isalpha():
                         return f"{base_part}-{quote}"
         return symbol
-    # Venue-prefixed listing (Futu connector format: HK.06693 / SH.600519 /
-    # SZ.000001 / US.AAPL): rewrite to the canonical suffix spelling so
-    # identity matching agrees with the market-data chain (06693.HK) that
-    # get_market_data uses. Shanghai's .SS alias is folded onto .SH here too,
-    # the same way the suffix branch below does it.
-    if base in _VENUE_PREFIXES and suffix:
-        venue = "SH" if base == "SS" else base
-        if venue == "US":
-            if _US_TICKER_RE.fullmatch(suffix):
-                return f"{suffix}.US"
-        elif suffix.isdigit():
-            digits = suffix.zfill(5) if venue == "HK" else suffix
-            return f"{digits}.{venue}"
+    # Venue-prefixed US listing (connector format: US.AAPL): rewrite to the
+    # canonical suffix spelling so identity matching agrees with the
+    # market-data chain (AAPL.US) that get_market_data uses. Prefixes for the
+    # removed markets are not rewritten — no venue is inferred for them.
+    if base in _VENUE_PREFIXES and suffix and _US_TICKER_RE.fullmatch(suffix):
+        return f"{suffix}.US"
     if suffix == "SS":
         suffix = "SH"
     if suffix == "HK" and base.isdigit():
@@ -239,106 +237,40 @@ def _scan_symbols(text: str) -> set[str]:
 
 
 def _infer_venue(symbol: str) -> str | None:
-    """Infer a coarse venue from a project symbol."""
+    """Infer a coarse venue from a project symbol.
+
+    Only the surviving settlement markets are known: US equities and the two
+    Canadian venues. Anything else — a removed market's suffix, a futures or
+    forex notation, or a bare code — returns ``None`` so the caller fails
+    closed rather than inventing a venue.
+    """
     upper = _normalize_symbol(symbol)
     suffixes = {
         ".US": "us",
-        ".SH": "shanghai",
-        ".SZ": "shenzhen",
-        ".BJ": "beijing",
-        ".HK": "hong_kong",
-        ".KS": "kospi",
-        ".KQ": "kosdaq",
-        ".NS": "nse",
-        ".BO": "bse",
-        ".FX": "forex",
         ".TO": "toronto",
         ".V": "tsx_venture",
-        ".BA": "buenos_aires",
-        ".L": "lse",
-        ".VN": "hose",
     }
     for suffix, venue in suffixes.items():
         if upper.endswith(suffix):
             return venue
-    # Yahoo's continuous-front-month futures notation (GC=F, CL=F, SI=F, ...).
-    # The exchange category is the venue class. The engine and the
-    # correlation helper mirror this pattern; this is the third copy.
-    if upper.endswith("=F"):
-        return "futures"
-    # Yahoo's forex notation (XAUUSD=X, EURUSD=X) is FX.
-    if re.match(r"^[A-Z]{6}=X$", upper):
-        return "forex"
-    # Bare 6-character precious-metal / FX symbols. The whitelist is
-    # ISO 4217 metals + G10 currencies; it intentionally does NOT include
-    # any US-equity prefix. Mirroring the engine ``_MARKET_PATTERNS``.
-    if re.match(
-        r"^(?:XAU|XAG|XPT|XPD|EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD)[A-Z]{3}$",
-        upper,
-    ):
-        return "forex"
-    # Dashed / slashed symbols are NOT categorically crypto: a USD quote is
-    # crypto only on a whitelisted base (``_CRYPTO_USD_BASES``), so
-    # ``XAU-USD`` / ``EUR-USD`` / ``GBP-USD`` are forex. Without this guard a
-    # spot-gold pair surfaced as a crypto-or-fx hybrid in the runtime
-    # registry, contradicting the engine classifier that already routes it to
-    # ``forex`` (#1280).
-    if "-" in upper or "/" in upper:
-        base, _, quote = (
-            upper.partition("-") if "-" in upper else upper.partition("/")
-        )
-        if quote in _CRYPTO_QUOTE_ASSETS:
-            return "crypto_or_fx"
-        if quote == "USD" and base in _CRYPTO_USD_BASES:
-            return "crypto_or_fx"
-        # Any other dashed / slashed pair is forex-shaped (e.g. ``XAU-USD``,
-        # ``EUR-USD``, ``GBP-USD``); the per-pair engine classifier decides
-        # ``forex`` vs ``crypto`` vs ``futures`` downstream.
-        return "forex"
     return None
 
 
 def _infer_currency(symbol: str) -> str | None:
-    """Infer quote currency without performing an implicit conversion."""
-    upper = _normalize_symbol(symbol)
-    # HKEX assigns the currency by code range (RMB counters 80000-89999, a few
-    # USD ranges), so 80700.HK is a CNY line beside 00700.HK in HKD. One table,
-    # shared with the backtest's currency guard.
-    from backtest.engines._market_hooks import hk_counter_currency
+    """Infer quote currency without performing an implicit conversion.
 
-    hk_currency = hk_counter_currency(upper)
-    if hk_currency is not None:
-        return hk_currency
+    Only the surviving settlement markets are known: US equities settle in USD
+    and Canadian listings in CAD. Anything else returns ``None``.
+    """
+    upper = _normalize_symbol(symbol)
     suffixes = {
         ".US": "USD",
-        ".SH": "CNY",
-        ".SZ": "CNY",
-        ".BJ": "CNY",
-        ".HK": "HKD",
-        ".KS": "KRW",
-        ".KQ": "KRW",
-        ".NS": "INR",
-        ".BO": "INR",
         ".TO": "CAD",
         ".V": "CAD",
-        ".BA": "ARS",
-        # The UK loaders admit only a declared GBP / GBp quote and hand back
-        # GBP, the same contract as the backtest's _MARKET_CURRENCY.
-        ".L": "GBP",
-        ".VN": "VND",
     }
     for suffix, currency in suffixes.items():
         if upper.endswith(suffix):
             return currency
-    for separator in ("-", "/"):
-        if separator in upper:
-            quote = upper.rsplit(separator, 1)[-1]
-            if 3 <= len(quote) <= 5:
-                return quote
-    if upper.endswith("=X"):
-        pair = upper[:-2]
-        if len(pair) == 6:
-            return pair[3:6]
     return None
 
 

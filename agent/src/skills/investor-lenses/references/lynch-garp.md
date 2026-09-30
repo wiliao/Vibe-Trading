@@ -24,8 +24,8 @@ decline.
 
 ## Market-fit note
 
-- Category discipline matters more in A-shares, where sentiment can push a
-  slow-grower to fast-grower multiples on a thematic label.
+- Category discipline matters more in high-retail-participation small caps, where
+  sentiment can push a slow-grower to fast-grower multiples on a thematic label.
 - Retail-visible businesses (consumer, restaurants, retail chains) are where the
   lens's observational edge is real; industrial B2B names give up that edge.
 - The category rules assume the earnings series is meaningful. Where earnings are

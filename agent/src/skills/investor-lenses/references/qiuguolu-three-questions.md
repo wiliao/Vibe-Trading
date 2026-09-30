@@ -3,7 +3,7 @@ name: qiuguolu-three-questions
 lens: Three Questions — Value, Pricing Power, Industry Structure
 attributed_to: Qiu Guolu (邱国鹭)
 style: value
-markets: A-share and HK; designed around industries whose competitive structure has already formed
+markets: US and Canadian equities; designed around industries whose competitive structure has already formed
 description: Answer three questions in order — is it cheap, does the company have pricing power, and is the industry structure favourable — and refuse to let a good answer to one substitute for a bad answer to another.
 ---
 
@@ -23,13 +23,13 @@ the outcome and is most often skipped.
 
 ## Market-fit note
 
-- Built for A-shares and applies directly to HK-listed China operations. Its
+- Built for US and Canadian equities. Its
   structural bias — preferring industries where competition has already consolidated —
   matches markets with long histories of capacity overbuild and price wars.
 - Least useful in industries whose structure has not yet formed (early-stage
   technology, newly created policy-driven sectors), where the third question has no
   answer yet. Say "unanswerable" rather than guessing.
-- Government-influenced pricing is a structural fact here, not an anomaly: an
+- Regulated pricing is a structural fact here, not an anomaly: an
   industry where the state sets prices has a ceiling on pricing power no matter how
   concentrated it is.
 

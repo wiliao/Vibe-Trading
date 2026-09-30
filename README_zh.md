@@ -613,7 +613,7 @@ LONGBRIDGE_ACCESS_TOKEN=...
 </details>
 
 <details>
-<summary><b>Preset Trading Teams</b> <sub>30 个 swarm presets</sub></summary>
+<summary><b>Preset Trading Teams</b> <sub>25 个 swarm presets</sub></summary>
 
 - 🏢 30 个开箱即用的智能体团队
 - ⚡ 预配置金融工作流

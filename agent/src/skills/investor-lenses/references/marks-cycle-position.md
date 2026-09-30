@@ -22,11 +22,10 @@ and adjusts posture. Its unit of analysis is the environment, not the company.
 
 ## Market-fit note
 
-- The sentiment indicators below are market-structure dependent. In A-shares, use
-  margin-financing balances, new account openings, turnover velocity and new-fund
-  issuance; in HK, use southbound flows, IPO pipeline activity and the discount
-  behaviour of dual-listed pairs; in crypto, funding rates, perpetual open interest
-  and leverage liquidations.
+- The sentiment indicators below are market-structure dependent. For US equities, use
+  FINRA margin-debt balances, retail account openings, turnover velocity, fund flows
+  and the VIX term structure; for Canada, add TSX/TSXV new-issue activity and the
+  discount behaviour of dual-listed pairs. Read them as behaviour, not as prices.
 - The lens travels well across markets precisely because it measures behaviour, and
   behaviour rhymes even when instruments differ.
 

@@ -154,11 +154,11 @@ Regression method: OLS regression, with at least 60 data points
 ```
 R_p - R_f = α + β_mkt × (R_m - R_f) + β_smb × SMB + β_hml × HML + β_mom × MOM + ε
 
-| Factor | Meaning | China A-share Proxy |
+| Factor | Meaning | US / Canada Proxy |
 |------|------|--------|
-| MKT | Market | CSI 300 return |
-| SMB | Small-cap premium | CSI 500 - CSI 300 |
-| HML | Value premium | high-PB group - low-PB group |
+| MKT | Market | S&P 500 (US) / S&P/TSX Composite (Canada) return |
+| SMB | Small-cap premium | Russell 2000 - S&P 500 (or TSXV - TSX) |
+| HML | Value premium | high-B/P group - low-B/P group |
 | MOM | Momentum | top past-12M winners - bottom group |
 ```
 
@@ -211,14 +211,14 @@ R_p - R_f = α + β × (R_m - R_f) + γ × max(R_m - R_f, 0) + ε
 
 ### Benchmark Selection
 
-| Strategy Type | Recommended Benchmark | China A-share Code |
+| Strategy Type | Recommended Benchmark | Reference Symbol |
 |---------|---------|---------|
-| China A-share large cap | CSI 300 | 000300.SH |
-| China A-share small cap | CSI 500 / CSI 1000 | 000905.SH |
-| China A-share broad market | CSI All Share | 000985.SH |
-| Hong Kong equities | Hang Seng Index | HSI |
-| US equities | S&P 500 | SPX |
-| Crypto | BTC | BTC-USDT |
+| US large cap | S&P 500 | `^GSPC` / SPY |
+| US small cap | Russell 2000 | `^RUT` / IWM |
+| US broad market | CRSP US Total Market | VTI |
+| Canada large cap | S&P/TSX 60 | XIU.TO |
+| Canada broad market | S&P/TSX Composite | `^GSPTSE` / XIC.TO |
+| Canada small cap | S&P/TSX Venture Composite | `^SPCDNX` |
 | Multi-asset | 60/40 portfolio | self-constructed |
 
 ### Risk-Adjusted Performance Metrics
@@ -314,6 +314,6 @@ Watch the risk of excessive small-cap exposure (`SMB beta=0.25`).
 3. **Data frequency**: daily attribution is noisy, monthly attribution is more stable but has fewer samples; recommended workflow is daily computation with monthly reporting
 4. **Survivorship bias**: delisted stocks may be excluded in backtests, creating false alpha
 5. **Multiple-testing problem**: if you test 100 strategies, about 5 may appear significant by chance (`p=0.05`); use multiple-comparison correction
-6. **Factor data requirement**: factor attribution requires factor return data, which can be obtained from `tushare` or self-constructed
+6. **Factor data requirement**: factor attribution requires factor return data, which you must construct from your own universe or obtain from the bundled alpha library / factor modules
 7. **Attribution in backtest reports**: `metrics.csv` already provides basic metrics after a backtest; this skill adds deeper attribution analysis
 8. **Brinson is implemented, not improvised**: `src/quantlib/attribution.py` holds the tested single-period and Carino-linked decomposition. Import it. Hand-written attribution code that reports a single-period residual is a bug in that code, not a property of the model

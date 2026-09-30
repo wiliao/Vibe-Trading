@@ -3,7 +3,7 @@ name: buffett-quality-franchise
 lens: Quality Franchise
 attributed_to: Warren Buffett
 style: quality
-markets: US, HK and A-share large caps with long operating histories; requires a decade of comparable financials
+markets: US and Canadian large caps with long operating histories; requires a decade of comparable financials
 description: Judge whether a business has a durable economic franchise, whether its true owner earnings are real cash, and only then whether the price leaves a margin of safety.
 ---
 
@@ -24,8 +24,8 @@ growth rate, and both are ranked above cheapness.
 
 - Needs ten years of comparable financials. A company with three years of history
   cannot be assessed under this lens, whatever its quality.
-- In A-shares and HK, the moat question is often really a *policy* question:
-  licences, pricing approval, distribution control. Name the source of the moat
+- The moat question is sometimes really a *regulatory* question: licences,
+  rate cases, tariffs, distribution control. Name the source of the moat
   precisely rather than calling it "brand".
 - State-influenced pricing (utilities, telecoms, healthcare procurement) caps
   franchise economics regardless of market share — treat administered pricing as a

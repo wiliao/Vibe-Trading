@@ -680,7 +680,7 @@ Paper-vs-live is a **structural per-broker runtime guard** (account-id format, h
 </details>
 
 <details>
-<summary><b>Preset Trading Teams</b> <sub>30 swarm presets</sub></summary>
+<summary><b>Preset Trading Teams</b> <sub>25 swarm presets</sub></summary>
 
 - 🏢 30 ready-to-use agent teams
 - ⚡ Pre-configured finance workflows

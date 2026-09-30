@@ -1,6 +1,6 @@
 """分钟级数据分析工具。
 
-通过 OKX API 获取分钟 K 线，计算 VWAP/TWAP/成交量分布等日内指标。
+通过 Yahoo Finance API 获取分钟 K 线，计算 VWAP/TWAP/成交量分布等日内指标。
 仅供分析输出，不可用于回测引擎（仅支持日线）。
 """
 
@@ -11,38 +11,49 @@ import pandas as pd
 import requests
 
 
-BASE_URL = "https://www.okx.com/api/v5"
+BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
 
 def fetch_minute_candles(
-    inst_id: str, bar: str = "5m", limit: int = 300
+    symbol: str, bar: str = "5m", limit: int = 300
 ) -> Optional[pd.DataFrame]:
-    """从 OKX 获取分钟级 K 线数据。
+    """从 Yahoo Finance 获取分钟级 K 线数据。
 
     Args:
-        inst_id: 交易对，如 "BTC-USDT"。
-        bar: K 线周期（1m/5m/15m/30m/1H/4H）。
-        limit: 获取根数（最多 300）。
+        symbol: 美股 / 加股代码，如 "AAPL" 或 "SHOP.TO"。
+        bar: K 线周期（1m/5m/15m/30m/1h）。
+        limit: 获取根数（Yahoo 单次返回上限约 300，日线以外的区间有限）。
 
     Returns:
         OHLCV DataFrame，index 为 datetime。None 表示获取失败。
     """
+    span_days = max(1, int(np.ceil(limit * 5 / 60 / 6.5)) + 1)
     resp = requests.get(
-        f"{BASE_URL}/market/candles",
-        params={"instId": inst_id, "bar": bar, "limit": str(min(limit, 300))},
+        f"{BASE_URL}/{symbol}",
+        params={"range": f"{span_days}d", "interval": bar},
+        headers={"User-Agent": "Mozilla/5.0"},
         timeout=15,
     )
     data = resp.json()
-    if data.get("code") != "0" or not data.get("data"):
-        print(f"[WARN] 获取失败: {data.get('msg', 'unknown')}")
+    result = (data.get("chart") or {}).get("result")
+    if not result:
+        print(f"[WARN] 获取失败: {(data.get('chart') or {}).get('error', 'unknown')}")
         return None
 
-    columns = ["ts", "open", "high", "low", "close", "vol", "volCcy", "volCcyQuote", "confirm"]
-    df = pd.DataFrame(reversed(data["data"]), columns=columns)
-    df["ts"] = pd.to_datetime(df["ts"].astype("int64"), unit="ms")
-    df = df.set_index("ts")
-    for col in ["open", "high", "low", "close", "vol"]:
-        df[col] = df[col].astype(float)
+    result = result[0]
+    quote = result["indicators"]["quote"][0]
+    df = pd.DataFrame(
+        {
+            "open": quote["open"],
+            "high": quote["high"],
+            "low": quote["low"],
+            "close": quote["close"],
+            "vol": quote["volume"],
+        },
+        index=pd.to_datetime(result["timestamp"], unit="s"),
+    )
+    df.index.name = "ts"
+    df = df.dropna(subset=["open", "high", "low", "close"])
     df["volume"] = df["vol"]
     return df
 
@@ -109,7 +120,7 @@ def hourly_volume(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    inst = "BTC-USDT"
+    inst = "AAPL"
     bar = "5m"
     print(f"=== {inst} {bar} 分钟级分析 ===\n")
 

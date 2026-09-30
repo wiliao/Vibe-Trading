@@ -45,8 +45,8 @@ Steps:
 ```
 
 **Example views**:
-- Absolute view: "China A-shares will return 10% over the next year"  → `P=[1,0,0], Q=[0.10]`
-- Relative view: "China A-shares will outperform US equities by 5%"   → `P=[1,-1,0], Q=[0.05]`
+- Absolute view: "US equities will return 10% over the next year"  → `P=[1,0,0], Q=[0.10]`
+- Relative view: "US equities will outperform Canadian equities by 5%"   → `P=[1,-1,0], Q=[0.05]`
 
 **Parameter guidance**:
 - `τ` (uncertainty scaling): `0.025-0.05`
@@ -79,11 +79,11 @@ Growth falling         Government bonds + inflation-protected bonds
 Inflation rising       Commodities + inflation-protected bonds + EM debt
 Inflation falling      Equities + government bonds
 
-Simplified allocation example for China-focused portfolios:
-- 30% CSI 300 / CSI 500
-- 40% government bonds / credit bonds
+Simplified allocation example for US/Canada-focused portfolios:
+- 30% S&P 500 / Russell 2000
+- 40% Treasuries / investment-grade credit
 - 15% gold
-- 15% commodities / REITs
+- 15% REITs / commodity-linked equities
 ```
 
 ## Guide to the 5 Optimizers
@@ -255,21 +255,20 @@ if bar_count % rebalance_freq == 0:
 
 ## Cross-Asset Correlation Analysis
 
-### Typical Correlation Matrix (China-Focused Portfolio Example)
+### Typical Correlation Matrix (US / Canada Portfolio Example)
 
-| | CSI 300 | CSI 500 | Government Bonds | Gold | BTC |
-|--|--------|--------|------|------|-----|
-| CSI 300 | 1.00 | 0.85 | -0.15 | 0.05 | 0.10 |
-| CSI 500 | 0.85 | 1.00 | -0.10 | 0.03 | 0.12 |
-| Government Bonds | -0.15 | -0.10 | 1.00 | 0.20 | -0.05 |
-| Gold | 0.05 | 0.03 | 0.20 | 1.00 | 0.15 |
-| BTC | 0.10 | 0.12 | -0.05 | 0.15 | 1.00 |
+| | S&P 500 | Russell 2000 | Treasuries | Gold |
+|--|--------|--------|------|------|
+| S&P 500 | 1.00 | 0.90 | -0.15 | 0.05 |
+| Russell 2000 | 0.90 | 1.00 | -0.20 | 0.03 |
+| Treasuries | -0.15 | -0.20 | 1.00 | 0.20 |
+| Gold | 0.05 | 0.03 | 0.20 | 1.00 |
 
 **Key patterns**:
 - Negative stock-bond correlation is the foundation of allocation (but it does not always hold; in 2022 both stocks and bonds sold off)
 - Gold has low correlation with equities and serves as a hedge
-- BTC's correlation with traditional assets is unstable and tends to become positive in crises
-- Large-cap versus small-cap China A-shares have high correlation (`0.85`), so diversification benefits are limited
+- Treasury correlation with equities flips sign with the inflation regime — never treat it as a constant
+- Large-cap versus small-cap US equities are highly correlated (`~0.9`), so the diversification benefit between them is limited; adding a Canadian sleeve helps mainly through a different sector mix (financials, energy, materials)
 
 ## Output Format
 
@@ -279,10 +278,10 @@ if bar_count % rebalance_freq == 0:
 ### Allocation Plan
 | Asset | Weight | Risk Contribution | Expected Return (Annualized) |
 |------|------|---------|--------------|
-| CSI 300 | 30% | 45% | 8% |
-| Government Bond ETF | 40% | 15% | 3% |
+| S&P 500 ETF | 30% | 45% | 8% |
+| Treasury ETF | 40% | 15% | 4% |
 | Gold | 15% | 20% | 5% |
-| BTC | 15% | 20% | 15% |
+| S&P/TSX Composite ETF | 15% | 20% | 7% |
 
 ### Optimizer Configuration
 ```json
@@ -311,7 +310,7 @@ if bar_count % rebalance_freq == 0:
 1. **The optimizer needs enough instruments**: at least 3 instruments are needed for meaningful optimization; with 2 instruments, `equal_volatility` is usually enough
 2. **`lookback` window**: too short (`<20`) is noisy, too long (`>120`) reacts slowly, and 60 is a reasonable default
 3. **`mean_variance` trap**: it is the easiest to overfit, and out-of-sample Sharpe is often cut by half or more
-4. **Rebalancing cost**: frequent rebalancing eats into returns; for China A-share portfolios, stamp duty of 0.05% plus commissions is material
-5. **Cross-market allocation**: use `"source": "auto"` in `config.json`, and let `codes` mix instruments from different markets
+4. **Rebalancing cost**: frequent rebalancing eats into returns; for US and Canadian portfolios, commissions, spreads and the SEC fee on sells are material (Canada has no transaction tax)
+5. **Cross-listing allocation**: use `"source": "auto"` in `config.json`, and let `codes` mix US and Canadian listings — remembering that a Canadian sleeve's returns are in CAD
 6. **Leverage constraint**: the sum of weights must be ≤ 1.0, and leverage is not allowed unless explicitly specified
 7. **Survivorship bias**: historical correlations may be distorted by delistings and new listings

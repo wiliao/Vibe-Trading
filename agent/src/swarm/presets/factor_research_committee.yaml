@@ -125,7 +125,7 @@ agents:
       - **Machine Learning Blending**: XGBoost / LightGBM nonlinear combination (watch for overfitting)
 
       ### III. Stock Selection Strategy Construction
-      - **Universe Definition**: Full market / sector-constrained / market-cap filtered (exclude ST, halted, or < 6 months listed stocks)
+      - **Universe Definition**: Full market / sector-constrained / market-cap filtered (exclude halted, sub-USD-1, or < 6 months listed stocks)
       - **Sector Neutralization**: Ensure over/underweights in each sector are driven by factor signals, not sector bets
       - **Market Cap Neutralization**: Control portfolio market cap exposure; avoid unintended large/small cap style drift
       - **Turnover Control**: Set monthly turnover cap (e.g., < 30%) to balance signal freshness and transaction costs
@@ -174,9 +174,9 @@ agents:
       - **Liquidity Bias**: Is daily trade volume constrained to a realistic fraction (e.g., < 10% of daily average volume)?
 
       ### III. Transaction Cost Realism Assessment
-      - **Slippage Assumption**: Is bilateral slippage reasonable (A-share retail 10–20 bps, institutional 5–10 bps)?
+      - **Slippage Assumption**: Is bilateral slippage reasonable (retail 10–20 bps, institutional 5–10 bps)?
       - **Market Impact**: Is large-order market impact accounted for? (Strategy capacity vs. actual AUM)
-      - **Taxes and Fees**: Are stamp duty (A-share 0.05% buy / 1% sell), commissions, etc. included?
+      - **Taxes and Fees**: Are commissions, exchange and regulatory fees, and any applicable transaction taxes included?
       - **Rebalancing Cost Calculation**: Based on monthly turnover, compute annualized one-way transaction costs as a fraction of net returns
 
       ### IV. Strategy Robustness Evaluation
@@ -229,7 +229,7 @@ tasks:
 
 variables:
   - name: market
-    description: "Target market (e.g.: A-shares, Hong Kong, US equities)"
+    description: "Target market (US or Canada equity)"
     required: true
   - name: factor_type
     description: "Factor type (value / momentum / quality / growth / alternative)"

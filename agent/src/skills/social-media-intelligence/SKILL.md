@@ -69,7 +69,7 @@ category: tool
 |-------|---------|---------|
 | r/wallstreetbets | Retail options traders | Meme-stock heat, abnormal options chatter |
 | r/investing | Value-oriented retail investors | Long-horizon sentiment, ETF flow |
-| r/cryptocurrency | Crypto retail | BTC / ETH cycle sentiment |
+| r/CanadianInvestor | Canadian retail investors | TSX sector sentiment, dividend names |
 | r/stocks | General stock discussants | Earnings-season sentiment |
 | r/options | Options-strategy community | Unusual IV-related topics |
 
@@ -93,7 +93,7 @@ def fetch_cashtag_tweets(ticker: str, max_results: int = 100) -> list[dict]:
     """Collect Twitter discussion data for a given ticker.
 
     Args:
-        ticker: Ticker symbol such as AAPL or BTC
+        ticker: Ticker symbol such as AAPL or SHOP.TO
         max_results: Max number of returned tweets, between 10 and 100
 
     Returns:
@@ -1121,11 +1121,11 @@ def compute_project_health_index(
     return {"health_score": health_score, "trend": trend, "flags": flags}
 ```
 
-**Whale-discussion monitoring**
+**Large-holder / institutional flow monitoring**
 
-- Monitor channels such as `#whale-watch` and `#large-transactions`
-- Keywords to watch: `whale alert`, `large transfer`, `moved X BTC`
-- Cross-check with Whale Alert Telegram bot data
+- Monitor channels such as `#institutional-flow` and `#13f-tracking`
+- Keywords to watch: `13F`, `insider buy`, `stake`, `block print`
+- Cross-check claims against `get_institutional_holdings` and filings via `get_sec_filings`; remember 13F data lags up to 45 days
 
 ---
 

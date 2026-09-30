@@ -50,7 +50,7 @@ If you encounter the following keywords, **do not modify the code**. The problem
 - `rate limit`
 - `API limit`
 - `daily limit`
-- `Information` (common in Tushare API responses)
+- a provider quota or entitlement message
 
 These issues require the user to check the API token, switch data sources, or wait for the quota to reset.
 

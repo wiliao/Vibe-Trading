@@ -150,8 +150,8 @@ Use this only as an event-risk analysis, not as a default recommendation.
 
 | Market | Useful Fields |
 |--------|---------------|
-| A-shares | Tushare `dividend`, `daily_basic.dv_ttm`, `fina_indicator`, `cashflow` |
-| US/HK | yfinance `Ticker.dividends`, `Ticker.info`, financial statements, cash flow |
+| US | yfinance `Ticker.dividends`, `Ticker.info`, financial statements, cash flow |
+| Canada | yfinance `.TO` / `.V` series, issuer dividend history, SEDAR+ filings, financial statements |
 | ETFs | distribution yield, SEC yield, holdings yield, expense ratio, distribution history |
 | REITs | FFO, AFFO, occupancy, debt maturities, AFFO payout |
 

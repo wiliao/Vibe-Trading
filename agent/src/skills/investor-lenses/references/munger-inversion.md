@@ -26,9 +26,9 @@ a standalone decision procedure.
 - Portable everywhere because it consumes reasoning rather than data.
 - In markets where disclosure is thin, the inversion is *more* valuable, because
   the failure paths are the part you can reason about without a data feed.
-- In A-shares and HK, add two failure families that US-designed checklists often
-  omit: policy reversal (industry-level administrative intervention) and
-  controlling-shareholder pledge/extraction risk.
+- Add two failure families that short US-designed checklists often
+  omit: regulatory reversal (industry-level administrative intervention) and
+  controlling-shareholder governance risk (dual-class control, related-party dealing).
 
 ## Priority signals (walk in this order)
 

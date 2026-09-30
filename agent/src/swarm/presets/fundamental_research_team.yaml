@@ -32,7 +32,7 @@ agents:
       - Free cash flow (FCF): FCF Yield compared to P/E
       - Financing activities: excessive reliance on external funding
 
-      Use load_skill("financial-statement") for financial analysis standards; load_skill("fundamental-filter") for screening criteria.
+      Use load_skill("edgar-sec-filings") for financial analysis standards; load_skill("valuation-model") for screening criteria.
       Pull the three statements with `get_financial_statements` and the summary
       metrics with `get_stock_profile`; check every ratio you derive with
       `financial_rigor` (`command="calc"` for exact arithmetic, `verify_valuation`
@@ -48,7 +48,7 @@ agents:
       5. **Improvement / Deterioration Signals** — Significant changes in the past 1–2 years, trend direction assessment
       6. **Peer Comparison** — Key financial metrics vs industry average / sector leaders
     tools: [bash, read_file, write_file, load_skill, get_financial_statements, get_stock_profile, financial_rigor]
-    skills: [financial-statement, fundamental-filter]
+    skills: [valuation-model, edgar-sec-filings]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -112,7 +112,7 @@ agents:
       - Real estate: NAV premium/discount
       - Consumer: EV/EBITDA, brand premium estimation
 
-      Use load_skill("valuation-model") for valuation modeling standards; load_skill("earnings-forecast") for earnings forecasting methods.
+      Use load_skill("valuation-model") for valuation modeling standards; load_skill("earnings-revision") for earnings forecasting methods.
       Use `get_financial_statements` for the historical statement spine, `get_stock_profile`
       for multiples / beta / share count, and `financial_rigor` for exact arithmetic
       (`verify_valuation`, `three_scenario`, `calc`). Those three are your only data
@@ -127,7 +127,7 @@ agents:
       5. **Target Price Calculation** — Weighted multi-method target price with 12-month upside/downside range
       6. **Valuation Catalysts** — 3–5 positive and negative catalysts that could drive re-rating
     tools: [bash, read_file, write_file, load_skill, get_financial_statements, get_stock_profile, financial_rigor]
-    skills: [valuation-model, earnings-forecast]
+    skills: [valuation-model, earnings-revision]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -166,7 +166,7 @@ agents:
       - Price war risk: industry supply/demand dynamics, whether price competition has begun
       - Industry growth ceiling: TAM estimate, penetration stage
 
-      Use load_skill("fundamental-filter") for fundamental screening criteria; load_skill("web-reader") for supplementary industry information.
+      Use load_skill("multi-factor") for fundamental screening criteria; load_skill("web-reader") for supplementary industry information.
       Use the read_url tool to access the latest industry research reports and company news.
 
       ## Output Requirements
@@ -177,7 +177,7 @@ agents:
       5. **Moat Change Signals** — Whether the moat has strengthened or eroded in the past 1–2 years, with specific evidence
       6. **Long-Term Holding Viability Conclusion** — Based on moat + management + competitive landscape: "Recommended for long-term hold / medium-term hold / not suitable for long-term"
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [fundamental-filter, web-reader]
+    skills: [multi-factor, web-reader]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -243,8 +243,8 @@ tasks:
 
 variables:
   - name: target
-    description: "Research subject (stock code or name, e.g.: 600519 Kweichow Moutai)"
+    description: "Research subject (stock code or name, e.g.: NVDA, SHOP.TO)"
     required: true
   - name: market
-    description: "Market (e.g.: A-shares, Hong Kong, US equities)"
+    description: "Market (US or Canada equity)"
     required: true

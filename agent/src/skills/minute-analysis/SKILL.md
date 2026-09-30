@@ -1,13 +1,13 @@
 ---
 name: minute-analysis
-description: Minute-level data analysis and backtesting. Retrieves minute candlesticks through OKX/Tushare/yfinance and can be used both for analysis and as input to the backtest engine.
+description: Minute-level data analysis and backtesting. Retrieves minute candlesticks through yfinance / the Yahoo Finance chart API for US and Canadian equities, and can be used both for analysis and as input to the backtest engine.
 category: strategy
 ---
 # Minute-Level Data Analysis and Backtesting
 
 ## Purpose
 
-Retrieve minute-level candlestick data through data-source APIs and calculate intraday indicators (VWAP, TWAP, volume distribution, and more).
+Retrieve minute-level candlestick data through the market-data loaders and calculate intraday indicators (VWAP, TWAP, volume distribution, and more).
 Supports minute-level backtesting: set `"interval": "5m"` in `config.json` and use the `backtest` tool to run intraday strategies.
 
 ## Backtest Configuration
@@ -16,8 +16,8 @@ For minute-level backtests, simply add the `interval` field in `config.json`:
 
 ```json
 {
-  "source": "okx",
-  "codes": ["BTC-USDT"],
+  "source": "yfinance",
+  "codes": ["AAPL"],
   "start_date": "2026-03-01",
   "end_date": "2026-03-15",
   "interval": "5m",
@@ -26,34 +26,42 @@ For minute-level backtests, simply add the `interval` field in `config.json`:
 }
 ```
 
-- The annualization factor is inferred automatically from `source + interval` (`OKX 5m = 365 x 288 = 105120`)
-- Minute-level datasets are large. Recommended time limits: no more than 7 days for `1m`, no more than 30 days for `5m`, and no more than 1 year for `1H`
+- The annualization factor is inferred automatically from `source + interval` (`yfinance 5m = 252 x 78 = 19656` bars per year on a US session)
+- Minute-level datasets are large. Recommended time limits: no more than 7 days for `1m`, no more than 30 days for `5m`, and no more than 1 year for `1h`
 
 ## Supported Data Sources and Intervals
 
 | Data Source | Supported Intervals | Notes |
 |--------|---------|------|
-| OKX | 1m/5m/15m/30m/1H/4H | Cryptocurrency, trades 7x24 |
-| Tushare | 1m/5m/15m/30m/1H | China A-shares, requires score >= 2000 |
-| yfinance | 1m/5m/15m/30m/1H | Hong Kong / US equities (free, no key required) |
+| yfinance / Yahoo Finance | 1m/2m/5m/15m/30m/1h | US and Canadian equities. Intraday history is limited by the API: roughly 7 days per request for `1m`, ~60 days for `5m`-`30m`, longer for `1h`. Verify against the live API before promising a window |
+| local | any interval present in the file | Offline CSVs you already hold |
+| stooq | daily and above | Daily fallback only; no intraday |
 
-## OKX Minute Candlestick API
+## Yahoo Finance Minute Candlestick API
 
 ```python
 import requests
 import pandas as pd
 
-resp = requests.get("https://www.okx.com/api/v5/market/candles", params={
-    "instId": "BTC-USDT",
-    "bar": "1m",       # 1m/5m/15m/30m/1H/4H
-    "limit": "300",    # At most 300 rows per request
-})
-data = resp.json()["data"]
-columns = ["ts", "open", "high", "low", "close", "vol", "volCcy", "volCcyQuote", "confirm"]
-df = pd.DataFrame(reversed(data), columns=columns)
-df["ts"] = pd.to_datetime(df["ts"].astype("int64"), unit="ms")
-for col in ["open", "high", "low", "close", "vol"]:
-    df[col] = df[col].astype(float)
+resp = requests.get(
+    "https://query1.finance.yahoo.com/v8/finance/chart/AAPL",
+    params={"range": "5d", "interval": "1m"},
+    headers={"User-Agent": "Mozilla/5.0"},
+)
+result = resp.json()["chart"]["result"][0]
+quote = result["indicators"]["quote"][0]
+df = pd.DataFrame(
+    {
+        "open": quote["open"],
+        "high": quote["high"],
+        "low": quote["low"],
+        "close": quote["close"],
+        "vol": quote["volume"],
+    },
+    index=pd.to_datetime(result["timestamp"], unit="s"),
+)
+df.index.name = "ts"
+df = df.dropna(subset=["open", "high", "low", "close"])
 ```
 
 ## Indicator Calculation Templates
@@ -82,17 +90,18 @@ hourly_vol = df.set_index("ts").resample("1h")["vol"].sum()
 
 | Parameter | Description |
 |------|------|
-| inst_id | Trading pair, such as `"BTC-USDT"` |
-| bar / interval | Candlestick interval: `1m/5m/15m/30m/1H/4H` |
-| limit | Number of records to retrieve (OKX returns at most 300 per request) |
+| symbol | US / Canada ticker, such as `"AAPL"` or `"SHOP.TO"` |
+| interval | Candlestick interval: `1m/2m/5m/15m/30m/1h` |
+| limit / range | Number of records or lookback window to retrieve |
 
 ## Common Pitfalls
 
-- OKX returns at most 300 rows per request. The loader paginates automatically, but `1m` datasets are still very large
+- Intraday history is capped by the vendor. A `1m` request cannot reach back years; state the window you actually retrieved
 - The time range for minute-level backtests should not be too long, otherwise both data retrieval and backtesting will become slow or time out
-- Tushare minute endpoints require a score >= 2000. If the score is insufficient, the API returns empty data
-- Timestamps are Unix timestamps in milliseconds and should be converted with `unit="ms"`
-- Transaction costs for minute strategies should be set lower (for example 0.05% instead of 0.1%) because intraday trading is frequent
+- Regular-session bars only: Yahoo returns the 9:30-16:00 ET session for US names, so pre/post-market flow is not in the series unless you explicitly request it
+- Timestamps are Unix timestamps in seconds and should be converted with `unit="s"`
+- Transaction costs for minute strategies should be set lower (for example 0.05% instead of 0.1%) because intraday trading is frequent — but the spread and impact assumptions from the execution model must still hold
+- Data for a Canada-only listing can be thinner and have gaps; drop the empty bars rather than forward-filling them
 
 ## Dependencies
 

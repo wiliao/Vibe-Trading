@@ -118,7 +118,7 @@ S  = current underlying price
 K  = strike price
 T  = time to expiration (years)
 r  = risk-free rate (annualized continuous compounding)
-q  = continuous dividend yield (commonly used for China A-share / index options)
+q  = continuous dividend yield (used for dividend-paying equity and index options)
 σ  = annualized volatility
 N  = standard normal CDF
 

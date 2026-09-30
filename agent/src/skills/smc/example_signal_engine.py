@@ -22,13 +22,13 @@ import pandas as pd
 from smartmoneyconcepts import smc
 
 
-def _fetch_okx(inst_id: str, bar: str = "1D", limit: int = 300) -> pd.DataFrame:
-    """从 OKX 获取K线数据。
+def _fetch_yahoo(symbol: str, interval: str = "1d", range_: str = "2y") -> pd.DataFrame:
+    """从 Yahoo Finance 获取K线数据。
 
     Args:
-        inst_id: 交易对，如 "BTC-USDT"。
-        bar: K线周期，默认日线。
-        limit: 获取K线数量。
+        symbol: 美股 / 加股代码，如 "AAPL"。
+        interval: K线周期，默认 "1d"。
+        range_: 回看区间，默认 "2y"。
 
     Returns:
         包含 open/high/low/close/volume 列的 DataFrame，index 为 datetime。
@@ -36,21 +36,24 @@ def _fetch_okx(inst_id: str, bar: str = "1D", limit: int = 300) -> pd.DataFrame:
     import requests
 
     resp = requests.get(
-        "https://www.okx.com/api/v5/market/candles",
-        params={"instId": inst_id, "bar": bar, "limit": str(limit)},
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+        params={"range": range_, "interval": interval},
+        headers={"User-Agent": "Mozilla/5.0"},
     )
-    candles = resp.json()["data"]
-    columns = [
-        "ts", "open", "high", "low", "close",
-        "vol", "volCcy", "volCcyQuote", "confirm",
-    ]
-    df = pd.DataFrame(reversed(candles), columns=columns)
-    df["ts"] = pd.to_datetime(df["ts"].astype("int64"), unit="ms")
-    df = df.set_index("ts")
-    for col in ["open", "high", "low", "close"]:
-        df[col] = df[col].astype(float)
-    df["volume"] = df["vol"].astype(float)
-    return df
+    result = resp.json()["chart"]["result"][0]
+    quote = result["indicators"]["quote"][0]
+    df = pd.DataFrame(
+        {
+            "open": quote["open"],
+            "high": quote["high"],
+            "low": quote["low"],
+            "close": quote["close"],
+            "volume": quote["volume"],
+        },
+        index=pd.to_datetime(result["timestamp"], unit="s"),
+    )
+    df.index.name = "ts"
+    return df.dropna(subset=["open", "high", "low", "close"])
 
 
 class SignalEngine:
@@ -64,8 +67,8 @@ class SignalEngine:
 
     Example:
         >>> engine = SignalEngine(swing_length=50)
-        >>> signals = engine.generate({"BTC-USDT": df})
-        >>> print(signals["BTC-USDT"].value_counts())
+        >>> signals = engine.generate({"AAPL": df})
+        >>> print(signals["AAPL"].value_counts())
     """
 
     def __init__(self, swing_length: int = 10, close_break: bool = True):
@@ -153,7 +156,7 @@ class SignalEngine:
 
 
 if __name__ == "__main__":
-    instruments = ["BTC-USDT", "ETH-USDT", "SOL-USDT"]
+    instruments = ["AAPL", "MSFT", "SPY"]
     data_map = {}
 
     print("=" * 50)
@@ -163,7 +166,7 @@ if __name__ == "__main__":
     for inst in instruments:
         print(f"\n获取 {inst} 日线数据...")
         try:
-            data_map[inst] = _fetch_okx(inst, bar="1D", limit=300)
+            data_map[inst] = _fetch_yahoo(inst)
             print(f"  {inst}: {len(data_map[inst])} 根K线")
         except Exception as e:
             print(f"  {inst} 获取失败: {e}")

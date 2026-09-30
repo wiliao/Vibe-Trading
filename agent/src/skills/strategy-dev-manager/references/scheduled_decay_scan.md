@@ -150,7 +150,7 @@ Choose scan intervals based on the factor's `decay_horizon` metadata and the por
 
 - **Avoid over-scanning**: Each scan consumes agent iterations and data-loader calls. Daily scans on a 500-factor universe are expensive; reserve them for live-trading portfolios.
 - **Align with rebalance cycles**: A factor that rebalances monthly gains little from weekly scans -- the transition would not take effect until the next rebalance anyway.
-- **Stagger multi-universe jobs**: Offset scan times across universes to avoid concurrent data-loader pressure on shared sources (e.g., tushare rate limits).
+- **Stagger multi-universe jobs**: Offset scan times across universes to avoid concurrent data-loader pressure on shared sources (Yahoo/yfinance rate limits and provider quotas).
 - **Monitor scan duration**: If a scan consistently takes longer than the interval between fires, the executor will queue dispatches. Increase the interval or narrow the universe.
 
 ## Job Lifecycle

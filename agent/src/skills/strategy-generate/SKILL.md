@@ -51,9 +51,10 @@ class SignalEngine:
         """
         Args:
             data_map: code -> DataFrame (columns: open, high, low, close, volume, DatetimeIndex)
-                     If config.extra_fields is specified, pe, pb, roe, and similar daily_basic columns will also be present.
-                     If config.fundamental_fields is specified, PIT-safe statement columns such as
-                     income_total_revenue, income_n_income, and fina_indicator_roe will also be present.
+                     For this US/Canada build no extra columns are merged in: the
+                     retired legacy `extra_fields` / `fundamental_fields` provider
+                     paths are not available, so read only OHLCV here and pre-compute any
+                     fundamental inputs with the `get_fundamentals` tool.
         Returns:
             code -> signal Series, value range [-1.0, 1.0]
             1.0 = fully long, 0.5 = half position, 0.0 = flat, -1.0 = fully short
@@ -82,41 +83,37 @@ Self-check after writing `signal_engine.py`:
 
 ## Instrument Code Normalization
 
-- 6-digit China A-share codes → automatically append suffix: codes starting with `600/601/603` → `.SH`, all others → `.SZ`
-- US stocks: uppercase letters + `.US`, such as `AAPL.US` (`yfinance` converts automatically)
-- Hong Kong stocks: digits + `.HK`, such as `700.HK` (`yfinance` converts automatically)
+- US stocks: a bare uppercase ticker (`AAPL`) or uppercase letters + `.US` (`AAPL.US`); the loaders accept both and normalize internally
 - Canadian stocks: Yahoo ticker + `.TO` for TSX or `.V` for TSXV, such as `TD.TO` or `PNG.V`
-- Cryptocurrencies: `BTC-USDT` format (OKX spot pairs, **must use the hyphen `-`, not slash `/`**)
-  - The user may write `BTC/USDT`, but `config.json` must use `"BTC-USDT"`
-
-## Cryptocurrency Notes
-
-- **Code format**: must be `XXX-USDT` (uppercase + hyphen), such as `BTC-USDT` and `ETH-USDT`
-- **source**: must be set to `"okx"`
-- **extra_fields**: must be `null` (OKX does not support fundamentals)
-- **Data format**: `DataLoader` has already normalized the output to match China A-shares exactly: `open, high, low, close, volume` + `DatetimeIndex`
-- **No special handling needed in strategy code**: `signal_engine.py` should be written the same way as for China A-shares; do not add extra data conversion for OKX
+- Indices: Yahoo `^` symbols, such as `^GSPC`, `^GSPTSE`, `^NDX` or `^VIX` (index-level series; not tradable equity)
 
 ## Market Detection and Data Sources
 
 | Pattern | Market | source | Extra Fields |
 |------|------|--------|----------|
-| `^\d{6}\.(SZ\|SH\|BJ)$` | China A-shares | tushare | `extra_fields`: pe, pb, pe_ttm, ps_ttm, dv_ttm, total_mv, circ_mv, roe; `fundamental_fields`: income/balancesheet/cashflow/fina_indicator |
-| `^[A-Z]+\.US$` | US stocks | yfinance | - |
-| `^\d{3,5}\.HK$` | Hong Kong stocks | yfinance | - |
-| `^[A-Z0-9&.-]+\.(TO\|V)$` | Canadian stocks (TSX / TSXV) | yahoo / yfinance | - |
-| `^[A-Z]+-USDT$` | Cryptocurrency | okx | - |
+| `^[A-Z][A-Z0-9.-]*$` (bare) or `^[A-Z][A-Z0-9.-]*\.US$` | US equity | `auto` → yahoo / yfinance / stooq / sina / eastmoney, then key-gated tiingo / fmp / finnhub / alphavantage / local | `null` |
+| `^[A-Z0-9&.-]+\.(TO\|V)$` | Canada equity (TSX / TSXV) | `auto` → yahoo / yfinance / local | `null` |
+| `^\^[A-Z0-9]+$` | Index | `auto` → yahoo / yfinance / local | `null` |
 
-**`extra_fields` selection logic**: only China A-shares (`tushare`) support daily valuation fields. If the strategy needs `PE/PB/ROE` and similar daily_basic fields, specify them in `config.json.extra_fields` and `DataLoader` will retrieve them automatically. Hong Kong, US, Canadian stocks, and crypto do not support `extra_fields`.
+**`extra_fields` selection logic**: `extra_fields` and `fundamental_fields` were
+legacy-provider-only options and are dead for this US/Canada build — leave both `null` in
+`config.json`. Pull fundamentals with the `get_fundamentals` tool (PIT-safe SEC
+panels, filed-date anchored) or `get_financial_statements` and bake the values you
+need into `signal_engine.py` instead of asking the runner to fetch them.
 
-**`fundamental_fields` selection logic**: use this for China A-share financial statement pre-filters. The runner queries `income`, `balancesheet`, `cashflow`, and/or `fina_indicator` through the Tushare fundamental provider, then merges rows into daily bars only after their announcement/disclosure date. Output columns are prefixed by table name, for example `income_total_revenue`, `income_n_income`, `balancesheet_total_hldr_eqy_exc_min_int`, and `fina_indicator_roe`. **Daily frames only**: an announcement date carries no time of day, so on an intraday frame a filing would be visible from the first bar of its own announcement day. A sub-daily interval plus `fundamental_fields` is rejected outright; set `"fundamental_subdaily": "next_day"` to run it anyway under the conservative rule that day D's announcement becomes visible at the first bar of D+1.
+**`fundamental_fields` selection logic**: do not use it. The runner's enrichment
+path routes through the retired legacy provider, so a US/Canada run that sets it
+fails rather than enriching. Use the `get_fundamentals` tool for PIT-safe SEC
+statement panels; on daily frames only, since an announcement date carries no time
+of day.
+
 
 ## `config.json` Format
 
 ```json
 {
   "source": "auto",
-  "codes": ["000001.SZ"],
+  "codes": ["AAPL.US"],
   "start_date": "2016-03-18",
   "end_date": "2026-03-18",
   "warmup_bars": 0,
@@ -135,18 +132,17 @@ Self-check after writing `signal_engine.py`:
 }
 ```
 
-- `source`: `"auto"` (recommended, auto-select by code format) / `"tushare"` / `"yfinance"` / `"okx"` / `"akshare"` / `"ccxt"`
-  - `"auto"` supports mixed instruments. For example, `["000001.SZ", "BTC-USDT"]` will be automatically routed to `tushare` and `okx`
-  - Futures codes (e.g. `"IF2406.CFFEX"`, `"ESZ4"`) and forex pairs (e.g. `"EUR/USD"`) are also auto-routed
+- `source`: `"auto"` (recommended, auto-select by code format) / `"yahoo"` / `"yfinance"` / `"stooq"` / `"sina"` / `"eastmoney"` / `"tiingo"` / `"fmp"` / `"finnhub"` / `"alphavantage"` / `"local"`
+  - `"auto"` supports mixed US + Canada instruments. For example, `["AAPL.US", "TD.TO"]` is routed to the US and Canada fallback chains respectively
 - `interval`: candlestick interval, default `"1D"`. Supported values: `"1m"` / `"5m"` / `"15m"` / `"30m"` / `"1H"` / `"4H"` / `"1D"` / `"1W"` / `"1M"` (weekly and monthly bars are built from daily ones; `"1M"` is a month, `"1m"` a minute)
-  - The annualization factor for minute backtests is inferred automatically from `source` (252 trading days for China A-shares, 365 calendar days for crypto)
+  - The annualization factor for minute backtests is inferred automatically from `source` (252 trading days for US and Canadian equities)
   - Minute backtests can be very data-heavy. Recommended limits are no more than 30 days for `1m`, or 1 year for `1H`
 - `warmup_bars`: how many leading bars exist only to prime the indicators. They are loaded and fed to `SignalEngine.generate()`, then excluded from trades, the equity curve, the benchmark and every metric. Default `0` grades the whole loaded window.
   - Use it whenever you widen `start_date` for an indicator's lookback. `start_date` is the **data** window; `start_date` plus `warmup_bars` is the **evaluation** window, and the report describes the second one.
   - Size it from the longest lookback in the strategy, plus a margin: MA200 needs at least 200 daily bars, a 252-day rolling z-score needs 252. Then set `start_date` far enough back to supply them.
   - `evaluation_start_date` (`"YYYY-MM-DD"`) is the same instruction stated as a date, for when the user names the period rather than the lookback. Declare one or the other — declaring both is rejected.
-- `extra_fields`: China A-shares can use values such as `["pe", "pb", "roe"]`; other markets should use `null`
-- `fundamental_fields`: optional China A-share statement fields, such as `{"income": ["total_revenue", "n_income"], "fina_indicator": ["roe"]}`; use `null` unless the strategy needs financial statement pre-filtering
+- `extra_fields`: must be `null` for US and Canadian symbols (the legacy valuation fields are retired); fetch valuation inputs with the `get_fundamentals` tool instead
+- `fundamental_fields`: must be `null` (the legacy statement-enrichment path is retired); fetch PIT-safe SEC panels with the `get_fundamentals` tool instead
 - `optimizer`: optional, one of `"equal_volatility"` / `"risk_parity"` / `"mean_variance"` / `"max_diversification"` / `"turnover_aware"` / `null` (equal-weight by default)
 - `optimizer_params`: optimizer parameters, such as `{"lookback": 60}`. `mean_variance` additionally supports `{"risk_free": 0.0}`; `turnover_aware` supports `{"risk_aversion": 1.0, "turnover_penalty": 0.5}` (L1 penalty on weight changes; tune to data frequency)
 - `engine`: backtest engine, default `"daily"`. For options strategies, set `"options"` (requires `OptionsSignalEngine`)
@@ -208,10 +204,10 @@ If improvements are needed after evaluation, write `action_items`:
 
 ## Cross-Market Strategies
 
-When the user requests a backtest with codes from **different markets** (e.g. `["000001.SZ", "BTC-USDT"]`):
+When the user requests a backtest with codes from **both surviving markets** (e.g. `["AAPL.US", "TD.TO"]`):
 - Set `source: "auto"` in `config.json`
 - The `CompositeEngine` handles calendar alignment, shared capital, and per-market rules automatically
-- Use volatility-adjusted weights so high-vol assets (crypto) don't dominate the risk budget
+- Use volatility-adjusted weights so high-vol names don't dominate the risk budget
 - See the [cross-market-strategy](../cross-market-strategy/SKILL.md) skill for per-market parameters, vol-adjustment, and example code
 
 ## Supporting Files

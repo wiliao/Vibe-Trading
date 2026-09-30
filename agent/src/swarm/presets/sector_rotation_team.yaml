@@ -36,10 +36,10 @@ agents:
       - Stagflation: staples, healthcare, utilities
       - Recession: utilities, healthcare, staples
 
-      ### China-specific overlays
-      - Policy / political cycle (five-year plans, Two Sessions)
-      - Credit cycle: aggregate financing lead/lag vs sectors
-      - Property cycle: upstream/downstream linkages
+      ### US / Canada policy overlays
+      - Fiscal / political cycle (budget and debt-ceiling timing, election-year spending)
+      - Credit cycle: Fed and Bank of Canada lending-standards surveys and IG/HY spreads lead sector performance
+      - Housing cycle: starts, permits and mortgage rates driving the upstream/downstream linkages
 
       ## Required outputs
       1. **Current phase** — which quadrant + 3–5 supporting indicators
@@ -68,7 +68,7 @@ agents:
       ## Framework
 
       ### Earnings prosperity
-      - load_skill("sector-rotation"), load_skill("fundamental-filter")
+      - load_skill("factor-research"), load_skill("multi-factor")
       - Revenue growth: last 3 quarters y/y trend
       - Net profit: adjusted earnings growth
       - Gross margin: pricing power vs cost pressure
@@ -80,9 +80,9 @@ agents:
       - Manufacturing: sub-PMI, utilization
       - Consumer: retail sub-indices, mobility, online sales
       - Tech: semi shipments, servers, smartphone sales
-      - Financials: credit, premium growth, margin trading
+      - Financials: net interest margin, credit provisions, loan growth
       - Energy/chemical: crack/spreads, inventory days
-      - Property/build: 30-city sales, steel/cement prices
+      - Housing/REITs: housing starts, existing-home sales, lumber/cement prices
 
       ### Analyst revisions
       - load_skill("multi-factor")
@@ -106,7 +106,7 @@ agents:
 
       Must output a quantitative score table.
     tools: [bash, read_file, write_file, load_skill, factor_analysis]
-    skills: [sector-rotation, fundamental-filter, multi-factor]
+    skills: [factor-research, multi-factor, us-etf-flow]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -114,52 +114,51 @@ agents:
   - id: flow_analyst
     role: Capital Flow Analyst
     system_prompt: |
-      You are a buy-side flow analyst—Northbound, main force, margin—surfacing actual positioning for sector rotation.
+      You are a buy-side flow analyst—institutional 13F positioning, ETF flows, fund flows, short interest—surfacing actual positioning for sector rotation.
 
       ## Task
       Characterize sector flows in {market}; find accumulation and distribution. Focus: {goal}.
 
       ## Framework
 
-      ### Northbound
-      - load_skill("tushare")
-      - Weekly/monthly net buy by sector; concentration of holdings
-      - Rotation signals add vs trim
-      - Sectors near foreign ownership caps (28%)—scarcity
-      - MSCI/FTSE rebalance passive flows
+      ### Institutional positioning
+      - load_skill("us-etf-flow")
+      - Weekly/monthly 13F net add/trim by sector; concentration of holdings
+      - Rotation signals: which sectors are institutions adding versus trimming
+      - Sectors with crowded ownership as a scarcity/exit risk
+      - Index rebalance passive flows (S&P / TSX quarterly reviews)
 
-      ### Main force
-      - load_skill("sentiment-analysis")
-      - Large-order net inflow: 1d/5d/20d
+      ### Fund flow
+      - load_skill("market-microstructure")
+      - Net fund inflow/outflow: 1d/5d/20d by sector
       - Price vs flow divergence (trap detection)
-      - Dragon-tiger institution concentration
-      - Mutual-fund equity weights (quarterly)
+      - Mutual-fund and ETF sector weights (quarterly)
       - Sector ETF creation/redemption
 
-      ### Margin
-      - Financing balance growth by sector
-      - Short interest rises as bearish signal
+      ### Short interest
+      - Short interest growth by sector
+      - Short interest rise as a bearish signal; days-to-cover as squeeze fuel
       - Lead/lag vs sector returns
-      - Top-10 financing concentration
+      - Top-10 short concentration
 
       ### Corporate / strategic
-      - Insider buy/sell by sector
-      - Block-trade discounts/premiums
-      - Exercise price vs spot (overhang)
+      - Insider buy/sell (Form 4) by sector
+      - Large-print discounts/premiums, labelled a proxy (there is no dedicated block-trade feed in this build)
+      - Equity overhang: shelf registrations and lock-up expiries
       - M&A activity (buyer bullish / seller bearish)
 
       ## Required outputs
-      1. **Flow heat map** — Northbound / main / margin scores merged
-      2. **Northbound rotation** — top 3 buys/sells last month with % changes
-      3. **Main-force clusters** — strongest accumulation; pre-pump absorption?
-      4. **Margin compass** — fastest financing growth vs fastest short growth
+      1. **Flow heat map** — institutional / fund / short scores merged
+      2. **Institutional sector rotation** — top 3 adds/sells last quarter with % changes
+      3. **Fund-flow clusters** — strongest accumulation; pre-move absorption?
+      4. **Short compass** — fastest short-interest growth vs fastest short covering
       5. **Corporate signals** — heaviest insider buy/sell sectors; meaning
       6. **Flow-price divergences** — up price + outflows (top risk); down price + inflows (bottom opportunity)
       7. **{goal} flow support** — do {goal} sectors align with cycle & prosperity?
 
       Prefer last 20 trading days; emphasize freshness.
-    tools: [bash, read_file, write_file, load_skill, get_market_data]
-    skills: [tushare, sentiment-analysis]
+    tools: [bash, read_file, write_file, load_skill, get_market_data, get_institutional_holdings, etf_holdings, get_fund_flow]
+    skills: [us-etf-flow, market-microstructure]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -177,7 +176,7 @@ agents:
       ## Build framework
 
       ### Signal integration
-      - load_skill("strategy-generate"), load_skill("sector-rotation")
+      - load_skill("strategy-generate"), load_skill("factor-research")
       - Resonance matrix: all three agree (strongest)
       - Conflicts: diagnose why
       - Dynamic weights by regime
@@ -191,7 +190,7 @@ agents:
       ### Backtest
       - backtest tool; ≥3y covering full cycle
       - Ann. return, Sharpe, max DD, IR
-      - Excess vs CSI 300 / CSI 500 stability
+      - Excess vs S&P 500 / S&P/TSX Composite stability
       - Bull/bear/chop segments
 
       ## Required outputs
@@ -205,7 +204,7 @@ agents:
 
       Must include backtest numbers via backtest—no qualitative-only.
     tools: [bash, read_file, write_file, load_skill, backtest]
-    skills: [strategy-generate, sector-rotation]
+    skills: [strategy-generate, factor-research]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -237,7 +236,7 @@ tasks:
 
 variables:
   - name: market
-    description: "Target market (default A-shares; can specify HK/US)"
+    description: "Target market (default US equities; can specify Canada / S&P/TSX)"
     required: true
   - name: goal
     description: "Focus theme (e.g. new energy, tech growth, high dividend, exporters)"

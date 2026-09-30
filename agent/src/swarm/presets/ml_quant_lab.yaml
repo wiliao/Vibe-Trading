@@ -15,7 +15,7 @@ agents:
       - **Technical features**: price/volume derivatives (momentum, volatility, turnover ratio); technical-indicator features (RSI, MACD, Bollinger deviation); candlestick pattern encodings
       - **Fundamental features**: valuation factors (PE, PB, PS); earnings quality (ROE, gross-margin change); growth factors (revenue/earnings growth)
       - **Cross features**: industry relative strength; cross-horizon momentum spreads; factor interaction terms
-      - **Alternative-data features**: sentiment, capital flows, northbound holdings (where applicable), margin balance changes
+      - **Alternative-data features**: sentiment, capital flows, short interest and institutional (13F) holdings changes, fund-flow changes
 
       ## Feature-engineering standards
       - All features must be strictly point-in-time aligned to avoid future data leakage (use t−1 information to predict t-period return)
@@ -130,7 +130,7 @@ tasks:
 
 variables:
   - name: market
-    description: "Target market (e.g., A-shares, Hong Kong/US equities)"
+    description: "Target market (US or Canada equity)"
     required: true
   - name: target_variable
     description: "Prediction target (return / direction / volatility)"

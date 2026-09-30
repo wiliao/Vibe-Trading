@@ -25,7 +25,7 @@ Three-dimensional structure: strike × expiry × implied volatility.
 **Key dimensions**:
 | Dimension | Meaning | Typical Shape |
 |------|------|----------|
-| Smile / Skew | IV across strikes for the same expiry | China A-shares: left-skewed (`put IV > call IV`) |
+| Smile / Skew | IV across strikes for the same expiry | US equity index options: left-skewed (`put IV > call IV`) |
 | Term Structure | IV across expiries for the same strike | Normal case: near-month IV < far-month IV |
 | Surface dynamics | Parallel or nonlinear movement of the entire surface | In panic, the whole surface lifts, and near-month IV lifts faster |
 
@@ -33,7 +33,7 @@ Three-dimensional structure: strike × expiry × implied volatility.
 ```
 α (alpha): initial volatility level, around 0.2-0.5
 β (beta): CEV exponent, equities usually use 0.5-1.0
-ρ (rho): correlation between volatility and the underlying, usually -0.3 to -0.7 in China A-shares (negative = left skew)
+ρ (rho): correlation between volatility and the underlying, usually -0.3 to -0.7 for equities (negative = left skew)
 ν (nu): volatility of volatility (vol of vol), around 0.3-0.8
 ```
 
@@ -173,7 +173,7 @@ Portfolio Theta: -450 / day
 
 ## Notes
 
-1. **China A-share option characteristics**: liquidity in 50ETF / 300ETF options is concentrated in near-month ATM ± 3 strikes; deep OTM and far-month options are illiquid and have large slippage
+1. **Liquidity concentration**: for US and Canadian listed equity/ETF options, liquidity is concentrated in near-month ATM ± 3 strikes on the liquid index and mega-cap names; deep OTM and far-month options are illiquid and have large slippage. A Canada-only underlying may have no listed chain at all — say so instead of assuming one
 2. **Margin management**: short-option margin changes dynamically with the underlying; keep >30% buffer to avoid margin calls
 3. **Expiry-week effect**: Gamma rises sharply during the week before expiry, Pin Risk increases, and short-option traders should reduce size early
 4. **Market-making barrier**: real market making requires high-frequency infrastructure, low latency, and professional risk controls; retail traders should not attempt pure market making

@@ -283,10 +283,10 @@ def realized_correlation(
         rolling_corrs[f"roll_{w}d"] = df["y"].rolling(w).corr(df["x"])
 
     # Regime labels.
-    # N-day rolling mean (N = 252 for US equity; use 244 for A-share, 365 for crypto)
+    # N-day rolling mean (N = 252 trading days for US and Canadian equities)
     bm_ret_252 = df["bm"].rolling(252).mean()
     bm_vol = df["bm"].rolling(vol_window).std()
-    # N-day rolling mean of volatility (N = 252 for US equity; use 244 for A-share, 365 for crypto)
+    # N-day rolling mean of volatility (N = 252 trading days for US and Canadian equities)
     bm_vol_mean = bm_vol.rolling(252).mean()
 
     df["regime"] = "sideways"
@@ -312,13 +312,13 @@ def realized_correlation(
 ```
 
 **Market-Adaptive Window (N)**:
-The rolling window for regime classification adapts to market type:
-- US equity: N = 252 (standard trading days per year)
-- A-share (China): N = 244 (fewer trading days due to holidays)
-- Crypto: N = 365 (24/7 market)
+The rolling window for regime classification is one trading year:
+- US equity: N = 252
+- Canada (TSX / TSXV): N = 252 (the TSX and US calendars differ only on a handful of holidays, so use the union of trading days actually present in the series)
 
-The default value 252 in the function signature targets US equity.
-Callers for other markets should adjust the rolling windows accordingly.
+The default value 252 in the function signature targets US and Canadian equity. If you
+analyse a series with a different trading calendar, adjust the window to that calendar's
+trading-day count and say which count you used.
 
 **Fallback for Short Data**:
 If available data length is shorter than N days (the market-equivalent annual window),
@@ -329,7 +329,7 @@ regime classification falls back to fixed-threshold definitions:
 
 ### Typical Correlation Behavior by Market Regime
 
-| Market Regime | Equity-Equity Correlation | Equity-Bond Correlation | A-Share Characteristic |
+| Market Regime | Equity-Equity Correlation | Equity-Bond Correlation | US / Canada Characteristic |
 |---------|---------|---------|--------|
 | Bull | Medium (0.4-0.6) | Low or negative | Small-cap names tend to move together strongly |
 | Bear | **High (0.7-0.9)** | Negative (safe-haven effect) | Broad selloff, correlation jumps sharply |
@@ -577,42 +577,42 @@ def kalman_hedge_ratio(
 
 ## Cross-Market Correlation
 
-### Correlation Across China A-Share Sectors
+### Correlation Across US and Canadian Sectors
 
 ```python
-# Typical China A-share sector-correlation patterns
-ASHARE_SECTOR_PATTERNS = {
+# Typical US / Canada sector-correlation patterns
+SECTOR_PATTERNS = {
     "strong_pairs_gt_0_7": [
         "Banks & insurance",
-        "Baijiu & consumer staples",
-        "New energy & solar",
-        "Defense & aerospace",
+        "Integrated energy & energy services",
+        "Semiconductors & semiconductor equipment",
+        "Homebuilders & building materials",
     ],
     "medium_pairs_0_4_to_0_7": [
-        "Pharma & consumer",
-        "Technology & semiconductors",
-        "Real estate & building materials",
+        "Pharma & consumer staples",
+        "Technology & communication services",
+        "REITs & utilities",
     ],
     "low_or_negative_lt_0_3": [
-        "Gold & technology",
+        "Gold miners & technology",
         "Utilities & cyclicals",
-        "Consumer & cyclicals",
+        "Consumer staples & cyclicals",
     ],
 }
 ```
 
-### Cross-Market Linkage Analysis
+### Cross-Listing Linkage Analysis
 
 ```python
 def cross_market_correlation(
-    markets: dict,  # {"China A-shares": series, "Hong Kong": series, "crypto": series, "US": series}
+    markets: dict,  # {"US": series, "Canada (TSX)": series, "US index": series}
     rolling_window: int = 60,
     lag_days: list = [0, 1, 2, 3],
 ) -> dict:
-    """Cross-market correlation plus lead-lag analysis.
+    """Cross-listing correlation plus lead-lag analysis.
 
     Args:
-        markets: Daily return series for each market
+        markets: Daily return series for each market / listing
         rolling_window: Rolling window
         lag_days: List of lags to test
 
@@ -656,12 +656,12 @@ def cross_market_correlation(
 
 | Market Pair | Average Correlation | Transmission Direction | Lag |
 |-------|---------|---------|------|
-| China A-shares ↔ Hong Kong | 0.5-0.7 | Two-way, Hong Kong slightly leads | 0-1 day |
-| China A-shares ↔ U.S. equities | 0.2-0.4 | U.S. leads overnight | 1 day |
-| BTC ↔ ETH | 0.7-0.9 | Highly synchronous | < 1 hour |
-| China A-shares ↔ BTC | 0.0-0.2 | Mostly independent, except correlation spikes in crises | Unstable |
-| U.S. equities ↔ BTC | 0.1-0.4 | U.S. leads through institutional capital flows | Within 1 day |
-| RMB exchange rate ↔ China A-shares | -0.2 - 0.3 | RMB weakness → foreign outflows → China A-share weakness | 0-2 days |
+| US ↔ Canada (TSX) | 0.6-0.8 | US leads; the TSX follows resource and rate moves | Same day to 1 day |
+| US ↔ Canada (TSXV) | 0.3-0.6 | US risk appetite leads the venture complex | 1-3 days |
+| Dual-listed line (e.g. RY ↔ RY.TO) | 0.95+ | One asset; the residual is FX and venue friction | Intraday |
+| US equities ↔ gold | -0.1 - 0.3 | Regime-dependent safe-haven bid | Unstable |
+| US equities ↔ 10Y yield | -0.4 - 0.2 | Sign flips with the inflation regime | Unstable |
+| CAD/USD ↔ TSX | 0.2 - 0.5 | Commodity terms of trade drive both | 0-2 days |
 
 ### Impact of FX Factors on Cross-Market Correlation
 
@@ -671,7 +671,7 @@ Cross-market correlation analysis must distinguish between local-currency return
 def fx_adjusted_correlation(
     foreign_price: pd.Series,   # foreign-market price, denominated in foreign currency
     domestic_price: pd.Series,  # domestic-market price
-    fx_rate: pd.Series,         # foreign currency / domestic currency, e.g. USD/CNY
+    fx_rate: pd.Series,         # foreign currency / domestic currency, e.g. USD/CAD
 ) -> dict:
     """Cross-market correlation adjusted for FX effects.
 
@@ -686,12 +686,12 @@ def fx_adjusted_correlation(
     # Domestic-currency foreign return = foreign return + FX return
     foreign_ret = foreign_price.pct_change(fill_method=None)
     fx_ret = fx_rate.pct_change(fill_method=None)
-    foreign_ret_cny = (1 + foreign_ret) * (1 + fx_ret) - 1
+    foreign_ret_domestic = (1 + foreign_ret) * (1 + fx_ret) - 1
 
     domestic_ret = domestic_price.pct_change(fill_method=None)
 
     df = pd.concat([foreign_ret.rename("foreign_raw"),
-                    foreign_ret_cny.rename("foreign_domestic"),
+                    foreign_ret_domestic.rename("foreign_domestic"),
                     domestic_ret.rename("domestic"),
                     fx_ret.rename("fx")], axis=1).dropna()
 
@@ -1095,6 +1095,6 @@ pip install pandas numpy scipy statsmodels matplotlib seaborn
 3. **Cointegration is not the same as high correlation**: Two series can have Pearson < 0.3 and still be cointegrated, and the reverse can also happen.
 4. **Out-of-sample validation**: If a pair is selected using cointegration on the first N years, you must verify whether the relationship survives in later out-of-sample data to avoid overfitting.
 5. **Crisis-period risk**: Correlation jumps in crises, and both legs in a pair can crash together. Stop thresholds should be tighter than in normal periods.
-6. **China A-share specifics**: China A-shares contain many non-trading days due to holidays and suspensions. Date alignment is especially important in cross-market comparison.
+6. **Holiday mismatches**: the US and Canadian calendars differ on a handful of holidays, and halted names create extra gaps. Date alignment is especially important when comparing a US listing with its Canadian counterpart.
 7. **Multiple testing**: When testing N asset pairs simultaneously, use Benjamini-Hochberg FDR adjustment on p-values. Otherwise false positives will be excessive.
 8. **Kalman tuning**: Tune `delta` with grid search plus out-of-sample validation. Do not rely blindly on the default value.

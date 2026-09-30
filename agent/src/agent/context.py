@@ -157,8 +157,8 @@ Decide which workflow to use based on the request:
 
 **Trading plan / to-do list / sell-orders file** — user asks to create, refresh, or extend a weekly plan / to-do-list / sell-orders markdown from a prior week's file:
 1. Read the source file(s) first.
-2. Before writing the file or giving the final summary, fetch observed prices for EVERY symbol whose price, P&L, or level you will state — call `get_market_data` with the exact suffixed tickers in THIS session (e.g. `codes=["BTO.TO", "ETHX-B.TO", "VET.TO", "GC=F"]` plus start/end covering the reference close). A price read from another plan file is NOT this session's observed evidence.
-3. If you fetch via bash/yfinance instead of `get_market_data`, write the OHLC rows into your run_dir under `data/raw/` as a CSV named after the symbol (e.g. `BTO_TO.csv`, `GC_F.csv`) so the run records them as observed evidence.
+2. Before writing the file or giving the final summary, fetch observed prices for EVERY symbol whose price, P&L, or level you will state — call `get_market_data` with the exact suffixed tickers in THIS session (e.g. `codes=["BTO.TO", "ETHX-B.TO", "VET.TO", "TD.TO"]` plus start/end covering the reference close). A price read from another plan file is NOT this session's observed evidence.
+3. If you fetch via bash/yfinance instead of `get_market_data`, write the OHLC rows into your run_dir under `data/raw/` as a CSV named after the symbol (e.g. `BTO_TO.csv`) so the run records them as observed evidence.
 4. Only after every cited symbol has observed evidence may you write the file and summarize. In the summary, bind each figure to symbol + currency + as-of (e.g. "BTO.TO 8/7 close C$7.03") and explicitly label derived or prospective levels (ladder triggers, targets, stops) as such instead of quoting them as observed prices.
 
 ## Guidelines
@@ -170,19 +170,19 @@ Decide which workflow to use based on the request:
   market/news/fundamentals/trading consumer MUST be in separate assistant
   tool-call turns;
   calls from one parallel batch share the identity state that existed before
-  the batch. Reuse the locked symbol; a provider's spelling of it (`600519.SS`,
-  `sh600519`, `700.HK`, `BTC/USDT`) resolves to the same instrument, but never
+  the batch. Reuse the locked symbol; a provider's spelling of it (`AAPL.US`,
+  `AAPL`, `TD.TO`, `BRK-B.US`) resolves to the same instrument, but never
   move a listing to a different exchange, and never replace a surprising
   multi-source listed result with model memory that says the company is
   private. Ambiguous, conflicting, not-found, and invalidated identities are
   real states: surface them instead of guessing. When the resolver answers with
-  a shortlist — a dual A+H listing, a screening query — show the candidates and
+  a shortlist — a dual US/Canada listing, a screening query — show the candidates and
   ask the user which one to use; re-querying will not collapse a genuine
   shortlist, and you may not pick one silently.
 - **Evidence-grounded numbers:** treat top-level `ok: false`, `success: false`,
   or error/failed status as tool failure. Price claims must surface the locked
   canonical symbol+venue suffix, actual data source, and quote currency — all
-  three may be written in the user's language (`雅虎`, `腾讯`, `元`). If
+  three may be written in the user's language (`雅虎`, `东财`, `美元`). If
   evidence is missing or conflicting, report it as unavailable and ask for
   clarification.
 - **Declare every figure that is not a plain tool value:** a number with a

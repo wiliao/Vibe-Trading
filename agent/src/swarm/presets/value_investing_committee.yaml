@@ -28,7 +28,7 @@ agents:
 
       Use load_skill / get_financial_statements / get_market_data / financial_rigor to source and verify numbers precisely (no "TBD" skips).
     tools: [bash, read_file, write_file, load_skill, get_market_data, get_financial_statements, web_search, financial_rigor]
-    skills: [fundamental-filter, valuation-model, management-deep-dive]
+    skills: [valuation-model, management-deep-dive, investor-lenses]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -58,7 +58,7 @@ agents:
 
       Use financial_rigor to verify any key number; load_skill("risk-analysis") to systematize risk.
     tools: [bash, read_file, write_file, load_skill, get_market_data, get_financial_statements, web_search, financial_rigor]
-    skills: [risk-analysis, financial-statement, fundamental-filter]
+    skills: [risk-analysis, edgar-sec-filings, valuation-model]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -88,7 +88,7 @@ agents:
 
       load_skill("thesis-tracker") to build a thesis and red lines.
     tools: [bash, read_file, write_file, load_skill, get_market_data, get_financial_statements, web_search, financial_rigor]
-    skills: [management-deep-dive, fundamental-filter, thesis-tracker]
+    skills: [management-deep-dive, valuation-model, thesis-tracker]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -105,11 +105,11 @@ agents:
 
       ## You must answer
       1. **Still here in 10 years?** — will this business be stronger, the same, or disrupted in 10 years? Where does the certainty come from?
-      2. **Civilizational trend** — what long-term trend is it on (AI infrastructure, energy transition, consumption upgrade, China modernization...)? How certain is the trend? (load_skill("bottleneck-hunter") to see if it sits on a supply-chain choke point)
+      2. **Civilizational trend** — what long-term trend is it on (AI infrastructure, energy transition, consumption upgrade, North-American reindustrialization...)? How certain is the trend? (load_skill("bottleneck-hunter") to see if it sits on a supply-chain choke point)
       3. **Demographic clock & consumption trend (MANDATORY for consumer/end-market names)** —
          - Is the end-market's customer base growing or shrinking? (population decline, aging, household formation)
          - Are marginal consumption patterns favorable? (consumption upgrade vs downgrade; is the cohort that buys this product expanding or contracting?)
-         - Generational shift: will the next generation still buy this category, or is it a generational-erosion risk (e.g. baijiu, traditional retail, education)?
+         - Generational shift: will the next generation still buy this category, or is it a generational-erosion risk (e.g. traditional retail, linear TV, legacy education)?
          - For consumer-dependent names, a structurally declining population or downgrading consumption is a slow but fatal headwind — weight it explicitly in your 10-year certainty. Do NOT give a high certainty score to a consumer name without addressing demographics.
       4. **Compounding machine** — can it reinvest earnings at a high rate of return, compounding?
       5. **Is management a long-term thinker?** — does it do the long-term-right thing even under short-term pressure?
@@ -123,7 +123,7 @@ agents:
 
       Use load_skill("bottleneck-hunter") to judge the supply-chain position; financial_rigor for exact valuation.
     tools: [bash, read_file, write_file, load_skill, get_market_data, get_financial_statements, web_search, financial_rigor]
-    skills: [bottleneck-hunter, valuation-model, thesis-tracker, global-macro]
+    skills: [bottleneck-hunter, valuation-model, thesis-tracker, macro-analysis]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -193,8 +193,8 @@ tasks:
 
 variables:
   - name: company
-    description: "Target company name or ticker (e.g.: Tencent, NVDA, Moutai)"
+    description: "Target company name or ticker (e.g.: NVDA, SHOP.TO, Costco)"
     required: true
   - name: market
-    description: "Market (e.g.: A-shares, Hong Kong, US)"
+    description: "Market (US or Canada equity)"
     required: true

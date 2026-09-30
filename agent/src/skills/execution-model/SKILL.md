@@ -48,14 +48,14 @@ multiplies the impact, so an unchecked 2 would silently double the modelled cost
 
 | Market | Instrument | Suggested Slippage (bps) | Notes |
 |------|------|-------------|------|
-| China A-share large cap | CSI 300 constituents | 3-5 | Good liquidity |
-| China A-share small cap | CSI 1000 constituents | 5-10 | Average liquidity |
-| China micro-cap | market cap < 5 billion RMB | 10-30 | Poor liquidity |
 | US large cap | AAPL / MSFT | 1-3 | Excellent liquidity |
-| Hong Kong stocks | Hang Seng constituents | 5-10 | Less liquid than A / US |
-| BTC spot | BTC-USDT | 2-5 | Good OKX liquidity |
-| ETH spot | ETH-USDT | 3-8 | Slightly worse than BTC |
-| Small altcoins | other `-USDT` pairs | 10-50 | Liquidity varies widely |
+| US mid cap | S&P 400 constituents | 3-8 | Good liquidity |
+| US small cap | Russell 2000 constituents | 5-15 | Average liquidity |
+| Canada large cap | S&P/TSX 60 constituents | 5-10 | Good, but a thinner book than US mega-cap |
+| Canada small cap / TSXV | TSXV constituents | 15-50 | Poor liquidity; size down |
+| Index / sector ETF | SPY / QQQ / XIU.TO | 1-3 | Tightest spreads |
+
+These are starting assumptions, not measured costs — re-estimate them from your own fills before trusting a backtest.
 
 ### 2. Linear Impact Model
 
@@ -74,10 +74,10 @@ Marginal impact is constant here, which overstates the cost of very large orders
 
 | Market | impact_coeff | Notes |
 |------|-------------|------|
-| China A-share large cap | 0.05-0.10 | 10% daily price-limit system |
-| China A-share small cap | 0.10-0.20 | Liquidity premium |
-| US equities | 0.03-0.08 | Market-maker buffering |
-| Crypto | 0.05-0.15 | 24h trading is dispersed |
+| US large cap | 0.03-0.08 | Market-maker buffering |
+| US small cap | 0.08-0.20 | Liquidity premium |
+| Canada large cap | 0.05-0.12 | Thinner book than US |
+| TSXV small cap | 0.15-0.40 | Very thin; assume worse, not better |
 
 ### 3. Square-Root Impact Model
 
@@ -127,12 +127,15 @@ Execution logic:
 2. Split the order according to the predicted profile
 3. Execute proportionally in each time slice
 
-Typical China A-share VWAP volume profile (U-shaped):
-09:30-10:00  15%  (active open)
-10:00-11:30  25%  (normal morning session)
-13:00-14:00  15%  (weak afternoon session)
-14:00-14:30  15%  (afternoon recovery)
-14:30-15:00  30%  (active close)
+Typical US equity VWAP volume profile (U-shaped, ET):
+09:30-10:00  20%  (active open)
+10:00-12:00  25%  (normal morning session)
+12:00-14:00  20%  (midday lull)
+14:00-15:30  15%  (afternoon recovery)
+15:30-16:00  20%  (closing auction and late flow)
+
+The TSX session ends at 16:00 ET with its own closing auction, and the TSXV book
+is materially thinner — re-fit the profile per listing rather than reusing the US one.
 
 VWAP in backtests:
 - Daily backtest: use the VWAP field directly as the fill price
@@ -164,8 +167,7 @@ signals = delayed_execution(raw_signal, delay_bars=1)   # T+1: trade tomorrow on
 signals = delayed_execution(raw_signal, delay_bars=0)   # same-bar execution
 ```
 
-- China A-shares: `delay_bars=1` (T+1 rule)
-- Crypto: `delay_bars=0` or `1`
+- US and Canadian equities: `delay_bars=1` is the conservative default (T+1 settlement means a signal computed on the close cannot be filled at that same close)
 
 A negative `delay_bars` raises. It would pull future signal values into the past,
 which is look-ahead bias and silently inflates every backtest containing it — the
@@ -179,8 +181,8 @@ tested implementation refuses rather than letting that pass unnoticed.
 Total trading cost = explicit cost + implicit cost
 
 Explicit cost:
-- Commission: China A-shares 2-3 bps, crypto 0.02-0.1%
-- Stamp duty (China A-share sell side): 0.05% (sell orders only)
+- Commission: US 0-1 bps (many brokers are zero-commission), Canada 1-5 bps
+- Regulatory fees: US SEC Section 31 fee on sells; no Canadian transaction tax
 - Transfer fee: negligible
 
 Implicit cost:
@@ -191,13 +193,15 @@ Implicit cost:
 
 ### Reference Trading Costs by Market
 
-| Cost Item | China A-shares | Hong Kong | US | Crypto (OKX) |
-|--------|-----|------|------|-----------|
-| Commission (one way) | 0.025% | 0.05% | 0 (zero commission) | 0.08% (maker) |
-| Stamp duty | 0.05% (sell) | 0.1% (both sides) | 0 | 0 |
-| Bid-ask spread | 0.03-0.1% | 0.05-0.2% | 0.01-0.05% | 0.01-0.05% |
-| Total one-way | ~0.1% | ~0.2% | ~0.03% | ~0.1% |
-| Total round-trip | ~0.2% | ~0.4% | ~0.06% | ~0.2% |
+| Cost Item | US equities | Canada (TSX) | Canada (TSXV) |
+|--------|-----|------|-----------|
+| Commission (one way) | 0 (zero commission) to 0.01% | 0.01-0.05% | 0.05-0.10% |
+| Regulatory fee | SEC Section 31 fee on sells | None | None |
+| Bid-ask spread | 0.01-0.05% | 0.05-0.15% | 0.2-1.0% |
+| Total one-way (reference) | ~0.02-0.05% | ~0.1% | ~0.3-1.0% |
+| Total round-trip (reference) | ~0.05-0.10% | ~0.2% | ~0.6-2.0% |
+
+Re-estimate these from your own sample; they are starting assumptions, not measured costs.
 
 ### Cost Settings in Backtests
 
@@ -209,9 +213,9 @@ Implicit cost:
 ```
 
 **Recommendations**:
-- China A-shares: `commission = 0.001` (conservative, includes all costs)
-- Crypto: `commission = 0.001` (including slippage)
-- Hong Kong / US equities: `commission = 0.001-0.002`
+- US equities: `commission = 0.0005` (conservative; fold in spread and impact)
+- Canada (TSX): `commission = 0.001`
+- Canada (TSXV): `commission = 0.002-0.003` (thin books, wide spreads)
 
 ## Backtest Execution Assumptions
 
@@ -327,8 +331,8 @@ Conclusion: the strategy still has meaningful profitability under 10bps slippage
 
 1. **Backtest only**: this system does not execute live trades; the execution model is used only to improve backtest realism
 2. **Conservative assumptions**: in backtests, it is better to overestimate transaction costs than to underestimate them
-3. **China A-share T+1 rule**: trades cannot be executed on the same day the signal is generated, so execution must be delayed by 1 day
-4. **Price-limit constraints**: when China A-shares are locked at limit-up / limit-down, no fill is possible; those dates should be skipped in backtests
+3. **T+1 settlement**: US and Canadian equities settle T+1, so the conservative backtest convention is to delay execution by one bar rather than fill at the signal bar
+4. **Halts, not price limits**: US and Canadian markets have no fixed daily price limits; they use LULD bands and circuit-breaker halts. Skip halted dates in backtests instead of modelling a limit-up/limit-down lock
 5. **Volume constraints**: order size should not exceed 5-10% of the day’s traded volume, otherwise the impact model becomes invalid
 6. **Backtest overfitting**: even with slippage included, the strategy may still overfit; out-of-sample validation matters more
 7. **`commission` in config**: the default `0.001` (0.1%) is a reasonable all-in cost estimate

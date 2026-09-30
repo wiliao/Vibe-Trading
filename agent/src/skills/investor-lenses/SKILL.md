@@ -59,9 +59,9 @@ decision rests on.
 | Debt cycle & uncorrelated bets (Dalio) | Macro / allocation | Rates, currency, liquidity regime; portfolio shape | Stock picking | [dalio-debt-cycle](references/dalio-debt-cycle.md)                 |
 | Forensic short (Chanos) | Short / accounting | Accounting distortion, value traps, structural decline | Longs; anything you must be right about *soon* | [chanos-forensic-short](references/chanos-forensic-short.md)                 |
 | Cost drag & mean reversion (Bogle) | Allocation / cost | Whether the *activity itself* is worth its cost | Individual security selection | [bogle-cost-drag](references/bogle-cost-drag.md)                 |
-| Right business, right people (Duan Yongping / 段永平) | Quality / concentration | Founder-led A-share, HK and US-listed China names | Diversified baskets; turnarounds | [duan-right-business](references/duan-right-business.md)                 |
-| Weak-system contrarian (Feng Liu / 冯柳) | Contrarian / positioning | A-share names beaten down by known bad news | Momentum regimes; names with unresolved fraud risk | [fengliu-weak-system](references/fengliu-weak-system.md)                 |
-| Three questions (Qiu Guolu / 邱国鹭) | Value / industry structure | A-share and HK industry structure and pricing power | Early-stage, structure-not-yet-formed industries | [qiuguolu-three-questions](references/qiuguolu-three-questions.md)                 |
+| Right business, right people (Duan Yongping / 段永平) | Quality / concentration | Founder-led US and Canadian listed names | Diversified baskets; turnarounds | [duan-right-business](references/duan-right-business.md)                 |
+| Weak-system contrarian (Feng Liu / 冯柳) | Contrarian / positioning | US small/mid caps beaten down by known bad news | Momentum regimes; names with unresolved fraud risk | [fengliu-weak-system](references/fengliu-weak-system.md)                 |
+| Three questions (Qiu Guolu / 邱国鹭) | Value / industry structure | US and Canadian industry structure and pricing power | Early-stage, structure-not-yet-formed industries | [qiuguolu-three-questions](references/qiuguolu-three-questions.md)                 |
 
 ## Choosing a lens
 
@@ -75,8 +75,8 @@ decision rests on.
 | "What does the rates / currency / liquidity regime do to this?" | Dalio | Marks |
 | "The accounting smells" | Chanos | Munger, Fisher |
 | "Should we be picking at all, or just allocating?" | Bogle | Marks |
-| A-share name down 50% on known bad news | Feng Liu | Chanos, Qiu Guolu |
-| A-share / HK industry with consolidating competitive structure | Qiu Guolu | Buffett, Duan Yongping |
+| Small/mid cap down 50% on known bad news | Feng Liu | Chanos, Qiu Guolu |
+| US or Canadian industry with consolidating competitive structure | Qiu Guolu | Buffett, Duan Yongping |
 | Founder-controlled company, governance is the swing factor | Duan Yongping | Munger, Chanos |
 
 ## Stacking protocol
@@ -114,8 +114,8 @@ Stacking is where lenses earn most of their value, but only under discipline.
   in place of walking the signal list.
 - **Silent disqualifier** — noticing a hard veto and continuing to score anyway
   because the rest of the picture is attractive.
-- **Lens applied out of market** — a US-designed lens dropped onto an A-share name
-  without adjusting for what the disclosure regime actually reveals. Each lens file
+- **Lens applied out of market** — a US-designed lens dropped onto a Canadian
+  small cap without adjusting for what the disclosure regime actually reveals. Each lens file
   carries a market-fit note; read it.
 - **Retrofitting the evidence** — going back to collect exactly the data the chosen
   lens rewards, after choosing the lens.

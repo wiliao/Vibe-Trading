@@ -7,7 +7,7 @@ category: research
 
 ## Purpose
 
-When the user asks about prebuilt cross-sectional alphas — Kakushadze 101, GTJA 191, Qlib 158, Fama-French / Carhart — or wants to bench a whole zoo on an investable universe (CSI 300, S&P 500, BTC-USDT, ...), this skill orients you. The zoo is the curated library; the bench is the evaluator.
+When the user asks about prebuilt cross-sectional alphas — Qlib 158, Kakushadze 101, Fama-French / Carhart — or wants to bench a whole zoo on an investable universe (S&P 500, S&P/TSX Composite, ...), this skill orients you. The zoo is the curated library; the bench is the evaluator.
 
 ## Tools Available
 
@@ -21,7 +21,7 @@ When the user asks about prebuilt cross-sectional alphas — Kakushadze 101, GTJ
 
 - "list all momentum alphas" → `alpha_zoo` with `action=list_alphas, theme=momentum`.
 - "show me gtja191_alpha_001" → `alpha_zoo` with `action=get_alpha, alpha_id=gtja191_alpha_001`.
-- "bench all of GTJA 191 on CSI 300 from 2020 to 2024" → `alpha_bench` with `zoo=gtja191, universe=csi300, period=2020-2024`.
+- "bench the whole alpha101 zoo on the S&P 500 from 2020 to 2024" → `alpha_bench` with `zoo=alpha101, universe=sp500, period=2020-2024`.
 - "is the registry healthy" → `alpha_zoo` with `action=health` — surfaces `loaded`, `failed`, and per-error reasons.
 - User uploads `my_factor.csv` → `factor_analysis` (zoo tools are for prebuilt alphas only).
 
@@ -29,10 +29,10 @@ When the user asks about prebuilt cross-sectional alphas — Kakushadze 101, GTJ
 
 | Zoo | Description | Approx. count |
 |------|------|------|
-| `kakushadze101` | Formulaic alphas from Kakushadze's 2015 paper. Mix of momentum, reversal, volume, and microstructure. | ~101 |
-| `gtja191` | Guotai Junan 191 alphas — A-share focused cross-sectional factors. | ~191 |
-| `qlib158` | Microsoft Qlib's 158 alpha factors — features tuned for ML pipelines. | ~158 |
-| `classical` | Fama-French 3/5-factor + Carhart momentum. | <10 |
+| `qlib158` | Microsoft Qlib's `Alpha158` feature handler. Mix of momentum, reversal, volume, and microstructure. | ~154 |
+| `alpha101` | Kakushadze's 2015 formulaic alphas. Short-horizon price-volume and microstructure combinations. | ~101 |
+| `academic` | Fama-French 5 + Carhart momentum, Jegadeesh reversal, 52-week-high, Amihud illiquidity, Harvey-Siddique skew, betting-against-beta, correlation-rewiring stability. | ~12 |
+| `fundamental` | PIT-safe earnings yield, ROE, gross profitability, and asset growth from daily fundamental panels. | ~4 |
 
 Counts are nominal; check `alpha_zoo action=health` for the live count currently loaded.
 
@@ -46,7 +46,7 @@ Counts are nominal; check `alpha_zoo action=health` for the live count currently
 
 ## Common Pitfalls
 
-- Filter mismatch on `list_alphas`: theme / universe must match the alpha's declared metadata exactly (e.g. `equity_cn`, not `cn` or `china`).
+- Filter mismatch on `list_alphas`: theme / universe must match the alpha's declared metadata exactly (e.g. `equity_us`, not `us` or `usa`).
 - Calling `alpha_bench` with both `alpha_id` and `zoo` set — they are mutually exclusive; pick one.
 - Empty registry (`loaded=0`) means no zoo modules are populated yet; treat it as "zoos pending W3 porting" rather than a bug.
 

@@ -151,10 +151,14 @@ def test_lens_styles_cover_distinct_schools() -> None:
     assert len(styles) >= 6, f"only {len(styles)} distinct styles: {sorted(styles)}"
 
 
-def test_china_market_coverage_is_represented() -> None:
-    """At least three lenses speak to A-share / HK market structure."""
-    hits = [slug for slug in _lens_ids() if "A-share" in _lens_text(slug)]
-    assert len(hits) >= 3, f"only {hits} mention A-share market structure"
+def test_us_canada_market_coverage_is_represented() -> None:
+    """At least three lenses speak to US / Canada market structure."""
+    hits = [
+        slug
+        for slug in _lens_ids()
+        if re.search(r"\b(US|U\.S\.|Canada|Canadian|TSX|TSXV|SEC|SEDAR)\b", _lens_text(slug))
+    ]
+    assert len(hits) >= 3, f"only {hits} mention US / Canada market structure"
 
 
 # ---------------------------------------------------------------------------

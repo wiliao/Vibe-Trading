@@ -3,7 +3,7 @@ name: fengliu-weak-system
 lens: Weak-System Contrarian
 attributed_to: Feng Liu (冯柳)
 style: contrarian
-markets: A-share primarily; adaptable to HK where the same names trade with a discount
+markets: US small and mid caps, plus Canadian venture names; adaptable to dual-listed names where one line trades at a persistent discount
 description: Assume you have no information advantage, buy where the bad news is already known and priced, and let the position structure rather than the forecast carry the risk control.
 ---
 
@@ -24,12 +24,13 @@ superior facts.
 
 ## Market-fit note
 
-- Designed around A-share market structure: high retail participation, fast and
+- Designed around high-retail-participation market structure: fast and
   violent sentiment swings, wide dispersion between price and expectation, and
-  liquid mid-caps that can be accumulated on weakness.
-- Translates to HK for dual-listed and China-operating names, where the discount and
-  the sentiment cycle are often deeper. Translates poorly to markets where
-  institutional ownership dominates and expectations reset gradually.
+  liquid mid-caps that can be accumulated on weakness — US small/mid caps and
+  Canadian venture names fit; mega-cap US index members fit poorly.
+- Translates to a dual-listed pair where the Canadian line trades at a persistent
+  discount to its US line and the sentiment cycle is deeper. Translates poorly to
+  names where institutional ownership dominates and expectations reset gradually.
 - Requires a stock that can be *bought* on the way down — enough liquidity and no
   hard limit-down mechanics blocking accumulation.
 

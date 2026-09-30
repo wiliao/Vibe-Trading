@@ -76,7 +76,7 @@ result = cointegration_test(prices_a, prices_b, significance=0.05)
 
 Both legs must be individually non-stationary (check with `adf_test` first) — cointegration on two already-stationary series is meaningless.
 
-Both legs must also share one index. Two same-length series on *different* indices raise `ValueError` rather than being zipped positionally, because a positional join of, say, an A-share calendar against a US one reports cointegration between days that never coexisted. Reindex or inner-join the two legs yourself before calling.
+Both legs must also share one index. Two same-length series on *different* indices raise `ValueError` rather than being zipped positionally, because a positional join of, say, a US calendar against a Canadian one reports cointegration between days that never coexisted. Reindex or inner-join the two legs yourself before calling.
 
 **Application in pair trading**:
 
@@ -170,20 +170,20 @@ Requires the optional `arch` package (`pip install "arch>=6.0"`); the call raise
 | GJR-GARCH | Another asymmetric form | Same use case as EGARCH, easier to interpret |
 | FIGARCH | Long memory | Volatility clustering persists for very long periods |
 
-**GARCH characteristics in China A-shares / crypto**:
+**GARCH characteristics in US / Canada equities**:
 
 ```
-China A-shares:
+US / Canada large caps:
 - α usually 0.05-0.15
 - β usually 0.80-0.90
 - Clear leverage effect (EGARCH fits better)
 - Strong volatility clustering persistence
 
-BTC:
+US small caps / TSXV names:
 - α usually 0.05-0.20 (shocks matter more)
 - β usually 0.75-0.90
-- More symmetric shocks (little difference between up/down volatility)
-- Long-run volatility around 60-80% annualized
+- Weaker asymmetry but noisier estimates — check the standard errors
+- Long-run volatility materially above large-cap levels; estimate it per name rather than assuming a range
 ```
 
 ## Regression Diagnostics

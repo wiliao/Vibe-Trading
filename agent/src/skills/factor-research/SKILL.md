@@ -117,7 +117,7 @@ First orthogonalize the factors with the Schmidt process to remove collinearity,
 ### Industry Neutralization
 - Factor values can be highly similar within the same industry, causing stock selection to cluster in a few sectors
 - Solution: perform Z-score standardization within each industry (industry neutralization) to remove industry effects
-- For China A-shares, Shenwan Level-1 industries can be used
+- Neutralize by GICS sector (US) or the TSX sector classification (Canada), or by an industry mapping you state explicitly
 
 ### Insufficient Sample Size
 - Each cross-section should contain at least 5 valid instruments to compute meaningful IC

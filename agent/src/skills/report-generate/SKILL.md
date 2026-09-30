@@ -252,10 +252,9 @@ Output the complete Markdown research report directly, following the template st
 
 ## Notes
 
-1. **Do not make overly precise forecasts**: use ranges rather than single points (`target price 25-30 RMB` instead of `target price 27.5 RMB`)
+1. **Do not make overly precise forecasts**: use ranges rather than single points (`target price 25-30 USD` instead of `target price 27.5 USD`)
 2. **Data consistency**: all quoted numbers must be consistent throughout the report and never contradict each other
 3. **Mark timeliness**: state both the data cut-off date and the report generation date
 4. **Disclaimer is mandatory**: AI-generated reports must explicitly state that they are not investment advice
 5. **Avoid absolutes**: "likely" is better than "certain", and "may" is better than "will"
-6. **China A-share specific risks**: policy risk / delisting risk / goodwill impairment / major-shareholder selling / lock-up expiry
-7. **Crypto-specific risks**: regulation / smart-contract exploits / liquidity risk / rug pulls
+6. **US / Canada equity-specific risks**: regulatory and antitrust risk / delisting and index-removal risk / goodwill impairment / insider and major-holder selling / lock-up and shelf expiry / dual-listing and CAD/USD exposure

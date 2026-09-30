@@ -256,23 +256,6 @@ def test_prepare_sandbox_home_copy_fallback_when_symlink_privileges_missing(
     assert not sandbox.exists()
 
 
-def test_prepare_sandbox_home_preseeds_mootdx_config(tmp_path: Path) -> None:
-    sandbox = _prepare_sandbox_home(tmp_path)
-    try:
-        cfg = sandbox / ".mootdx" / "config.json"
-        # mootdx's setup() runs `finally: load_config()`, re-reading the file
-        # even after bestip(sync=False) fails to write it — the sandbox HOME
-        # must ship a valid config or mootdx raises an uncaught FileNotFoundError.
-        assert cfg.exists()
-        import json
-
-        assert isinstance(json.loads(cfg.read_text(encoding="utf-8")), dict)
-    finally:
-        import shutil
-
-        shutil.rmtree(sandbox, ignore_errors=True)
-
-
 def test_rlimit_bootstrap_argv_shape_on_posix() -> None:
     # Structural check only; test_execute_applies_address_space_rlimit below
     # proves the ceiling really lands, end-to-end through a real exec.

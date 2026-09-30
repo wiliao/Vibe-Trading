@@ -39,15 +39,15 @@ SYMBOL = "562500.SS"
 HDR = "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。"
 
 
-def _market_payload() -> str:
+def _market_payload(symbol: str = SYMBOL) -> str:
     return json.dumps(
         {
-            SYMBOL: [
+            symbol: [
                 {"trade_date": "2026-06-23", "open": 1.141, "high": 1.164, "low": 1.121, "close": 1.137, "volume": 1},
                 {"trade_date": "2026-06-24", "open": 1.137, "high": 1.180, "low": 1.110, "close": 1.171, "volume": 1},
             ],
             "_provenance": {
-                SYMBOL: {
+                symbol: {
                     "source": "yahoo",
                     "requested_source": "auto",
                     "detected_source": "yahoo",
@@ -59,7 +59,7 @@ def _market_payload() -> str:
     )
 
 
-def _indicator_payload(**extra: Any) -> str:
+def _indicator_payload(symbol: str = SYMBOL, **extra: Any) -> str:
     indicators: dict[str, Any] = {
         "rsi_14": 55.2,
         "sma_20": 1.150,
@@ -71,7 +71,7 @@ def _indicator_payload(**extra: Any) -> str:
     return json.dumps(
         {
             "ok": True,
-            "symbol": SYMBOL,
+            "symbol": symbol,
             "interval": "1d",
             "latest_close": 1.171,
             "latest_date": "2026-06-24",
@@ -109,6 +109,7 @@ def _ledger(
     tmp_path: Path,
     message: str = "请分析 562500.SS 并给出买入价",
     *,
+    symbol: str = SYMBOL,
     market: bool = True,
     indicators: bool = True,
     **extra_indicators: Any,
@@ -117,16 +118,16 @@ def _ledger(
     if market:
         ledger.ingest_tool_result(
             tool_name="get_market_data",
-            arguments={"codes": [SYMBOL]},
-            result=_market_payload(),
+            arguments={"codes": [symbol]},
+            result=_market_payload(symbol),
             call_id="prices",
             success=True,
         )
     if indicators:
         ledger.ingest_tool_result(
             tool_name="technical_indicators",
-            arguments={"symbol": SYMBOL},
-            result=_indicator_payload(**extra_indicators),
+            arguments={"symbol": symbol},
+            result=_indicator_payload(symbol, **extra_indicators),
             call_id="indicators",
             success=True,
         )
@@ -351,8 +352,8 @@ def test_a_return_figure_is_matched_at_its_written_precision(tmp_path: Path) -> 
 
 
 def test_repair_provenance_appends_the_missing_words(tmp_path: Path) -> None:
-    ledger = _ledger(tmp_path)
-    draft = "562500.SS 最新收盘价 1.171 元，处于下行趋势。"
+    ledger = _ledger(tmp_path, symbol="AAPL.US", message="请分析 AAPL.US 并给出买入价")
+    draft = "AAPL.US 最新收盘价 1.171 美元，处于下行趋势。"
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["data_source_not_surfaced"]
 
@@ -360,7 +361,7 @@ def test_repair_provenance_appends_the_missing_words(tmp_path: Path) -> None:
 
     assert repaired is not None
     assert repaired.startswith(draft)
-    assert "yahoo" in repaired and "CNY" in repaired
+    assert "yahoo" in repaired and "USD" in repaired
     assert ledger.validate_final_answer(repaired).valid is True
 
 
@@ -386,8 +387,8 @@ def test_repair_provenance_refuses_without_price_evidence(tmp_path: Path) -> Non
 
 
 def test_redacted_release_keeps_the_analysis_and_cuts_the_figure(tmp_path: Path) -> None:
-    ledger = _ledger(tmp_path)
-    draft = HDR + " 均线空头排列，处于下行趋势。建议买入价 1.10 元，分批建仓。"
+    ledger = _ledger(tmp_path, symbol="AAPL.US", message="请分析 AAPL.US 并给出买入价")
+    draft = "AAPL.US（Yahoo，USD）最新收盘价 1.171 美元。 均线空头排列，处于下行趋势。建议买入价 1.10 美元，分批建仓。"
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["numeric_claim_conflict"]
 
@@ -398,8 +399,8 @@ def test_redacted_release_keeps_the_analysis_and_cuts_the_figure(tmp_path: Path)
     assert "1.10" not in released
     assert _REDACTION_MARKER_ZH in released
     assert "※ 略去 1 处" in released
-    assert "（略※）元" not in released and "建议买入价（略※）" in released
-    assert "1.11–1.18 CNY" in released
+    assert "（略※）美元" not in released and "建议买入价（略※）" in released
+    assert "1.11–1.18 USD" in released
     assert ledger.validate_final_answer(released).valid is True
 
 
@@ -1595,8 +1596,12 @@ def test_repair_provenance_refuses_a_misattributed_symbol(tmp_path: Path) -> Non
 
 
 def test_repair_provenance_writes_english_for_an_english_user(tmp_path: Path) -> None:
-    ledger = _ledger(tmp_path, message="Analyse 562500.SS and give me an entry price")
-    draft = "562500.SS last close 1.171 CNY, trending down."
+    ledger = _ledger(
+        tmp_path,
+        message="Analyse AAPL.US and give me an entry price",
+        symbol="AAPL.US",
+    )
+    draft = "AAPL.US last close 1.171 USD, trending down."
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["data_source_not_surfaced"]
 
@@ -1604,7 +1609,7 @@ def test_repair_provenance_writes_english_for_an_english_user(tmp_path: Path) ->
 
     assert repaired is not None
     # The note spells the symbol the way the answer does, not the canonical form.
-    assert "Data note: 562500.SS: price source yahoo, quote currency CNY." in repaired
+    assert "Data note: AAPL.US: price source yahoo, quote currency USD." in repaired
     assert ledger.validate_final_answer(repaired).valid is True
 
 

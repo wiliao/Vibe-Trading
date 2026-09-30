@@ -43,49 +43,6 @@ _MARKET_CURRENCY = {
 }
 
 
-# HKEX's Stock Code Allocation Plan (updated 2026-03-12) assigns a trading
-# currency by code range: 80000-89999 are "Products traded in Renminbi" (the
-# RMB counters, 80700.HK beside 00700.HK), and these sub-ranges trade in USD.
-# Every other .HK code trades in HKD.
-#
-# NOTE: Hong Kong is no longer a settlement market in this build. This table is
-# retained only because the grounding ledger's ``identity._infer_currency``
-# still reads it; it is removed with that call site in the prompts/identity
-# phase.
-_HK_COUNTER_CURRENCY_RANGES: tuple[tuple[int, int, str], ...] = (
-    (80000, 89999, "CNY"),
-    (9000, 9199, "USD"),  # ETFs
-    (9200, 9399, "USD"),  # leveraged and inverse products
-    (9400, 9499, "USD"),  # ETFs
-    (9500, 9599, "USD"),  # leveraged and inverse products
-    (9700, 9799, "USD"),  # leveraged and inverse products
-    (9800, 9849, "USD"),  # ETFs
-    (10900, 10999, "USD"),  # derivative warrants
-    (41500, 41599, "USD"),  # ETFs
-)
-_HK_CODE = re.compile(r"^(\d{3,5})\.HK$", re.I)
-
-
-def hk_counter_currency(code: str) -> str | None:
-    """Return the currency HKEX's code allocation assigns to a ``.HK`` code.
-
-    Args:
-        code: Ticker / symbol string, optionally ``local:``-prefixed.
-
-    Returns:
-        ``"CNY"``, ``"USD"`` or ``"HKD"`` for a Hong Kong code, ``None`` for
-        anything else.
-    """
-    match = _HK_CODE.match(strip_local_prefix(code).strip())
-    if match is None:
-        return None
-    number = int(match.group(1))
-    return next(
-        (cur for low, high, cur in _HK_COUNTER_CURRENCY_RANGES if low <= number <= high),
-        "HKD",
-    )
-
-
 def strip_local_prefix(code: str) -> str:
     """Return the instrument symbol behind a ``local:`` routing prefix.
 

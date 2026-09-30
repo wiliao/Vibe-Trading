@@ -16,7 +16,7 @@ def compute_hv(close: pd.Series, window: int = 20, annualize: int = 252) -> pd.S
     Args:
         close: 收盘价序列。
         window: 波动率计算窗口。
-        annualize: 年化系数（A股252，加密365）。
+        annualize: 年化系数（美股 / 加股按 252 个交易日）。
 
     Returns:
         年化历史波动率序列。
@@ -52,8 +52,8 @@ class SignalEngine:
 
     Example:
         >>> engine = SignalEngine(hv_window=20, lookback=120)
-        >>> signals = engine.generate({"BTC-USDT": df})
-        >>> signals["BTC-USDT"].value_counts()
+        >>> signals = engine.generate({"AAPL": df})
+        >>> signals["AAPL"].value_counts()
     """
 
     def __init__(
@@ -71,7 +71,7 @@ class SignalEngine:
             lookback: 百分位排名回看期。
             low_pct: 低波阈值（百分位）。
             high_pct: 高波阈值（百分位）。
-            annualize: 年化系数（A股252，加密365）。
+            annualize: 年化系数（美股 / 加股按 252 个交易日）。
         """
         self.hv_window = hv_window
         self.lookback = lookback
@@ -115,44 +115,50 @@ class SignalEngine:
 if __name__ == "__main__":
     import requests
 
-    def _fetch_okx(inst_id: str, bar: str = "1D", limit: int = 300) -> pd.DataFrame:
-        """从 OKX API 获取 K 线数据。
+    def _fetch_yahoo(symbol: str, interval: str = "1d", range_: str = "2y") -> pd.DataFrame:
+        """从 Yahoo Finance 获取 K 线数据。
 
         Args:
-            inst_id: 交易对标识，如 "BTC-USDT"。
-            bar: K 线周期。
-            limit: 获取根数。
+            symbol: 美股 / 加股代码，如 "AAPL"。
+            interval: K 线周期，默认 "1d"。
+            range_: 回看区间，默认 "2y"。
 
         Returns:
             OHLCV DataFrame。
         """
         resp = requests.get(
-            "https://www.okx.com/api/v5/market/candles",
-            params={"instId": inst_id, "bar": bar, "limit": str(limit)},
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+            params={"range": range_, "interval": interval},
+            headers={"User-Agent": "Mozilla/5.0"},
         )
-        candles = resp.json()["data"]
-        columns = ["ts", "open", "high", "low", "close", "vol", "volCcy", "volCcyQuote", "confirm"]
-        df = pd.DataFrame(reversed(candles), columns=columns)
-        df["ts"] = pd.to_datetime(df["ts"].astype("int64"), unit="ms")
-        df = df.set_index("ts")
-        for col in ["open", "high", "low", "close"]:
-            df[col] = df[col].astype(float)
-        df["volume"] = df["vol"].astype(float)
-        return df
+        result = resp.json()["chart"]["result"][0]
+        quote = result["indicators"]["quote"][0]
+        df = pd.DataFrame(
+            {
+                "open": quote["open"],
+                "high": quote["high"],
+                "low": quote["low"],
+                "close": quote["close"],
+                "volume": quote["volume"],
+            },
+            index=pd.to_datetime(result["timestamp"], unit="s"),
+        )
+        df.index.name = "ts"
+        return df.dropna(subset=["open", "high", "low", "close"])
 
-    symbols = ["BTC-USDT", "ETH-USDT", "SOL-USDT"]
+    symbols = ["AAPL", "MSFT", "SPY"]
     data_map = {}
     for sym in symbols:
         print(f"Fetching {sym} ...")
-        data_map[sym] = _fetch_okx(sym, bar="1D", limit=300)
+        data_map[sym] = _fetch_yahoo(sym)
 
-    # 加密货币用 365 年化
-    engine = SignalEngine(hv_window=20, lookback=120, annualize=365)
+    # 美股 / 加股按 252 个交易日年化
+    engine = SignalEngine(hv_window=20, lookback=120, annualize=252)
     signals = engine.generate(data_map)
 
     for sym in symbols:
         sig = signals[sym]
-        hv = compute_hv(data_map[sym]["close"], 20, 365)
+        hv = compute_hv(data_map[sym]["close"], 20, 252)
         pct = compute_hv_percentile(hv, 120)
         print(f"\n{sym} ({len(sig)} bars)")
         print(f"  Current HV(20): {hv.iloc[-1]:.1%}")

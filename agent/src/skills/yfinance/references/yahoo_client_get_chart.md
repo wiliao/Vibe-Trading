@@ -22,7 +22,7 @@ IP; spacing is enforced process-wide across every Yahoo call.
 
 Name | Type | Required | Description
 ---- | ---- | -------- | -----------
-symbol | str | Y | Project-side symbol (`AAPL.US`, `00700.HK`, `BTC-USD`, `^GSPC`). Mapped to Yahoo form via `map_symbol`.
+symbol | str | Y | Ticker symbol (`AAPL`, `SHOP.TO`, `^GSPC`). Mapped to Yahoo form via `map_symbol`.
 interval | str | N | Bar size accepted by Yahoo: `1m`, `2m`, `5m`, `15m`, `30m`, `60m`, `90m`, `1h`, `1d`, `5d`, `1wk`, `1mo`, `3mo`. Default `1d`.
 period1 | int | N | Inclusive start as Unix epoch seconds. Ignored when `range_` is given.
 period2 | int | N | Exclusive end as Unix epoch seconds. Ignored when `range_` is given.

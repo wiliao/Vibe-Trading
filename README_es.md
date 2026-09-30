@@ -604,7 +604,7 @@ Paper-vs-live es una **guardia de runtime estructural por broker** (formato de i
 </details>
 
 <details>
-<summary><b>Equipos de Trading Preconfigurados</b> <sub>30 presets de swarm</sub></summary>
+<summary><b>Equipos de Trading Preconfigurados</b> <sub>25 presets de swarm</sub></summary>
 
 - 🏢 30 equipos de agentes listos para usar
 - ⚡ Flujos de trabajo financieros preconfigurados

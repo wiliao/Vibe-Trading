@@ -600,7 +600,7 @@ Paper-vs-live는 **구조적 브로커별 런타임 가드**(account-id 형식, 
 </details>
 
 <details>
-<summary><b>프리셋 트레이딩 팀</b> <sub>30개 swarm preset</sub></summary>
+<summary><b>프리셋 트레이딩 팀</b> <sub>25개 swarm preset</sub></summary>
 
 - 🏢 바로 사용할 수 있는 30개 에이전트 팀
 - ⚡ 사전 구성된 금융 워크플로

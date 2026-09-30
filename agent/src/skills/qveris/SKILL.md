@@ -5,13 +5,12 @@ description: Paid capability marketplace for global multi-asset data; use it whe
 ---
 # QVeris
 
-QVeris is a paid capability marketplace for global market, fundamental, macro,
-derivatives, crypto, China/HK, news, filings, and alternative-data calls. Use it
-when the built-in free sources cannot cover the requested dataset, when the user
-explicitly asks for QVeris, or when a premium provider is needed for depth such
-as options Greeks, analyst/calendar feeds, broad provider comparison, or paid
-China/HK/global coverage. For ordinary OHLCV, keep `source: "auto"` on the free
-loader chain unless the user explicitly selects `source: "qveris"`.
+QVeris is a paid capability marketplace for market, fundamental, macro, options,
+news, filings, and alternative-data calls. Use it when the built-in free sources
+cannot cover the requested US or Canadian dataset, when the user explicitly asks
+for QVeris, or when a premium provider is needed for depth such as options Greeks,
+analyst/calendar feeds, or broad provider comparison. For ordinary OHLCV, keep
+`source: "auto"` on the free loader chain.
 
 Signup link: [QVeris via Vibe-Trading](https://qveris.ai/?ref=Vyjjo5G_1cAHJA).
 Invite code fallback: `Vyjjo5G_1cAHJA`.
@@ -27,9 +26,9 @@ categories, and `stats` such as `success_rate` and average execution time.
 Good queries are concrete:
 
 - `US listed options chain implied volatility Greeks AAPL`
-- `Hong Kong market daily OHLCV financial statements`
+- `US and Canadian equity daily OHLCV and financial statements`
 - `FRED CPI Treasury yield curve macro series`
-- `China A share northbound fund flow daily`
+- `US institutional holdings 13F filings by issuer`
 
 ### 2. Inspect with `qveris_inspect`
 
@@ -80,10 +79,9 @@ choosing among paid options.
   result, row or value is refused as `quote_not_bounded`, because its leading
   number is not the bill: `1 credits/result` charged 9.66 credits for one
   stock-year.
-- `source: "qveris"` in a backtest or `get_market_data` serves crypto, forex,
-  futures and macro bars only. Stocks, ETFs and other markets with splits and
-  dividends are refused: the loader picks a capability by search rank, which
-  ignores price adjustment, so it could not say how the bars were adjusted.
+- `source: "qveris"` is **not** part of this build's `VALID_SOURCES` loader
+  registry: route US/Canada equity bars through the built-in free loaders, and
+  treat any QVeris loader path as unavailable until it is re-registered.
 - Never hide cost: every successful execute result should preserve `cost` and
   `remaining_credits` for the user.
 

@@ -24,10 +24,11 @@ that. It expects to be wrong on individual names and to be right on the basket.
 
 - Works wherever balance sheets are audited and comparable, and where you can hold
   20+ names so idiosyncratic blowups average out.
-- In A-shares, statistically cheap screens are dominated by financials, utilities
-  and property; treat that concentration as a single macro bet, not diversification.
-- In HK, persistent deep discounts often reflect a controlling-shareholder
-  discount, not mispricing — see the disqualifiers.
+- A statistically cheap US/Canada screen is often dominated by financials, utilities
+  and REITs; treat that concentration as a single macro bet, not diversification.
+- Persistent deep discounts (holding-company structures, dual-class control, a
+  Canada-only listing with a US-listed twin) often reflect a governance or
+  liquidity discount, not mispricing — see the disqualifiers.
 
 ## Priority signals (walk in this order)
 

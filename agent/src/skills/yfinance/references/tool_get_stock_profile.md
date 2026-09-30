@@ -5,7 +5,7 @@
 Tool: `get_stock_profile`
 Backed by: `backtest.loaders.yahoo_client.get_quote_summary`
 Description: Read-only agent/CLI tool that returns a compact company profile for
-a US, Hong Kong, or UK (LSE .L) listing — valuation key statistics, analyst price
+a US or Canadian listing — valuation key statistics, analyst price
 targets and earnings/revenue estimates, institutional and insider ownership,
 and the analyst recommendation trend. Use it for fundamentals and consensus
 context, not for OHLCV price bars (use `get_market_data` for prices).

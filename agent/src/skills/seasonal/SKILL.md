@@ -7,7 +7,7 @@ category: strategy
 
 ## Purpose
 
-Uses time-based regularities in financial markets (month effects, day-of-week effects, and similar patterns) to generate trading signals. Examples include the China A-share "spring rally" (January-March) and the "sell in May" effect.
+Uses time-based regularities in financial markets (month effects, day-of-week effects, and similar patterns) to generate trading signals. Examples include the "Santa Claus rally" (late December into early January) and the "sell in May" effect. Treat every calendar pattern as a weak prior to be tested on your own sample, not as a standing rule.
 
 ## Signal Logic
 
@@ -30,9 +30,9 @@ Month signal × weekday signal; open a position only when both confirm.
 
 | Effect | Description | Reference Configuration |
 |------|------|---------|
-| Spring rally | Higher probability of gains in China A-shares from January to March | bullish_months=[1,2,3] |
+| Santa Claus rally | Higher probability of gains in US equities in late December into early January | bullish_months=[12,1] |
 | Sell in May | Weaker performance from May to October | bearish_months=[5,6,7,8,9,10] |
-| Year-end effect | Institutional rebalancing in December | bullish_months=[11,12] |
+| Year-end effect | Institutional rebalancing and tax-loss selling in December | bullish_months=[11,12] |
 | Monday effect | Lower returns on Mondays | bearish_weekdays=[0] |
 | Friday effect | Higher returns on Fridays | bullish_weekdays=[4] |
 

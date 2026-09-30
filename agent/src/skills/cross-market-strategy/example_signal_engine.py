@@ -1,7 +1,8 @@
 """Cross-market strategy example: vol-adjusted dual-MA with per-market parameters.
 
-Supports any combination of A-shares, crypto, US/HK/Canada equity, forex, and futures.
-The CompositeEngine handles calendar alignment, market rules, and shared capital.
+Covers the two venues this repo trades — US and Canada equity — including
+dual-listed names (e.g. ``RY`` on NYSE vs ``RY.TO`` on TSX). The CompositeEngine
+handles calendar alignment, market rules, and shared capital.
 """
 
 import re
@@ -12,24 +13,15 @@ import pandas as pd
 
 # Per-market indicator parameters
 MARKET_PARAMS = {
-    "a_share":    {"ma_fast": 5,  "ma_slow": 20, "vol_lookback": 20},
-    "crypto":     {"ma_fast": 7,  "ma_slow": 25, "vol_lookback": 14},
-    "us_equity":  {"ma_fast": 10, "ma_slow": 50, "vol_lookback": 20},
-    "hk_equity":  {"ma_fast": 10, "ma_slow": 50, "vol_lookback": 20},
-    "ca_equity":  {"ma_fast": 10, "ma_slow": 50, "vol_lookback": 20},
-    "forex":      {"ma_fast": 10, "ma_slow": 30, "vol_lookback": 20},
-    "futures":    {"ma_fast": 5,  "ma_slow": 20, "vol_lookback": 20},
+    "us_equity": {"ma_fast": 10, "ma_slow": 50, "vol_lookback": 20},
+    "ca_equity": {"ma_fast": 10, "ma_slow": 50, "vol_lookback": 20},
 }
 
 _MARKET_PATTERNS = [
-    (re.compile(r"^\d{6}\.(SZ|SH|BJ)$", re.I), "a_share"),
-    (re.compile(r"^[A-Z]+\.US$", re.I), "us_equity"),
-    (re.compile(r"^\d{3,5}\.HK$", re.I), "hk_equity"),
+    # Canadian listings carry the Yahoo exchange suffix; TSXV uses .V.
     (re.compile(r"^[A-Z0-9&.\-]+\.(TO|V)$", re.I), "ca_equity"),
-    (re.compile(r"^[A-Z]+-USDT$", re.I), "crypto"),
-    (re.compile(r"^[A-Z]+/USDT$", re.I), "crypto"),
-    (re.compile(r"^[A-Z]{3}/[A-Z]{3}$"), "forex"),
-    (re.compile(r"^[A-Z]{6}\.FX$"), "forex"),
+    # Everything else that looks like a North-American equity ticker is US.
+    (re.compile(r"^[A-Z][A-Z0-9.\-]{0,6}$"), "us_equity"),
 ]
 
 
@@ -39,7 +31,7 @@ class SignalEngine:
         raw_signals = {}
         for code, df in data_map.items():
             market = self._detect_market(code)
-            params = MARKET_PARAMS.get(market, MARKET_PARAMS["a_share"])
+            params = MARKET_PARAMS.get(market, MARKET_PARAMS["us_equity"])
             raw_signals[code] = self._market_signal(df, params)
 
         # Step 2: volatility-adjusted weights
@@ -49,7 +41,7 @@ class SignalEngine:
         for pattern, market in _MARKET_PATTERNS:
             if pattern.match(code):
                 return market
-        return "a_share"
+        return "us_equity"
 
     def _market_signal(self, df: pd.DataFrame, params: dict) -> pd.Series:
         close = df["close"]

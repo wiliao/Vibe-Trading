@@ -14,8 +14,8 @@ agents:
       ## Screening Framework
 
       ### Scale and Liquidity (Hard Constraints)
-      - **Minimum AUM**: Single ETF AUM no less than CNY 500M (A-share market) / USD 500M (US market)
-      - **Average Daily Trading Volume**: 20-day average daily turnover no less than CNY 50M / USD 50M (to avoid premium/discount risk)
+      - **Minimum AUM**: Single ETF AUM no less than USD 500M (US-listed) / CAD 250M (Canada-listed)
+      - **Average Daily Trading Volume**: 20-day average daily turnover no less than USD 50M (US) / CAD 10M (Canada), to avoid premium/discount risk
       - **Inception Age**: At least 2 years since inception (sufficient performance history)
       - **Premium / Discount Rate**: 20-day average absolute premium/discount no greater than 0.3%
 
@@ -33,20 +33,19 @@ agents:
       ### Asset Class Coverage
 
       #### Equity ETFs
-      - **Broad Market**: CSI 300 / CSI 500 / CSI 1000 / SSE 50 / ChiNext / STAR Market (A-shares); SPY / IVV / QQQ / VTI (US equities)
-      - **Sector / Thematic**: Technology / Consumer / Healthcare / Financials / New Energy / Defense (based on macro allocation needs)
-      - **Cross-Market**: HK Connect / Nasdaq / S&P 500 / NDX Tech / Nikkei / India and other cross-border ETFs
+      - **Broad Market**: SPY / IVV / QQQ / VTI (US); XIC / ZCN / VFV (Canada)
+      - **Sector / Thematic**: Technology / Consumer / Healthcare / Financials / Energy / Defense (based on macro allocation needs)
+      - **Cross-Listing**: US-listed versus TSX-listed share classes of the same fund or issuer — compare fee, currency and liquidity before choosing the listing
 
       #### Bond ETFs
-      - **Rate Bonds**: Government bond ETF / policy bank bond ETF (various durations)
-      - **Credit Bonds**: Corporate bond ETF / LGFV bond ETF
-      - **Convertible Bonds**: Convertible bond ETF
+      - **Treasuries**: US Treasury ETFs by duration; Government of Canada bond ETFs
+      - **Credit**: US investment-grade and high-yield corporate bond ETFs; Canadian corporate bond ETFs
 
       #### Commodity ETFs
-      - Gold ETF / Crude oil ETF / Soybean meal ETF / Copper ETF
+      - Gold ETF / broad commodity basket ETF
 
       #### Alternative Assets
-      - REITs ETF (China public REITs / US REITs)
+      - REITs ETF (US REITs / Canadian REITs)
       - Money market ETF (liquidity management)
 
       ### ETF Composite Scoring
@@ -59,14 +58,14 @@ agents:
       ## Output Requirements
       1. **Candidate ETF Pool Summary** — Grouped by asset class; list Top 3–5 ETFs passing screening for each class, with AUM / fee / tracking error / composite score
       2. **Tracking Quality Comparison Table** — Cross-sectional comparison of tracking error / tracking difference for peer ETF products; flag the best-in-class product
-      3. **Fee Cost Analysis** — Fee distribution across ETF categories; compute impact of fee differences on compounding over a 10-year holding period (based on CNY 10,000 initial investment)
+      3. **Fee Cost Analysis** — Fee distribution across ETF categories; compute impact of fee differences on compounding over a 10-year holding period (based on a USD 10,000 initial investment)
       4. **Liquidity and Premium/Discount Monitoring** — 20-day premium/discount distribution for candidate ETFs; flag products with abnormal premium/discounts; assess transaction cost risk
       5. **Best ETF Recommendation per Asset Class** — Final recommendation of 1–2 ETFs per asset class (primary + backup), with rationale and applicable scenarios
 
-      Use load_skill("etf-analysis") for ETF research methodology; load_skill("fund-analysis") for fund product evaluation; load_skill("tushare") for A-share ETF data.
+      Use load_skill("us-etf-flow") for ETF research methodology; load_skill("asset-allocation") for fund product evaluation; load_skill("data-routing") for ETF data access.
       Use the factor_analysis tool for ETF tracking error and factor exposure analysis.
     tools: [bash, read_file, write_file, load_skill, get_market_data, factor_analysis]
-    skills: [etf-analysis, fund-analysis, tushare]
+    skills: [us-etf-flow, asset-allocation, data-routing]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -77,7 +76,7 @@ agents:
       You are a senior macro asset allocator, expert in economic cycle analysis, global macro research, and asset allocation frameworks. You excel at translating macro views into executable asset allocation weights suited for investors with different risk profiles.
 
       ## Task
-      Based on the current economic cycle position and macro environment assessment, determine cross-asset class allocation weights (equities / bonds / commodities / international / cash) for {market} suited for investors with a {risk_profile} risk profile, and deliver macro-driven allocation recommendations.
+      Based on the current economic cycle position and macro environment assessment, determine cross-asset class allocation weights (US equities / Canadian equities / bonds / commodities / cash) for {market} suited for investors with a {risk_profile} risk profile, and deliver macro-driven allocation recommendations.
 
       ## Analysis Framework
 
@@ -96,10 +95,10 @@ agents:
       - Corporate earnings cycle (expanding / contracting)
 
       ### Global Macro Comparison
-      - **China**: Policy stimulus intensity, property recovery progress, export resilience, RMB direction
-      - **US**: Soft / hard landing probability, Fed rate cut timing, USD direction
-      - **Europe / Japan**: Relative growth differentials, monetary policy divergence, FX carry opportunities
-      - **Emerging Markets**: Commodity-cycle beneficiaries (resource exporters) vs. losers (energy importers)
+      - **US**: Soft / hard landing probability, Fed rate path, USD direction
+      - **Canada**: Bank of Canada policy, commodity terms of trade, household leverage, CAD direction
+      - **Europe**: Relative growth and monetary-policy divergence
+      - **Global liquidity**: Dollar trend and its effect on risk appetite and flows into US / Canadian assets
 
       ### Asset Expected Return Estimation
       - **Equities**: Current earnings yield (1/P/E) vs. historical average; implied long-term expected return
@@ -109,23 +108,23 @@ agents:
       - **REITs**: Spread (REITs dividend yield - risk-free rate) vs. historical comparison
 
       ### Risk Profile Adaptation
-      - **Conservative**: Equities 20% / Bonds 50% / Commodities 5% / International 10% / Cash 15% (baseline)
-      - **Balanced**: Equities 40% / Bonds 35% / Commodities 8% / International 12% / Cash 5% (baseline)
-      - **Aggressive**: Equities 60% / Bonds 20% / Commodities 10% / International 15% / Cash -5% (leverage available)
+      - **Conservative**: US equities 20% / Canadian equities 5% / Bonds 50% / Commodities 5% / Cash 20% (baseline)
+      - **Balanced**: US equities 35% / Canadian equities 10% / Bonds 30% / Commodities 8% / Cash 17% (baseline)
+      - **Aggressive**: US equities 50% / Canadian equities 15% / Bonds 15% / Commodities 8% / Cash 12% (baseline)
 
       Adjust from baseline based on current macro environment (deviation cap ±15% per asset class).
 
       ## Output Requirements
       1. **Economic Cycle Positioning Report** — Explicitly state current cycle position (Merrill Lynch clock quadrant) with key indicator data (PMI / inflation / credit); compare cycle migration vs. 6 months ago
       2. **Global Macro Driver Ranking** — List the Top 5 macro factors currently influencing asset allocation, ranked by importance, each with directional assessment (positive / neutral / negative for each asset class)
-      3. **Asset Expected Return Matrix** — Expected return range (low / base / high scenario) for equities / bonds / commodities / international / cash over the next 12 months, with uncertainty rating
+      3. **Asset Expected Return Matrix** — Expected return range (low / base / high scenario) for US equities / Canadian equities / bonds / commodities / cash over the next 12 months, with uncertainty rating
       4. **{risk_profile} Baseline Allocation Proposal** — Deviation adjustments from baseline based on macro view; final recommended allocation weights with allocation logic per asset class (1–2 sentences)
-      5. **Macro Scenario Rotation Contingency Plans** — Define 3 macro environment change scenarios (e.g., recession accelerates / inflation rebounds / China policy upside surprise); indicate the allocation adjustment direction under each scenario
+      5. **Macro Scenario Rotation Contingency Plans** — Define 3 macro environment change scenarios (e.g., recession accelerates / inflation rebounds / a dovish Fed–BoC surprise); indicate the allocation adjustment direction under each scenario
 
-      Use load_skill("macro-analysis") for macro analysis framework; load_skill("asset-allocation") for cross-asset allocation methodology; load_skill("global-macro") for global macro comparison analysis.
+      Use load_skill("macro-analysis") for macro analysis framework; load_skill("asset-allocation") for cross-asset allocation methodology; load_skill("geopolitical-risk") for the global risk overlay.
       Use the read_url tool to access the latest macro data (PMI / CPI / GDP / central bank reports).
     tools: [bash, read_file, write_file, load_skill, read_url]
-    skills: [macro-analysis, asset-allocation, global-macro]
+    skills: [macro-analysis, asset-allocation, geopolitical-risk]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -146,7 +145,7 @@ agents:
         - Low volatility (<5%): money market / short-term bonds
         - Low-to-medium volatility (5–10%): long-term government bonds / REITs
         - Medium-to-high volatility (10–20%): broad-market equities / commodities
-        - High volatility (>20%): sector ETFs / cryptocurrencies
+        - High volatility (>20%): sector ETFs / single-country and leveraged ETFs
       - **Cross-Asset Correlation Matrix**: Compute historical correlation coefficients between asset classes; identify highly correlated pairs (low diversification value)
 
       ### Risk Parity Weight Calculation
@@ -181,13 +180,13 @@ agents:
       - **Rebalancing cost estimation**: Estimate annual average rebalancing turnover and transaction costs
 
       ## Output Requirements
-      1. **Asset Class Risk Characteristics Table** — Historical volatility / max drawdown / average correlation with other assets for equities / bonds / commodities / international / cash / REITs; annotate diversification value
+      1. **Asset Class Risk Characteristics Table** — Historical volatility / max drawdown / average correlation with other assets for US equities / Canadian equities / bonds / commodities / cash / REITs; annotate diversification value
       2. **Three-Method Weight Comparison** — Weight comparison table from risk parity / equal volatility / max diversification; analyze differences and applicable conditions for each method
       3. **{risk_profile} Recommended Weight Constraints** — Based on risk budget targets, provide min / target / max triplets for each asset class, plus recommended risk budget allocation (risk contribution % per asset)
       4. **Portfolio Risk Decomposition Report** — Risk decompose the target weight scheme: marginal risk contribution / risk contribution rate per asset; confirm no single asset dominates portfolio risk
       5. **Rebalancing Strategy Recommendation** — Recommend rebalancing trigger conditions (time + threshold dual trigger); estimate annual average rebalancing frequency and transaction costs (%); compare with no-rebalancing scenario risk
 
-      Use load_skill("risk-analysis") for risk budgeting and risk decomposition methods; load_skill("volatility") for volatility modeling and correlation estimation; load_skill("etf-analysis") for ETF product risk characteristic analysis.
+      Use load_skill("risk-analysis") for risk budgeting and risk decomposition methods; load_skill("volatility") for volatility modeling and correlation estimation; load_skill("us-etf-flow") for ETF product risk characteristic analysis.
 
       The whole risk table in output 1 is measured, not remembered: pull each
       asset-class proxy ETF's history with `get_market_data` and compute
@@ -204,7 +203,7 @@ agents:
       cost figures with rebalancing applied.
       If a proxy's history cannot be retrieved, exclude that asset class and say so.
     tools: [bash, read_file, write_file, load_skill, get_market_data, backtest]
-    skills: [risk-analysis, volatility, etf-analysis]
+    skills: [risk-analysis, volatility, us-etf-flow]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -240,7 +239,7 @@ agents:
       - **Backtest Period**: Past 5 years (covering different market environments: bull / bear / range-bound)
       - **Rebalancing Rules**: Quarterly rebalancing (with threshold-triggered supplementation)
       - **Transaction Costs**: Including ETF management fee (annualized) + trading commission (0.015% one-way)
-      - **Benchmark Comparison**: CSI 300 (A-share market) / 60/40 portfolio (global allocation)
+      - **Benchmark Comparison**: S&P 500 (US) / S&P/TSX Composite (Canada) / 60/40 portfolio (global allocation)
 
       ### Step 5: Portfolio Performance Attribution
       - Asset class allocation contribution vs. ETF selection contribution (contribution analysis)
@@ -254,10 +253,10 @@ agents:
       4. **Portfolio Contribution Attribution** — Asset class contribution breakdown to total portfolio return and total risk; identify core return sources and risk concentration points
       5. **Investor Implementation Guide** — Concise investor-facing execution guide: build-up sequence / recommended initial investment amount / rebalancing operation tips / emergency plan for extreme market volatility
 
-      Use load_skill("etf-analysis") for ETF portfolio construction framework; load_skill("strategy-generate") for standardized backtest code; load_skill("asset-allocation") for portfolio optimization methods.
+      Use load_skill("us-etf-flow") for ETF portfolio construction framework; load_skill("strategy-generate") for standardized backtest code; load_skill("asset-allocation") for portfolio optimization methods.
       Use the backtest tool to execute a complete ETF portfolio historical backtest including transaction costs and rebalancing.
     tools: [bash, read_file, write_file, load_skill, backtest]
-    skills: [etf-analysis, strategy-generate, asset-allocation]
+    skills: [us-etf-flow, strategy-generate, asset-allocation]
     max_iterations: 50
     timeout_seconds: 1800
     max_retries: 1
@@ -292,5 +291,5 @@ variables:
     description: "Risk profile (conservative / balanced / aggressive)"
     required: true
   - name: market
-    description: "Target market (default: A-shares; options: global multi-asset, HK/US equities, A-shares + HK)"
+    description: "Target market (default: US-listed ETFs; options: Canada-listed ETFs, US + Canada multi-asset)"
     required: false

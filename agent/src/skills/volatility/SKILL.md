@@ -32,7 +32,7 @@ Uses percentile ranking of historical volatility (HV) to capture volatility mean
 | lookback | 120 | Lookback period for percentile ranking |
 | low_pct | 20.0 | Low-volatility threshold (percentile) |
 | high_pct | 80.0 | High-volatility threshold (percentile) |
-| annualize | 252 | Annualization factor (252 for China A-shares, 365 for crypto) |
+| annualize | 252 | Annualization factor (252 trading days for US and Canadian equities) |
 
 ## Common Pitfalls
 

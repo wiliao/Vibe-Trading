@@ -7,8 +7,9 @@ description: The single ROUTER for every data need. Load this skill BEFORE any b
 
 This is the one router. It maps (a) every registered backtest data **source** to its
 markets / auth / skill, and (b) every research **data need** to the concrete **tool**
-that serves it, its market, and the env key it requires. Source names below are a
-strict subset of `backtest.loaders.registry.VALID_SOURCES` (enforced by
+that serves it, its market, and the env key it requires. The supported universe is
+**US and Canadian equities plus indices**; source names below are a strict subset of
+`backtest.loaders.registry.VALID_SOURCES` (enforced by
 `tests/test_data_routing_sources_subset.py`).
 
 ## Source Overview
@@ -19,30 +20,21 @@ per-source skill.
 
 | Source | Markets | Auth (env key) | Network | Skill |
 |--------|---------|----------------|---------|-------|
-| tushare | A-shares, funds, futures, macro | Yes (`TUSHARE_TOKEN`) | China network | tushare |
-| akshare | A-shares, US, HK, futures, macro, forex | No | Unrestricted | akshare |
-| yfinance | US, HK, Canada (TSX/TSXV) stocks, ETFs | No | Needs Yahoo access | yfinance |
-| okx | Crypto (OKX exchange) | No | Needs okx.com access | okx-market |
-| nobitex | Crypto, IRT/Toman-quoted pairs (BTC-IRT, USDT-IRT — Iran market premium) | No | Needs apiv2.nobitex.ir access | data-routing (explicit `*IRT` routing only) |
-| wallex | Crypto, TMN/Toman-quoted pairs (USDT-TMN, BTC-TMN — Iran market premium) | No | Needs api.wallex.ir access | data-routing (explicit `*TMN` routing only; truly serves 1m/1h/1d) |
-| ccxt | Crypto (100+ exchanges) | No | Needs exchange access | ccxt |
-| baostock | A-shares (free daily/min) | No | China network | data-routing |
-| tencent | A-shares, HK, US (never-banned) | No | Unrestricted | data-routing |
-| mootdx | A-shares (TDX servers, never-banned) | No | China network | data-routing |
-| futu | A/HK/US via OpenD gateway | Yes (OpenD running) | Local gateway | data-routing (runner-internal) |
-| mt5 | Forex & metals (your broker's MT5 feed) | Yes (running, logged-in MT5 terminal; optional `~/.vibe-trading/mt5.json`) | Local terminal (Windows) | data-routing (runner-internal) |
-| tickerall | Forex & metals (same broker MT5 feed, hosted) | Yes (`TICKERALL_API_KEY` + `TICKERALL_ACCOUNT_ID`; read-only) | Hosted API (any OS, no terminal) | data-routing (runner-internal; **explicit `source=tickerall` only**) |
-| local | User CSV/parquet on disk | No | Offline | data-routing (runner-internal) |
-| eastmoney | A-shares, HK, US equities | No (IP-throttled) | Unrestricted | data-routing |
-| sina | US equities (daily OHLCV) | No (IP-throttled) | Unrestricted | data-routing |
+| yahoo | US + Canada equities, indices | No (IP-throttled) | Needs Yahoo access | data-routing |
+| yfinance | US + Canada equities, indices | No | Needs Yahoo access | yfinance |
 | stooq | US equities (daily OHLCV) | No | Unrestricted | data-routing |
-| yahoo | US, HK, Canada (TSX/TSXV) equities | No (IP-throttled) | Needs Yahoo access | data-routing |
-| finnhub | US equities | Yes (`FINNHUB_API_KEY`) | Unrestricted | data-routing |
-| alphavantage | US equities | Yes (`ALPHAVANTAGE_API_KEY`) | Unrestricted | data-routing |
+| sina | US equities (daily OHLCV) | No (IP-throttled) | Unrestricted | data-routing |
+| eastmoney | US equities (daily OHLCV) | No (IP-throttled) | Unrestricted | data-routing |
 | tiingo | US equities | Yes (`TIINGO_API_KEY`) | Unrestricted | data-routing |
 | fmp | US equities | Yes (`FMP_API_KEY`) | Unrestricted | data-routing |
-| gildata | A-shares (Hundsun Juyuan commercial feed, forward-adjusted dailies) | Yes (`GILDATA_TOKEN` / Settings) | Gildata MCP API | data-routing |
-| qveris | Global multi-asset (paid, credits) | Yes (`QVERIS_API_KEY` / Settings) | QVeris API | qveris <!-- QVERIS-INTEGRATION --> |
+| finnhub | US equities | Yes (`FINNHUB_API_KEY`) | Unrestricted | data-routing |
+| alphavantage | US equities | Yes (`ALPHAVANTAGE_API_KEY`) | Unrestricted | data-routing |
+| local | US + Canada equities, indices (user CSV/parquet) | No | Offline | data-routing (runner-internal) |
+
+Free with no key: `yahoo` / `yfinance` (US + Canada equities and indices),
+`stooq` / `sina` / `eastmoney` (US daily OHLCV) and `local` (your own files).
+Key-gated: `tiingo`, `fmp`, `finnhub`, `alphavantage` (US only). `source: "auto"`
+is the cross-market selector, not a source of its own.
 
 ## Capability → Tool Routing
 
@@ -51,34 +43,33 @@ is required only where listed (no key listed = free / no auth).
 
 | Data need | Tool | Market | Env key |
 |-----------|------|--------|---------|
-| OHLCV price bars | `get_market_data` | A-share / US / HK / Canada / crypto / futures / forex | per-source (see Source Overview) |
-| Fund flow (资金流向) | `get_fund_flow` | A-share, HK, US | — |
-| Dragon-tiger (龙虎榜) | `get_dragon_tiger` | A-share | — |
-| Northbound flow (北向资金) | `get_northbound_flow` | A-share | — |
-| Margin trading (融资融券) | `get_margin_trading` | A-share | — |
-| Block trades (大宗交易) | `get_block_trades` | A-share | — |
-| Shareholder count (股东户数) | `get_shareholder_count` | A-share | — |
-| Lockup expiry (限售解禁) | `get_lockup_expiry` | A-share | — |
-| Sector / board taxonomy (板块) | `get_sector_info` | A-share | — |
-| Sell-side research reports | `get_research_reports` | A-share | — |
-| Stock news | `get_stock_news` | A-share, US, HK | — |
+| OHLCV price bars | `get_market_data` | US / Canada / index | per-source (see Source Overview) |
+| Fund flow | `get_fund_flow` | US | — |
+| Stock news | `get_stock_news` | US | — |
 | SEC filings (EDGAR) | `get_sec_filings` | US | — |
-| Financial statements | `get_financial_statements` | A-share, US, HK | — |
+| Financial statements | `get_financial_statements` | US | — |
 | Options chain | `get_options_chain` | US | — |
-| Stock profile / fundamentals | `get_stock_profile` | US | — |
-| Market screen | `screen_market` | A-share | — |
-| Symbol search | `search_symbol` | A-share, US, HK, Canada, crypto/index/FX | — |
-| Macro / FRED series | `get_macro_series` | Macro (US/global) | `FRED_API_KEY` |
-| iWenCai NL search (问财) | `iwencai_search` | A-share | `VIBE_TRADING_IWENCAI_KEY` |
+| Stock profile / fundamentals | `get_stock_profile` | US / Canada | — |
+| PIT-safe fundamentals panels | `get_fundamentals` | US | — |
+| Institutional holdings (13F) | `get_institutional_holdings` | US | — |
+| ETF look-through | `etf_holdings` | US | — |
+| Market screen | `screen_market` | US | — |
+| Symbol search | `search_symbol` | US / Canada / index | — |
+| Technical indicators | `technical_indicators` | US / Canada / index | — |
+| Broker quote snapshot | `trading_quote` | selected connector profile | Connector app / OAuth |
+| Broker historical bars | `trading_history` | selected connector profile | Connector app / OAuth |
+| Macro / FRED series | `get_macro_series` | Macro (US / global) | `FRED_API_KEY` |
 
 Notes:
 - `get_financial_statements` reads US statements from SEC EDGAR companyfacts
-  (ticker -> CIK -> XBRL concepts) and A-share/HK statements from the Eastmoney
-  datacenter report API (per-market F10 report names).
-- `get_stock_news` routes A-share (SH/SZ/BJ) to an Eastmoney news client and
-  US (.US) / HK (.HK) to a Yahoo search client; a failure on one upstream is
-  returned as an error envelope, never raised, so a single bad symbol never
-  aborts a batch.
+  (ticker -> CIK -> XBRL concepts). Canadian issuers file on SEDAR+, which is not
+  wired to this tool, so use `local` statement data for them.
+- `get_stock_news` fetches US-listed headlines from a Yahoo Finance search client;
+  a failure on the upstream is returned as an error envelope, never raised, so a
+  single bad symbol never aborts a batch.
+- `screen_market` screens the **US** universe only; Canada has no screener here.
+- `technical_indicators` and `get_market_data` read through the same loader layer,
+  so their fallback behaviour and `_provenance` stamps are identical.
 
 ## Decision Tree
 
@@ -96,43 +87,44 @@ same-market sources automatically. Only set a concrete source when the user asks
 
 ### Source priority (for OHLCV by market)
 
-- **A-shares**: tencent / mootdx (never banned) > tushare (`TUSHARE_TOKEN`) >
-  baostock / akshare > eastmoney (throttled).
-- **US stocks**: stooq / yahoo > tiingo / finnhub / fmp / alphavantage (key-gated) >
-  sina / eastmoney (throttled) > yfinance.
-- **HK stocks**: tencent (never banned, daily) > eastmoney / yahoo > futu (local
-  OpenD) > akshare (Eastmoney-backed, daily only) > yfinance > tushare
-  (`TUSHARE_TOKEN`) / longbridge (key-gated).
-- **Canada (TSX/TSXV)**: yahoo > yfinance > local; use Yahoo's canonical
-  `.TO` / `.V` suffixes (for example `TD.TO`, `PNG.V`).
-- **Crypto**: okx (single exchange) > ccxt (multi-exchange).
-- **Futures / macro**: tushare > akshare.
-- **Forex / metals**: mt5 (local MetaTrader 5 terminal, Windows) > akshare. TickerAll (`source="tickerall"`) is a hosted, no-terminal alternative to the *same* broker feed (any OS) — opt-in and **explicit-only**: it never joins this automatic chain, so a user's broker credential is used only when deliberately requested.
+These chains are exactly `backtest.loaders.registry.FALLBACK_CHAINS`; the first
+available source wins.
+
+- **US equities (`us_equity`)**: yahoo > stooq > sina > eastmoney > yfinance >
+  tiingo > fmp > finnhub > alphavantage > local.
+- **Canada equities (`ca_equity`, TSX `.TO` / TSXV `.V`)**: yahoo > yfinance > local.
+- **Indices (`index`, Yahoo `^` symbols)**: yahoo > yfinance > local.
+
+`yahoo` / `yfinance` are free and lead both equity markets and indices. `stooq`,
+`sina` and `eastmoney` are free US EOD fallbacks. `tiingo`, `fmp`, `finnhub` and
+`alphavantage` are US-only key-gated REST sources and trail the free ones. `local`
+is last everywhere and, like an explicit `fmp`, never silently degrades to a
+network source — an unavailable `local` is a Data Bridge config problem the user
+must see.
 
 ## Symbol Format Reference
 
 | Market | Format | Examples |
 |--------|--------|----------|
-| A-shares | `NNNNNN.SZ/SH/BJ` | 000001.SZ, 600000.SH, 430139.BJ |
-| US stocks | `TICKER.US` | AAPL.US, MSFT.US |
-| HK stocks | `NNNNN.HK` | 00700.HK, 09988.HK |
-| Canada TSX / TSXV | `TICKER.TO` / `TICKER.V` | TD.TO, BBD-B.TO, PNG.V |
-| Crypto | `SYMBOL-USDT` | BTC-USDT, ETH-USDT |
-| Futures | `XXNNNN.EXCHANGE` | CU2406.SHFE |
-| Forex | `XXX/YYY` | USD/CNY, EUR/USD |
+| US equity | `TICKER` or `TICKER.US` | AAPL, AAPL.US, MSFT.US |
+| Canada equity (TSX / TSXV) | `TICKER.TO` / `TICKER.V` | TD.TO, BBD-B.TO, PNG.V |
+| Index | `^SYMBOL` | ^GSPC, ^GSPTSE, ^NDX, ^VIX |
+
+US tickers may be written bare (`AAPL`) or suffixed with the project's `.US`
+convention; Canada always carries Yahoo's canonical `.TO` (TSX) or `.V` (TSXV)
+suffix; indices keep Yahoo's leading `^`.
 
 ## Ban-Risk & Fallback Notes
 
-- **Prefer never-banned sources**: `tencent` and `mootdx` have no observed IP ban;
-  reach for them first for A-share OHLCV when no token is set.
 - **Eastmoney rate-limits by IP and must be throttled.** Every Eastmoney-backed
-  tool/loader routes through the shared per-host throttle; do not hammer it. On a
-  throttle/timeout, fall back to the same-market source above (tencent/baostock).
+  loader routes through the shared per-host throttle; do not hammer it. On a
+  throttle/timeout, fall back to the next US source in the chain (stooq / sina /
+  yahoo).
 - **Sina / Yahoo also throttle by IP** — same per-host wrapper, same fallback rule.
-- **Key-gated sources need their env key** (`FINNHUB_API_KEY`,
-  `ALPHAVANTAGE_API_KEY`, `TIINGO_API_KEY`, `FMP_API_KEY`, `FRED_API_KEY`,
-  `VIBE_TRADING_IWENCAI_KEY`, `TUSHARE_TOKEN`). If the key is absent the tool/loader
-  is unavailable — route to a free same-market source instead of erroring out.
+- **Key-gated sources need their env key** (`TIINGO_API_KEY`, `FMP_API_KEY`,
+  `FINNHUB_API_KEY`, `ALPHAVANTAGE_API_KEY`, `FRED_API_KEY`). If the key is absent
+  the tool/loader is unavailable — route to a free same-market source instead of
+  erroring out.
 - A single failing symbol or transient HTTP error is reported inside the envelope;
   it never aborts the surrounding batch.
 

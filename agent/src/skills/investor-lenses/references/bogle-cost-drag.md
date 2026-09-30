@@ -23,11 +23,11 @@ examination. It is the lens that asks whether the *whole exercise* is worth doin
 
 ## Market-fit note
 
-- Cost structures differ sharply by market and must be enumerated locally: A-share
-  stamp duty on sales, exchange and settlement fees, and the bid-ask on small caps;
-  HK stamp duty on both sides plus trading and settlement levies; US commission-free
-  equity trading where the cost has moved into spread and order routing; crypto
-  taker fees, funding and slippage that can dwarf everything else.
+- Cost structures differ sharply by market and must be enumerated locally: US
+  commission-free equity trading where the cost has moved into spread and order
+  routing, plus the SEC fee on sells; Canadian commissions and wider small-cap
+  spreads, with no transaction tax; ETF management fees that compound regardless of
+  performance.
 - Turnover is the multiplier on all of it. A strategy's cost is a function of how
   often it trades, not of its headline fee.
 

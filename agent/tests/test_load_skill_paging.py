@@ -3,7 +3,7 @@
 Skill documents are the implementation for much of this product — the bond
 maths, the implied-vol solver, the impact models, the China market structure.
 A tool result is capped at ``TOOL_RESULT_LIMIT`` characters and 31 of the 88
-bundled skills exceed it: ``tushare`` delivered 9.7% of its ~103k characters,
+bundled skills exceed it: ``social-media-intelligence`` delivered a fraction of its
 ``options-payoff`` 33.8%, ``credit-analysis`` 43.0%. The cut was silent, so the
 agent could not tell an amputated document from a complete one and had no way
 to reach the remainder.
@@ -52,7 +52,7 @@ class TestEnvelopeStatesWhatItDelivered:
     """A partial read must never look like a whole document."""
 
     def test_a_long_skill_reports_that_it_is_incomplete(self, tool):
-        payload = json.loads(tool.execute(name="tushare"))
+        payload = json.loads(tool.execute(name="social-media-intelligence"))
 
         assert payload["complete"] is False
         assert payload["next_offset"] > 0
@@ -71,12 +71,12 @@ class TestEnvelopeStatesWhatItDelivered:
         assert payload["status"] == "error"
 
     def test_a_non_integer_offset_is_rejected(self, tool):
-        payload = json.loads(tool.execute(name="tushare", offset="banana"))
+        payload = json.loads(tool.execute(name="social-media-intelligence", offset="banana"))
 
         assert payload["status"] == "error"
 
     def test_an_offset_past_the_end_is_rejected(self, tool):
-        payload = json.loads(tool.execute(name="tushare", offset=10_000_000))
+        payload = json.loads(tool.execute(name="social-media-intelligence", offset=10_000_000))
 
         assert payload["status"] == "error"
 
@@ -104,6 +104,6 @@ class TestEverySkillIsFullyReachable:
         assert mismatched == []
 
     def test_the_largest_skill_pages_in_a_sane_number_of_calls(self, tool):
-        _, pages, _ = _read_all(tool, "tushare")
+        _, pages, _ = _read_all(tool, "social-media-intelligence")
 
         assert 1 < pages <= 20

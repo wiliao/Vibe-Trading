@@ -11,7 +11,7 @@ The U.S. Securities and Exchange Commission (SEC) publishes free, no-auth JSON e
 
 This is the **fetch** skill — it covers how to get filing-index rows, document URLs, and us-gaap metric series out of EDGAR. The separate `edgar-sec-filings` skill is the **methodology** layer (how to read a 10-K, score insider activity, interpret 8-K items); for any actual data retrieval it delegates here.
 
-Scope is the United States only. EDGAR has no coverage of A-shares, HK, or other non-U.S. markets — route those through `tushare` / `yfinance` / `akshare` instead.
+Scope is the United States only. EDGAR has no coverage of Canadian issuers or other non-U.S. markets — route Canadian filings through SEDAR+ (via `read_url`) and market data through `yfinance` / the market-data tools.
 
 > Link convention: every link below that points into `references/` is written **relative to this document** (`references/...`) — the form GitHub resolves when someone opens the file in a browser. The `read_file` tool resolves the same string against the skill that owns it, so the agent and a human reader reach one file. Keep the relative form when adding new docs, and keep reference paths unique across skills: a path two skills both carry is reported as ambiguous rather than guessed.
 

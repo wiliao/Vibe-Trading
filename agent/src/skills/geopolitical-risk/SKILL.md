@@ -65,7 +65,7 @@ Layer 3: Event risk (sudden shocks, daily / hourly scale)
 
 **Asset impact direction**
 - Bullish: crude oil, LNG, shipping stocks (BDRY/FRO), defense stocks (LMT/RTX)
-- Bearish: airlines (DAL/UAL), petrochemical refiners, emerging-market importers such as INR and KRW
+- Bearish: airlines (DAL/UAL), petrochemical refiners, energy-importing economies (as background — their currencies are not tradable here)
 
 ---
 
@@ -83,18 +83,18 @@ Layer 3: Event risk (sudden shocks, daily / hourly scale)
 
 **Key monitoring indicators**
 ```python
-# Proxy indicators
+# Proxy indicators, all readable from US/Canada-listed instruments or public data
 - Abnormal weakness in the Philadelphia Semiconductor Index (SOX)
 - TSM ADR (TSM) premium / discount in the U.S. market
-- Taiwan CDS spreads
-- TWD NDF depreciation under stress
-- KOSPI, given Korea's semiconductor linkage
-- U.S.-listed Chinese ADRs / Hong Kong Hang Seng Tech Index
+- TSM option-implied volatility (US-listed chain)
+- SOX index realized volatility
+- Memory contract pricing (DRAM / NAND) as the Korea-linked read-through
+- Revenue-exposure disclosure of US-listed names with China/Taiwan manufacturing
 ```
 
 **Asset impact direction**
-- Bullish: Intel / GlobalFoundries as substitute capacity providers, defense stocks, JPY as a haven
-- Bearish: Apple / NVIDIA / AMD / Qualcomm as TSMC clients, TSM ADR, Samsung Electronics
+- Bullish: Intel / GlobalFoundries as substitute capacity providers, defense stocks
+- Bearish: Apple / NVIDIA / AMD / Qualcomm as TSMC clients, TSM ADR
 - Extreme scenario: global semiconductor shortage leading to collapse across auto and consumer-electronics supply chains
 
 **Supply chain substitution timeline**
@@ -212,12 +212,11 @@ Sanctions announcement
 
 **Key monitoring indicators**
 ```python
-# Proxy indicators
-- KRW/USD volatility spike
-- KOSPI decline
-- South Korean CDS spreads
-- JPY safe-haven inflows (JPY/USD strength)
-- ADR prices of Samsung / SK Hynix
+# Proxy indicators, all readable from US/Canada-listed instruments or public data
+- VIX and SOX index volatility
+- US-listed memory-linked semis (as the read-through to Korean supply)
+- Treasury yields and gold as the haven bid
+- Defense-sector relative strength
 ```
 
 ---
@@ -418,7 +417,7 @@ Estimated impact under a Taiwan Strait crisis:
 Beneficiaries through substitution:
 - Intel (INTC): IDM model with U.S.-based capacity
 - GlobalFoundries (GFS): U.S. / Europe / Singapore capacity
-- Samsung, though Korea itself is also a geopolitical risk zone
+- Note: a Korean foundry alternative exists, but Korea itself sits in a geopolitical risk zone
 ```
 
 ### Shipping / Logistics
@@ -757,9 +756,9 @@ DATA_SOURCES = {
         "source": "Bulletin of the Atomic Scientists Doomsday Clock",
         "use_case": "Tail-risk monitoring"
     },
-    "commodity_futures": {
-        "desc": "Commodity futures prices, including geopolitical premium",
-        "source": "Integrated in this project: Tushare commodity futures / OKX crypto",
+    "commodity_proxy": {
+        "desc": "Commodity-linked equity and ETF prices, including any geopolitical premium",
+        "source": "Integrated in this project: US/Canada-listed energy and materials equities / ETFs",
         "use_case": "Estimate war premium"
     }
 }
@@ -806,12 +805,12 @@ SCENARIOS = {
         "usd_shock": +3,
         "description": "30-day Strait of Hormuz blockade scenario"
     },
-    "taiwan_conflict_mild": {
+    "semiconductor_supply_shock_mild": {
         "semioconductor_shock": -25,
         "gold_shock": +5,
         "equity_shock": -15,
-        "jpy_shock": +8,
-        "description": "Mild Taiwan Strait military conflict scenario"
+        "usd_shock": +8,
+        "description": "Mild semiconductor supply-chain disruption scenario"
     },
     "russia_gas_cutoff": {
         "eu_natgas_shock": +80,

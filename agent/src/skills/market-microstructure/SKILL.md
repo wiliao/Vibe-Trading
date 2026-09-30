@@ -1,6 +1,6 @@
 ---
 name: market-microstructure
-description: "Market microstructure: bid-ask spread analysis, order-flow toxicity metrics (VPIN / Kyle lambda), liquidity measures (Amihud / Roll), price-impact models, limit-order-book analysis, and China A-share call auction / block trade mechanics."
+description: "Market microstructure: bid-ask spread analysis, order-flow toxicity metrics (VPIN / Kyle lambda), liquidity measures (Amihud / Roll), price-impact models, limit-order-book analysis, and US / Canada opening and closing auction mechanics."
 category: analysis
 ---
 
@@ -15,7 +15,7 @@ Applicable scenarios:
 - Designing large-order execution strategies (`TWAP / VWAP / IS`)
 - Detecting order-flow toxicity (avoid time windows dominated by informed traders)
 - Quantifying liquidity risk (flash-crash warning)
-- Capturing China A-share-specific microstructure features (call auction / closing auction / block trades)
+- Capturing US / Canada market-structure features (opening auction / closing auction / block prints)
 
 ## Core Concepts
 
@@ -29,21 +29,22 @@ Applicable scenarios:
 | Realized spread | `2 × direction × (trade price - mid price 5min later)` | True market-maker profit |
 
 ```
-China A-share example:
-  Instrument: 600519.SH Kweichow Moutai
-  Best bid: 1680.00  Best ask: 1680.50
-  Quoted spread: 0.50 RMB = 0.03%
+US equity example:
+  Instrument: AAPL
+  Best bid: 228.40  Best ask: 228.42
+  Quoted spread: 0.02 USD = 0.01%
 
-  Instrument: 000001.SZ Ping An Bank
-  Best bid: 11.05  Best ask: 11.06
-  Quoted spread: 0.01 RMB = 0.09%
+  Instrument: a mid-cap industrial
+  Best bid: 41.05  Best ask: 41.08
+  Quoted spread: 0.03 USD = 0.07%
 
 Spread decomposition (Roll):
   Spread = adverse-selection cost + inventory cost + order-processing cost
-  In China A-shares: adverse selection accounts for 60-70% (mixture of retail and informed traders)
+  Estimate the split from your own trade sample; do not assume a fixed
+  adverse-selection share — it varies by name, venue and regime
 
 Spread drivers:
-  - Larger market cap -> smaller spread (Moutai 0.03% vs small-cap 0.5%)
+  - Larger market cap -> smaller spread (mega-cap 0.01% vs small-cap 0.5%)
   - Higher volatility -> wider spread (market-maker risk premium)
   - Higher volume -> narrower spread (greater competition)
   - Higher information asymmetry -> wider spread (adverse selection)
@@ -73,11 +74,12 @@ Interpretation:
   VPIN 0.3-0.5 -> caution, informed trading rising
   VPIN > 0.5 -> dangerous, high probability that major information is about to be released
 
-China A-share usage:
+US equities usage:
   A sudden VPIN spike in a stock may foreshadow:
-  - insider trading ahead of a major announcement
+  - informed trading ahead of a major announcement
   - institutional position building / distribution
-  Before the 2015 China A-share flash crashes, VPIN stayed above 0.6 for a prolonged period
+  VPIN was elevated in the run-up to the 2010 US Flash Crash, and the metric
+  is best read as a relative, per-name signal against its own history
 ```
 
 **Kyle's Lambda (price impact coefficient)**:
@@ -94,10 +96,10 @@ Interpretation:
   Large λ -> poor liquidity, high impact
   Small λ -> good liquidity, large orders can be executed cheaply
 
-Typical China A-share values:
-  Large cap (CSI 300): λ ≈ 0.001-0.005
-  Mid cap (CSI 500): λ ≈ 0.005-0.02
-  Small cap (CSI 1000): λ ≈ 0.02-0.1
+Typical US equity values:
+  Large cap (S&P 500): λ ≈ 0.001-0.005
+  Mid cap (S&P 400): λ ≈ 0.005-0.02
+  Small cap (Russell 2000): λ ≈ 0.02-0.1
 ```
 
 ### Liquidity Measures
@@ -111,7 +113,7 @@ Typical China A-share values:
 | Traded value | average daily notional | Absolute liquidity | Does not reflect relative impact |
 
 ```
-Amihud calculation (China A-shares):
+Amihud calculation (US / Canada equities):
   ILLIQ = (1/D) × Σ(|R_d| / VOL_d)  (D=trading days, monthly)
 
   Normalization: ILLIQ × 10^6 (for readability)
@@ -141,14 +143,14 @@ Amihud calculation (China A-shares):
 
 ```
 Model: impact = η × σ × (Q / V)^0.6
-  η: impact coefficient, about 0.5-1.5 for China A-shares
+  η: impact coefficient, about 0.5-1.5 for large-cap US equities (higher for small caps)
   σ: daily volatility
   Q: traded quantity (shares)
   V: average daily volume (shares)
 
 Example:
-  Sell 100,000 shares of Kweichow Moutai
-  Average daily volume 5,000,000 shares, daily volatility 1.8%
+  Sell 100,000 shares of AAPL
+  Average daily volume 50,000,000 shares, daily volatility 1.8%
   impact = 1.0 × 0.018 × (100000/5000000)^0.6
          = 0.018 × 0.0085
          = 0.015% (1.5bp, acceptable)
@@ -191,16 +193,17 @@ Resilience:
   Fast recovery -> good liquidity, temporary impact
   Slow recovery -> poor liquidity, persistent impact
 
-China A-share LOB characteristics:
-  - The shallowest depth is in the 15 minutes before the open (highest information asymmetry)
+US equity LOB characteristics (regular session 9:30-16:00 ET):
+  - The shallowest depth is in the first 15 minutes after the open (highest information asymmetry)
   - Depth improves from 10:00-10:30 (institutions begin participating)
-  - Best depth is from 14:00-14:57 (most intraday information has been digested)
-  - During the 14:57-15:00 closing auction, depth changes sharply (late-day grabbing / dumping)
+  - Best depth is from 14:00-15:30 (most intraday information has been digested)
+  - During the 15:50-16:00 closing auction, depth changes sharply (late-day rebalancing / index flows)
+  - On the TSX the closing auction runs into the 16:00 close, and the TSXV book is materially thinner
 
 Order-book imbalance signal:
   OIR = (Bid_vol - Ask_vol) / (Bid_vol + Ask_vol)
   Rolling 5-minute OIR > 0.3 -> short-term bullish signal (accuracy about 55-60%)
-  Note: in China A-shares, large orders are often rapidly added and canceled (icebergs / spoofing), so OIR signals need filtering
+  Note: large orders are often rapidly added and canceled (icebergs / spoofing), so OIR signals need filtering
 ```
 
 ### 3. Flash-Crash Mechanism and Prevention
@@ -225,39 +228,46 @@ Preventive measures:
   4. Spread monitor: if spread widens suddenly to >5x normal -> pause orders
   5. Time avoidance: do not execute large orders in the first 15 minutes after open or the last 5 minutes before close
 
-China A-share flash-crash cases:
-  2015 Jun-Jul: thousands of stocks hit limit-down, with VPIN staying elevated
-  2020-07-13: Shanghai Composite plunged and then rebounded in a V-shape
-  Pattern: liquidity dries up -> limit-down locking (China-specific) -> next-day panic selling
+Flash-crash reference cases (US):
+  2010-05-06: the US Flash Crash — major indices fell roughly 9% intraday and
+    rebounded within minutes as liquidity evaporated
+  2015-08-24: pre-open ETF pricing broke down (ETFs traded far below NAV before
+    the underlying market opened)
+  Pattern: liquidity dries up -> LULD / circuit-breaker halts trigger -> the
+  reopening auction concentrates the imbalance
 ```
 
-### 4. China A-Share-Specific Microstructure
+### 4. US / Canada Market-Structure Specifics
 
 ```
-Call-auction strategy:
-  9:15-9:20: orders can be entered and canceled, mostly probing quotes (low reference value)
-  9:20-9:25: orders can be entered but not canceled, so real intent is revealed
-  Signal: after 9:20, buy orders far exceed sell orders -> likely gap-up open
+Opening auction / opening cross (9:30 ET):
+  Pre-open: orders can be entered and canceled, mostly probing quotes (low reference value)
+  Final minutes before 9:30: orders are locked in, so real intent is revealed
+  Signal: a large imbalance in the published opening imbalance -> likely
+    gap-up or gap-down open
+  Execution: the opening cross prints a single price; a market-on-open order
+    cannot be canceled after the cutoff and may fill away from the last pre-open print
+  Risk: the final auction price may deviate from expectation in a thin name
 
-  Execution: place orders at 9:24:50 (last 10 seconds of the call auction)
-  Risk: cannot cancel, and the final execution price may deviate from expectation
-
-Closing call auction (14:57-15:00):
-  Feature: closing price is decided within 3 minutes, with concentrated institutional rebalancing and index-fund flows
+Closing auction (15:50-16:00 ET on NYSE, the 16:00 cross on Nasdaq):
+  Feature: the closing price is decided in the auction, with concentrated
+    institutional rebalancing and index-fund flows
   Signal: closing-auction volume > 10% of the whole day -> institutions are rebalancing
-
   Strategy application:
-  - VWAP algos should finish most of execution before 14:50, leaving a small residual for the close
-  - Avoid placing large orders after 14:57 (high price uncertainty)
+  - VWAP algos should finish most of execution before 15:45, leaving a small residual for the close
+  - Avoid placing large orders after 15:50 in names with a thin closing book
 
-Block-trade discount signal:
-  Discount = (block-trade price - closing price) / closing price
+Block prints:
+  **There is no dedicated block-trade feed in this build.** Reconstruct
+  large-print proxies from volume clusters in the bars (`get_market_data` +
+  `src.quantlib.microstructure`) and label the result a proxy, never a reported block.
+
+  Discount = (large-print price - closing price) / closing price
   Discount < -5%: seller is eager to exit -> short-term bearish
   Discount > -2%: traded near market price -> may be turnover rather than reduction
 
-  Buyer identity:
-  Well-known institutional seat buys -> positive signal
-  Same broker on both sides -> may be wash trading (neutral)
+  Institutional corroboration comes from 13F filings (`get_institutional_holdings`),
+  which lag by up to 45 days — treat it as confirmation, not a same-day signal.
 ```
 
 ## Output Format
@@ -265,28 +275,28 @@ Block-trade discount signal:
 Microstructure analysis report:
 ```
 === Liquidity Diagnosis ===
-Instrument: 000858.SZ Wuliangye
+Instrument: AAPL
 Date: 2026-03-28
-Average daily traded value: 2.8 billion RMB  Turnover ratio: 0.85%
+Average daily traded value: USD 12.5 billion  Turnover ratio: 0.85%
 Amihud: 0.32 (high liquidity)
-Effective spread: 0.05% (2.5bp)
-Kyle Lambda: 0.003
+Effective spread: 0.02% (1bp)
+Kyle Lambda: 0.001
 
 === Order-Flow Analysis ===
 VPIN: 0.28 (normal)
 Order-book imbalance (OIR): +0.12 (mild bid-side bias)
-Net large-order buying: +230 million RMB (institutional buying bias)
+Large-print proxy: net buying (volume-cluster estimate, not a reported block)
 
 === Trading-Cost Estimate ===
-Planned trade size: 500,000 shares (about 40 million RMB)
-Estimated impact cost: 0.08% (32k RMB)
-Commission: 0.025% (10k RMB)
-Stamp duty: 0.05% (20k RMB, sell side)
-Total one-way transaction cost: about 0.16%
+Planned trade size: 500,000 shares (about USD 114 million)
+Estimated impact cost: 0.08% (USD 91k)
+Commission: 0.01% (USD 11k)
+Regulatory fees (sell side): <0.01%
+Total one-way transaction cost: about 0.10%
 
 === Execution Suggestion ===
 Recommended strategy: VWAP
-Execution window: 10:00-14:50 (avoid the open and the close)
+Execution window: 10:00-15:45 (avoid the open and the closing auction)
 Number of slices: 5-8 (about 60k-100k shares per slice)
 Time sensitivity: low (VPIN is normal, no urgency to execute)
 ```
@@ -294,11 +304,11 @@ Time sensitivity: low (VPIN is normal, no urgency to execute)
 ## Notes
 
 1. **Data requirement is high**: microstructure analysis requires tick-level / Level-2 data, while ordinary daily data only supports rough measures such as Amihud / Roll
-2. **China A-share Level-2 data**: ten-level depth data from SSE / SZSE requires a paid subscription, costing roughly 50k-200k RMB per year
-3. **High-frequency trading restrictions**: China A-shares strictly prohibit programmatic quote-cancel manipulation (`spoofing`), so microstructure signals are for analysis only, not for HFT strategies
+2. **No L2 ladder in this build**: there is no live ten-level depth feed. Score depth from a stated proxy (turnover, ADV) and say it is a proxy, or leave it out; tick-level data would require a separate vendor
+3. **Spoofing is prohibited**: US and Canadian regulators prohibit programmatic quote-cancel manipulation (`spoofing` / layering), so microstructure signals here are for analysis and cost estimation, not for HFT strategies
 4. **VPIN calibration**: bucket size has a large impact on results and must be adjusted for instrument liquidity; one parameter does not fit all
-5. **Cross-market differences**: China A-share `T+1` settlement and daily price limits make its microstructure significantly different from textbook US-equity models
-6. **Illusion of liquidity**: high turnover in some China A-shares comes from speculative matched trading and does not represent true liquidity
+5. **Settlement and halts**: US and Canadian equities settle T+1, and both markets use LULD bands and market-wide circuit breakers rather than fixed daily price limits — do not import limit-up/limit-down assumptions from other market structures
+6. **Illusion of liquidity**: high turnover in a thin or promotionally traded small-cap (often on the TSXV) does not represent genuine depth
 
 ## Dependencies
 
