@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import sys
 from typing import Any
 
@@ -19,18 +18,7 @@ _SDK_CONNECTOR_MODULES = {
     "tiger": "src.trading.connectors.tiger.sdk",
     "longbridge": "src.trading.connectors.longbridge.sdk",
     "alpaca": "src.trading.connectors.alpaca.sdk",
-    "okx": "src.trading.connectors.okx.sdk",
-    "binance": "src.trading.connectors.binance.sdk",
     "futu": "src.trading.connectors.futu.sdk",
-    "dhan": "src.trading.connectors.dhan.sdk",
-    "shoonya": "src.trading.connectors.shoonya.sdk",
-    "zerodha": "src.trading.connectors.zerodha.sdk",
-    "kis": "src.trading.connectors.kis.sdk",
-    "upbit": "src.trading.connectors.upbit.sdk",
-    "toss": "src.trading.connectors.toss.sdk",
-    "trading212": "src.trading.connectors.trading212.sdk",
-    "mt5": "src.trading.connectors.mt5.sdk",
-    "etoro": "src.trading.connectors.etoro.sdk",
 }
 
 
@@ -61,9 +49,9 @@ def _allowed_override_keys(module: Any) -> frozenset[str]:
         The connector's declared allowlist, or an empty set when it declares
         none (fail closed).
     """
-    # Some connectors (etoro, mt5) only re-export ``build_config`` into their
-    # ``sdk`` module, leaving the allowlist beside the definition. Follow the
-    # function to its defining module before giving up.
+    # A connector may only re-export ``build_config`` into its ``sdk`` module,
+    # leaving the allowlist beside the definition. Follow the function to its
+    # defining module before giving up.
     candidates = [module]
     builder = getattr(module, "build_config", None)
     defining = sys.modules.get(getattr(builder, "__module__", ""))
@@ -130,8 +118,8 @@ def _sdk_config(
     # different account's legacy JSON file.
     #
     # Per-call overrides must still pass the connector's own allowlist. Every
-    # SDK connector deliberately narrows what a caller may override — OKX and
-    # Binance both exclude ``readonly`` ("always true for this layer") and
+    # SDK connector deliberately narrows what a caller may override — the
+    # read-only layers exclude ``readonly`` ("always true for this layer") and
     # ``timeout``; Longbridge's overlay is ``profile``/``region`` only,
     # precisely so a caller "cannot mix or bypass the shared resolver".
     # ``build_config`` applies that filter; constructing from a raw merged
@@ -389,8 +377,7 @@ def search_instruments(
                 limit=limit,
             ),
         )
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "instruments.search")
+    return _unsupported(profile, "instruments.search")
     module = _sdk_module(profile.connector)
     return _with_profile(
         profile,
@@ -645,39 +632,23 @@ def get_earnings_calendar(
 
 #: Connector → (instrument type, fixed asset class | None). ``None`` asset class
 #: means "infer from the symbol's market" (multi-market equity connectors).
-#: ``mt5`` is deliberately absent: its symbols split into forex pairs vs CFDs,
-#: so classification is per-symbol via ``classify_mt5_symbol`` (see
-#: ``_order_classification``).
 _CONNECTOR_INSTRUMENT = {
-    "okx": ("crypto", "crypto"),
-    "binance": ("crypto", "crypto"),
     "alpaca": ("equity", "us_equity"),
     "tiger": ("equity", None),
     "longbridge": ("equity", None),
     "futu": ("equity", None),
-    "trading212": ("equity", None),
-    "etoro": ("equity", None),
 }
 
 
 def _order_classification(connector: str, symbol: str):
     """Return ``(InstrumentType, AssetClass | None)`` for an order's mandate gate.
 
-    Crypto connectors are unambiguous; multi-market equity connectors infer the
-    asset class from the symbol's market tag (``.HK``/``HK.`` → HK, ``.US``/``US.``
-    → US, ``.SH``/``.SZ``/``CN.`` → A-share). When the market cannot be inferred
-    the asset class is ``None`` and the gate falls back to the US default — which
-    only ever DENIES (never silently widens) when the user's mandate permits a
-    non-US class, so the unknown case is fail-safe.
+    Surviving equity connectors are US-broker only; a ``.TO``/``.V`` (Canada)
+    symbol has no live asset class — Canada is market-data + backtest only
+    (decision D3) — so it classifies as unknown and the gate applies its US
+    default rather than inventing a class the mandate cannot express.
     """
     from src.live.mandate.model import AssetClass, InstrumentType
-
-    if connector == "mt5":
-        from src.trading.connectors.mt5.symbols import classify_mt5_symbol
-
-        # Forex pairs → (FOREX, FOREX); metals/indices/anything else → (CFD,
-        # None), which the mandate admits only via an explicit "cfd" allowance.
-        return classify_mt5_symbol(symbol)
 
     instrument_name, asset_name = _CONNECTOR_INSTRUMENT.get(connector, ("equity", None))
     instrument = InstrumentType(instrument_name)
@@ -685,13 +656,9 @@ def _order_classification(connector: str, symbol: str):
         return instrument, AssetClass(asset_name)
 
     token = (symbol or "").strip().upper()
-    if token.startswith("HK.") or token.endswith(".HK"):
-        return instrument, AssetClass.HK_EQUITY
-    if token.startswith("US.") or token.endswith(".US"):
-        return instrument, AssetClass.US_EQUITY
-    if token.startswith(("CN.", "SH.", "SZ.")) or token.endswith((".SH", ".SS", ".SZ")):
-        return instrument, AssetClass.CN_EQUITY
-    return instrument, None
+    if token.endswith((".TO", ".V")):
+        return instrument, None
+    return instrument, AssetClass.US_EQUITY
 
 
 def place_order(
@@ -787,458 +754,6 @@ def cancel_order(
     if profile.environment == "live":
         _audit_live_cancel(profile, order_id, symbol, result, session_id)
     return _with_profile(profile, result)
-
-
-def _unsupported_etoro(profile: TradingProfile, capability: str) -> dict[str, Any]:
-    return _unsupported(profile, capability)
-
-
-def _route_sdk_write(
-    profile: TradingProfile,
-    *,
-    remote_tool: str,
-    risk_reducing: bool,
-    intent: Any | None,
-    audit_request: dict[str, Any],
-    execute: Any,
-    overrides: dict[str, Any],
-    unsupported_capability: str,
-    structural_reason: str | None = None,
-) -> dict[str, Any]:
-    if profile.transport != "broker_sdk":
-        return _unsupported(profile, unsupported_capability)
-    if profile.readonly:
-        return _unsupported(profile, unsupported_capability)
-    module = _sdk_module(profile.connector)
-    config = _sdk_config(profile, module, overrides)
-    if profile.environment == "paper":
-        return _with_profile(profile, execute(config))
-    from src.live.sdk_order_gate import execute_live_action
-
-    return _with_profile(
-        profile,
-        execute_live_action(
-            broker=profile.connector,
-            connector_module=module,
-            config=config,
-            remote_tool=remote_tool,
-            risk_reducing=risk_reducing,
-            intent=intent,
-            execute_fn=lambda: execute(config),
-            audit_request=audit_request,
-            session_id=str(overrides.get("session_id") or ""),
-            structural_reason=structural_reason,
-        ),
-    )
-
-
-def _etoro_error(message: str) -> dict[str, Any]:
-    """Return a connector-shaped fail-closed error before any broker write."""
-    return {"status": "error", "error": message}
-
-
-def _etoro_copy_unavailable_on_paper(profile: TradingProfile) -> dict[str, Any] | None:
-    if profile.environment != "paper":
-        return None
-    from src.trading.connectors.etoro.copy_trading import COPY_TRADING_PAPER_UNSUPPORTED
-
-    return _with_profile(
-        profile,
-        {
-            "status": "error",
-            "error": COPY_TRADING_PAPER_UNSUPPORTED,
-            "error_code": "copy_unavailable_on_paper",
-        },
-    )
-
-
-def _close_etoro_position(
-    module: Any,
-    config: Any,
-    *,
-    position_id: str | int,
-    instrument_id: int | None,
-    units_to_close: float | None,
-    request_id: str | None,
-) -> dict[str, Any]:
-    """Resolve and validate an eToro position before a full or partial close."""
-    try:
-        snapshot = module.get_positions(config)
-    except Exception as exc:  # noqa: BLE001
-        return _etoro_error(f"could not verify position before close: {exc}")
-    if not isinstance(snapshot, dict) or snapshot.get("status") != "ok":
-        detail = snapshot.get("error") if isinstance(snapshot, dict) else None
-        return _etoro_error(f"could not verify position before close: {detail or 'invalid positions response'}")
-    rows = snapshot.get("positions")
-    if not isinstance(rows, list):
-        return _etoro_error("could not verify position before close: positions are missing")
-    requested_position_id = str(position_id).strip()
-    position = next(
-        (
-            row
-            for row in rows
-            if isinstance(row, dict) and str(row.get("position_id", "")).strip() == requested_position_id
-        ),
-        None,
-    )
-    if position is None:
-        return _etoro_error(f"position {requested_position_id!r} was not found")
-
-    try:
-        resolved_instrument_id = int(position.get("instrument_id"))
-    except (TypeError, ValueError, OverflowError):
-        return _etoro_error("position instrument_id is missing or invalid (fail-closed)")
-    if resolved_instrument_id <= 0:
-        return _etoro_error("position instrument_id is missing or invalid (fail-closed)")
-    if instrument_id is not None:
-        try:
-            supplied_instrument_id = int(instrument_id)
-        except (TypeError, ValueError, OverflowError):
-            return _etoro_error("supplied instrument_id is invalid")
-        if supplied_instrument_id != resolved_instrument_id:
-            return _etoro_error("supplied instrument_id does not match the open position (fail-closed)")
-
-    clean_units: float | None = None
-    if units_to_close is not None:
-        try:
-            clean_units = float(units_to_close)
-            open_units = abs(float(position.get("units")))
-        except (TypeError, ValueError, OverflowError):
-            return _etoro_error("position units or units_to_close are invalid")
-        if not math.isfinite(clean_units) or clean_units <= 0:
-            return _etoro_error("units_to_close must be a finite positive number")
-        if not math.isfinite(open_units) or open_units <= 0:
-            return _etoro_error("open position units are unavailable (fail-closed)")
-        tolerance = max(1e-12, open_units * 1e-12)
-        if clean_units > open_units + tolerance:
-            return _etoro_error(f"units_to_close ({clean_units}) exceeds open position units ({open_units})")
-
-    return module.close_position(
-        config,
-        position_id=position_id,
-        instrument_id=resolved_instrument_id,
-        units_to_close=clean_units,
-        request_id=request_id,
-    )
-
-
-def _etoro_account_currency(snapshot: Any) -> str | None:
-    """Extract the account currency from a normalized eToro account snapshot."""
-    if not isinstance(snapshot, dict) or snapshot.get("status") != "ok":
-        return None
-    account = snapshot.get("account")
-    if not isinstance(account, dict):
-        return None
-    pnl = account.get("pnl")
-    aggregated = account.get("aggregated_portfolio")
-    candidates = [
-        pnl.get("account_currency") if isinstance(pnl, dict) else None,
-        aggregated.get("accountCurrency") if isinstance(aggregated, dict) else None,
-        account.get("accountCurrency"),
-    ]
-    for value in candidates:
-        token = str(value or "").strip().upper()
-        if token:
-            return token
-    return None
-
-
-def close_position(
-    position_id: str | int,
-    profile_id: str | None = None,
-    *,
-    instrument_id: int | None = None,
-    units_to_close: float | None = None,
-    request_id: str | None = None,
-    session_id: str = "",
-    **overrides: Any,
-) -> dict[str, Any]:
-    """Close or partially close a position (eToro connector)."""
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "positions.close")
-    overrides = dict(overrides)
-    overrides.pop("session_id", None)
-    module = _sdk_module(profile.connector)
-    audit = {
-        "position_id": str(position_id),
-        "instrument_id": instrument_id,
-        "units_to_close": units_to_close,
-        "request_id": request_id,
-    }
-    return _route_sdk_write(
-        profile,
-        remote_tool="close_position",
-        risk_reducing=True,
-        intent=None,
-        audit_request=audit,
-        execute=lambda cfg: _close_etoro_position(
-            module,
-            cfg,
-            position_id=position_id,
-            instrument_id=instrument_id,
-            units_to_close=units_to_close,
-            request_id=request_id,
-        ),
-        overrides={**overrides, "session_id": session_id},
-        unsupported_capability="positions.close",
-    )
-
-
-def cancel_close_order(
-    order_id: str,
-    profile_id: str | None = None,
-    *,
-    request_id: str | None = None,
-    session_id: str = "",
-    **overrides: Any,
-) -> dict[str, Any]:
-    """Cancel a pending market close order (eToro connector)."""
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "orders.cancel_close")
-    overrides = dict(overrides)
-    overrides.pop("session_id", None)
-    module = _sdk_module(profile.connector)
-    audit = {"order_id": order_id, "request_id": request_id}
-    return _route_sdk_write(
-        profile,
-        remote_tool="cancel_close_order",
-        risk_reducing=False,
-        intent=None,
-        audit_request=audit,
-        execute=lambda cfg: module.cancel_close_order(cfg, order_id, request_id=request_id),
-        overrides={**overrides, "session_id": session_id},
-        unsupported_capability="orders.cancel_close",
-        structural_reason=(
-            "live eToro close-order cancellation is disabled because cancelling "
-            "a pending reduction can increase exposure and the reinstated risk "
-            "cannot be quantified from the current API response (fail-closed)"
-        ),
-    )
-
-
-def edit_position_stops(
-    position_id: str | int,
-    profile_id: str | None = None,
-    *,
-    stop_loss: float | None = None,
-    take_profit: float | None = None,
-    trailing_stop_loss: bool | None = None,
-    clear_stop_loss: bool = False,
-    clear_take_profit: bool = False,
-    request_id: str | None = None,
-    session_id: str = "",
-    **overrides: Any,
-) -> dict[str, Any]:
-    """Modify SL/TP on an open position (eToro connector)."""
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "positions.edit")
-    overrides = dict(overrides)
-    overrides.pop("session_id", None)
-    module = _sdk_module(profile.connector)
-    audit = {
-        "position_id": str(position_id),
-        "stop_loss": stop_loss,
-        "take_profit": take_profit,
-        "trailing_stop_loss": trailing_stop_loss,
-        "clear_stop_loss": clear_stop_loss,
-        "clear_take_profit": clear_take_profit,
-        "request_id": request_id,
-    }
-    return _route_sdk_write(
-        profile,
-        remote_tool="edit_position_stops",
-        risk_reducing=False,
-        intent=None,
-        audit_request=audit,
-        execute=lambda cfg: module.edit_position_stops(
-            cfg,
-            position_id=position_id,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            trailing_stop_loss=trailing_stop_loss,
-            clear_stop_loss=clear_stop_loss,
-            clear_take_profit=clear_take_profit,
-            request_id=request_id,
-        ),
-        overrides={**overrides, "session_id": session_id},
-        unsupported_capability="positions.edit",
-        structural_reason=(
-            "live eToro stop edits are disabled because loosening a stop can "
-            "transfer additional account funds into position margin and the "
-            "incremental USD funding cannot be quantified before execution "
-            "(fail-closed)"
-        ),
-    )
-
-
-def etoro_copy_precheck(
-    parent_cid: int,
-    amount: float,
-    profile_id: str | None = None,
-    *,
-    request_id: str | None = None,
-    **overrides: Any,
-) -> dict[str, Any]:
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "copy.precheck")
-    blocked = _etoro_copy_unavailable_on_paper(profile)
-    if blocked is not None:
-        return blocked
-    module = _sdk_module(profile.connector)
-    config = _sdk_config(profile, module, overrides)
-    return _with_profile(
-        profile,
-        module.copy_precheck(
-            config,
-            parent_cid=parent_cid,
-            amount=amount,
-            request_id=request_id,
-        ),
-    )
-
-
-def etoro_copy_start(
-    parent_cid: int,
-    amount: float,
-    profile_id: str | None = None,
-    *,
-    reference_id: str,
-    request_id: str | None = None,
-    session_id: str = "",
-    **overrides: Any,
-) -> dict[str, Any]:
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "copy.start")
-    blocked = _etoro_copy_unavailable_on_paper(profile)
-    if blocked is not None:
-        return blocked
-    overrides = dict(overrides)
-    overrides.pop("session_id", None)
-    module = _sdk_module(profile.connector)
-    try:
-        amount_value = float(amount)
-    except (TypeError, ValueError, OverflowError):
-        return _with_profile(
-            profile,
-            _etoro_error("amount must be a finite non-zero number"),
-        )
-    if not math.isfinite(amount_value) or amount_value == 0:
-        return _with_profile(
-            profile,
-            _etoro_error("amount must be a finite non-zero number"),
-        )
-    account_currency: str | None = None
-    structural_reason: str | None = None
-    if profile.environment == "live" and amount_value > 0:
-        config = _sdk_config(profile, module, overrides)
-        try:
-            account_currency = _etoro_account_currency(module.get_account_snapshot(config))
-        except Exception as exc:  # noqa: BLE001
-            structural_reason = f"could not verify eToro account currency before copy allocation: {exc}"
-        if structural_reason is None and account_currency != "USD":
-            structural_reason = (
-                "live eToro copy increases are supported only for verified USD "
-                f"accounts; received {account_currency or 'unknown'} (fail-closed)"
-            )
-    audit = {
-        "parent_cid": parent_cid,
-        "amount": amount_value,
-        "account_currency": account_currency,
-        "reference_id": reference_id,
-        "request_id": request_id,
-    }
-    from src.live.enforcement import OrderIntent
-
-    risk_reducing = amount_value < 0
-    intent = None
-    if not risk_reducing and structural_reason is None:
-        instrument_type, asset_class = _order_classification(profile.connector, str(parent_cid))
-        intent = OrderIntent(
-            symbol=f"COPY:{parent_cid}",
-            side="buy",
-            notional_usd=abs(amount_value),
-            quantity=None,
-            instrument_type=instrument_type,
-            asset_class=asset_class,
-        )
-    return _route_sdk_write(
-        profile,
-        remote_tool="copy_start_or_adjust",
-        risk_reducing=risk_reducing,
-        intent=intent,
-        audit_request=audit,
-        execute=lambda cfg: module.copy_start_or_adjust(
-            cfg,
-            parent_cid=parent_cid,
-            amount=amount_value,
-            reference_id=reference_id,
-            request_id=request_id,
-        ),
-        overrides={**overrides, "session_id": session_id},
-        unsupported_capability="copy.start",
-        structural_reason=structural_reason,
-    )
-
-
-def etoro_copy_poll(
-    reference_id: str,
-    profile_id: str | None = None,
-    *,
-    request_id: str | None = None,
-    **overrides: Any,
-) -> dict[str, Any]:
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "copy.poll")
-    blocked = _etoro_copy_unavailable_on_paper(profile)
-    if blocked is not None:
-        return blocked
-    module = _sdk_module(profile.connector)
-    config = _sdk_config(profile, module, overrides)
-    return _with_profile(profile, module.copy_poll(config, reference_id=reference_id, request_id=request_id))
-
-
-def etoro_copy_close(
-    mirror_id: int,
-    profile_id: str | None = None,
-    *,
-    unregister_type: str = "Close",
-    request_id: str | None = None,
-    session_id: str = "",
-    **overrides: Any,
-) -> dict[str, Any]:
-    profile = profile_by_id(profile_id)
-    if profile.connector != "etoro":
-        return _unsupported_etoro(profile, "copy.close")
-    blocked = _etoro_copy_unavailable_on_paper(profile)
-    if blocked is not None:
-        return blocked
-    overrides = dict(overrides)
-    overrides.pop("session_id", None)
-    module = _sdk_module(profile.connector)
-    audit = {"mirror_id": mirror_id, "unregister_type": unregister_type, "request_id": request_id}
-    return _route_sdk_write(
-        profile,
-        remote_tool="copy_close",
-        risk_reducing=True,
-        intent=None,
-        audit_request=audit,
-        execute=lambda cfg: module.copy_close(
-            cfg,
-            mirror_id=mirror_id,
-            unregister_type=unregister_type,
-            request_id=request_id,
-        ),
-        overrides={**overrides, "session_id": session_id},
-        unsupported_capability="copy.close",
-    )
-
-
 def _audit_live_cancel(profile, order_id, symbol, result, session_id) -> None:
     """Write a live-action audit record for a live order cancellation (best-effort)."""
     try:
@@ -1590,10 +1105,6 @@ def _remote_tool_name(connector: str, operation: str) -> str | None:
         from src.trading.connectors.robinhood.mcp import remote_tool_name
 
         return remote_tool_name(operation)
-    if connector == "scalable":
-        from src.trading.connectors.scalable.mcp import remote_tool_name
-
-        return remote_tool_name(operation)
     return None
 
 
@@ -1605,10 +1116,6 @@ def _remote_arguments(connector: str, operation: str, arguments: dict[str, Any])
         return remote_arguments(operation, arguments)
     if connector == "robinhood":
         from src.trading.connectors.robinhood.mcp import remote_arguments
-
-        return remote_arguments(operation, arguments)
-    if connector == "scalable":
-        from src.trading.connectors.scalable.mcp import remote_arguments
 
         return remote_arguments(operation, arguments)
     return {}

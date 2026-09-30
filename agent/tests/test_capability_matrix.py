@@ -45,7 +45,9 @@ def test_each_profile_keeps_its_own_permissions_and_transport() -> None:
 
 def test_paper_order_capability_never_becomes_a_live_permission() -> None:
     rows = _rows()
-    for broker in ("upbit", "dhan", "shoonya", "zerodha", "longbridge"):
+    # longbridge is the only surviving broker whose paper profiles can place
+    # orders while every live profile stays read-only.
+    for broker in ("longbridge",):
         profiles = [p for p in BUILTIN_PROFILES if p.connector == broker]
         assert any(p.environment == "paper" and "orders.place" in p.capabilities for p in profiles)
         for profile in profiles:
@@ -55,7 +57,6 @@ def test_paper_order_capability_never_becomes_a_live_permission() -> None:
     assert rows["alpaca-live-trade"][8] == "mandate required"
     assert rows["robinhood-live-mcp"][8] == "mandate required"
     assert rows["robinhood-live-mcp-readonly"][6] == "none declared"
-    assert "positions.edit" in rows["etoro-live-trade"][7]
 
 
 def test_only_builtin_declarations_are_rendered(monkeypatch) -> None:

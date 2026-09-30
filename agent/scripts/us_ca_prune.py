@@ -95,6 +95,7 @@ DELETIONS: list[tuple[str, str, str, str]] = [
     ("agent/src/trading/connectors/scalable", "dir", "6", "EU connector"),
     ("agent/src/trading/connectors/trading212", "dir", "6", "EU connector"),
     ("agent/src/trading/connectors/mt5", "dir", "6", "MetaTrader connector"),
+    ("agent/src/trading/connectors/etoro", "dir", "6", "global multi-asset connector (D4: drop)"),
 
     # --- Phase 7: bundled skills ----------------------------------------------
     # China / HK

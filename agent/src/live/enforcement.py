@@ -52,21 +52,16 @@ class UniverseDataUnavailable(Exception):
 
 
 #: AssetClass → the loader market key (``backtest.loaders.registry`` fallback
-#: chains). US equities/ETFs route to the ``us_equity`` chain (yfinance →
-#: akshare); crypto routes to the ``crypto`` chain (okx → ccxt).
+#: chains). US equities/ETFs route to the ``us_equity`` chain (yahoo →
+#: yfinance → the US EOD fallbacks).
 _ASSET_CLASS_MARKET: dict[AssetClass, str] = {
     AssetClass.US_EQUITY: "us_equity",
     AssetClass.US_ETF: "us_equity",
-    AssetClass.HK_EQUITY: "hk_equity",
-    AssetClass.IN_EQUITY: "india_equity",
-    AssetClass.CRYPTO: "crypto",
-    # CN_EQUITY has no loader market wired here, so market-cap / liquidity floors
-    # for A-shares fail closed (deny) rather than wave through — intentional. If
-    # ever wired, the registry's A-share market key is "a_share" (not "cn_equity").
-    # IN_EQUITY routes to the "india_equity" loader chain (Yahoo) for liquidity
-    # floors; market-cap floors stay US-only (see ``market_cap_usd``), so an
-    # India market-cap floor fails closed like CN — intentional until a metadata
-    # source is wired.
+    # The A-share / Hong Kong / India / crypto loader chains are gone from this
+    # build (US + Canada only), so those asset classes have no loader market
+    # wired here: a market-cap or liquidity floor set on such a mandate fails
+    # closed (deny) rather than waving through — intentional. If a chain is ever
+    # re-added, add the row here in the same commit.
     # FOREX likewise has no loader market wired: market-cap/liquidity floors do
     # not apply to currency pairs, so any floor set on a forex mandate fails
     # closed, and quantity pricing comes from the connector's own sizing hook
@@ -247,8 +242,8 @@ def last_price_usd(symbol: str, asset_class: AssetClass) -> float | None:
 
     The fallback path the gate uses when the broker's own quote read tool is
     unavailable: pull the most recent daily close from the first available
-    loader in the asset-class market chain (yfinance/akshare for US equity,
-    okx/ccxt for crypto — the project's standard auto-fallback). Used to convert
+    loader in the asset-class market chain (yahoo/yfinance for US equity — the
+    project's standard auto-fallback). Used to convert
     a quantity-only order into a USD notional so the notional cap stays
     enforceable (SPEC §4).
 

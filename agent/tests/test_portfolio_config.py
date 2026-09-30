@@ -56,7 +56,7 @@ def test_portfolio_settings_reject_trade_profiles():
                 "sources": [
                     {
                         "id": "unsafe",
-                        "profile_id": "binance-live-trade",
+                        "profile_id": "alpaca-live-trade",
                         "label": "Unsafe",
                     }
                 ],

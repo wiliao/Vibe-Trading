@@ -820,7 +820,12 @@ def test_no_longbridge_live_trade_profile() -> None:
 def test_trade_profiles_have_place_capability() -> None:
     from src.trading import profiles
 
-    for pid in ("alpaca-live-trade", "okx-live-trade", "binance-live-trade", "futu-live-trade", "tiger-live-trade"):
+    for pid in (
+        "alpaca-live-trade",
+        "futu-live-trade",
+        "tiger-live-trade",
+        "robinhood-live-mcp",
+    ):
         prof = profiles.profile_by_id(pid)
         assert prof.readonly is False
         assert any("requires_mandate" in c for c in prof.capabilities)
@@ -978,7 +983,7 @@ def test_longbridge_place_order_paper_only_guard() -> None:
     assert out2["status"] == "error" and "paper" in out2["error"].lower()
 
 
-@pytest.mark.parametrize("connector", ["tiger", "alpaca", "okx", "binance", "futu", "longbridge", "mt5"])
+@pytest.mark.parametrize("connector", ["tiger", "alpaca", "futu", "longbridge"])
 def test_connector_place_order_rejects_bad_side(connector) -> None:
     import importlib
 
@@ -988,7 +993,7 @@ def test_connector_place_order_rejects_bad_side(connector) -> None:
     assert out["status"] == "error"
 
 
-@pytest.mark.parametrize("connector", ["tiger", "alpaca", "okx", "binance", "futu", "longbridge", "mt5"])
+@pytest.mark.parametrize("connector", ["tiger", "alpaca", "futu", "longbridge"])
 def test_connector_place_order_rejects_both_qty_and_notional(connector) -> None:
     import importlib
 
@@ -996,14 +1001,3 @@ def test_connector_place_order_rejects_both_qty_and_notional(connector) -> None:
     cfg = mod.build_config({"profile": "paper"}, None)
     out = mod.place_order(cfg, symbol="AAPL", side="buy", quantity=1, notional=100)
     assert out["status"] == "error"
-
-
-def test_okx_order_result_rejects_failed_scode() -> None:
-    from src.trading.connectors.okx import sdk as ox
-
-    cfg = ox.OKXConfig(api_key="k", api_secret="s", passphrase="p")
-    # A 200 envelope (code 0) whose per-order sCode != 0 is a FAILED order.
-    failed = ox._order_result(cfg, {"code": "0", "data": [{"sCode": "51008", "sMsg": "insufficient"}]}, symbol="BTC-USDT", side="buy", order_type="market", time_in_force="day")
-    assert failed["status"] == "error"
-    ok = ox._order_result(cfg, {"code": "0", "data": [{"ordId": "O1", "sCode": "0"}]}, symbol="BTC-USDT", side="buy", order_type="market", time_in_force="day")
-    assert ok["status"] == "ok" and ok["order_id"] == "O1"

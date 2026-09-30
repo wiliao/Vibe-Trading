@@ -60,54 +60,11 @@ _BUILTIN: dict[str, ConnectorOnboarding] = {
         install_command="pip install alpaca-py keyring",
         setup_hint="Use a paper key for paper profiles and a live key for live profiles.",
     ),
-    "binance": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("api_key", "API Key"),
-            _field("api_secret", "API Secret"),
-        ),
-        dependency="ccxt",
-        install_command="pip install ccxt keyring",
-        setup_hint="Create a read-only Spot API key; do not enable withdrawals.",
-    ),
-    "dhan": ConnectorOnboarding(
-        auth_type="access_token",
-        credential_fields=(
-            _field("client_id", "Client ID", secret=False),
-            _field("access_token", "Access Token"),
-        ),
-        dependency="dhanhq",
-        install_command="pip install dhanhq keyring",
-    ),
-    "etoro": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("api_key", "API Key"),
-            _field("user_key", "User Key"),
-        ),
-        dependency="requests",
-        install_command="pip install keyring",
-    ),
     "futu": ConnectorOnboarding(
         auth_type="local_gateway",
         dependency="futu-api",
         install_command="pip install futu-api",
         setup_hint="Start and sign in to Futu OpenD on this computer before testing.",
-    ),
-    "kis": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("app_key", "App Key"),
-            _field("app_secret", "App Secret"),
-            _field("account_no", "Account Number (CANO)", secret=False),
-            _field("account_product_code", "Account Product Code", secret=False, required=False),
-        ),
-        dependency="requests",
-        install_command="pip install keyring",
-        setup_hint=(
-            "Apply for an app key/secret at apiportal.koreainvestment.com; test "
-            "against a 모의투자 (paper) account before ever using live-readonly."
-        ),
     ),
     "longbridge": ConnectorOnboarding(
         auth_type="api_key",
@@ -120,42 +77,6 @@ _BUILTIN: dict[str, ConnectorOnboarding] = {
         install_command="pip install longbridge keyring",
         setup_hint="The three LongPort values are stored and resolved as one atomic set.",
     ),
-    "mt5": ConnectorOnboarding(
-        auth_type="local_terminal",
-        credential_fields=(
-            _field("login", "Account Login", secret=False),
-            _field("password", "Account Password"),
-            _field("server", "Broker Server", secret=False),
-            _field("terminal_path", "Terminal Path", secret=False, required=False),
-            _field("symbol_suffix", "Symbol Suffix", secret=False, required=False),
-        ),
-        dependency="MetaTrader5",
-        install_command='pip install "vibe-trading-ai[mt5]" keyring',
-        setup_hint="MetaTrader5 is Windows-only and requires a local terminal session.",
-    ),
-    "okx": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("api_key", "API Key"),
-            _field("api_secret", "API Secret"),
-            _field("passphrase", "Passphrase"),
-        ),
-        dependency="python-okx",
-        install_command="pip install python-okx keyring",
-        setup_hint="Create a read-only key; do not grant Trade or Withdraw permissions.",
-    ),
-    "shoonya": ConnectorOnboarding(
-        auth_type="totp",
-        credential_fields=(
-            _field("user_id", "User ID", secret=False),
-            _field("password", "Password"),
-            _field("vendor_code", "Vendor Code", secret=False),
-            _field("api_secret", "API Secret"),
-            _field("totp_secret", "TOTP Secret"),
-        ),
-        dependency="NorenRestApiPy",
-        install_command="pip install NorenRestApiPy pyotp keyring",
-    ),
     "tiger": ConnectorOnboarding(
         auth_type="private_key_file",
         credential_fields=(
@@ -167,37 +88,20 @@ _BUILTIN: dict[str, ConnectorOnboarding] = {
         install_command="pip install tigeropen keyring",
         setup_hint="Only the private-key path is stored; the PEM file remains local.",
     ),
-    "trading212": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("api_key", "API Key"),
-            _field("api_secret", "API Secret", required=False),
-        ),
-        dependency="requests",
-        install_command="pip install keyring",
-    ),
-    "upbit": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("access_key", "Access Key"),
-            _field("secret_key", "Secret Key"),
-        ),
-        dependency="PyJWT",
-        install_command='pip install "vibe-trading-ai[upbit]" keyring',
-        setup_hint="Create a read-only key; do not grant withdrawal permission.",
-    ),
-    "toss": ConnectorOnboarding(
-        auth_type="api_key",
-        credential_fields=(
-            _field("client_id", "Client ID"),
-            _field("client_secret", "Client Secret"),
-            _field("account_seq", "Account Sequence", secret=False),
-        ),
-        dependency="requests",
-        install_command="pip install keyring",
+    "ibkr": ConnectorOnboarding(
+        auth_type="local_app",
+        dependency="ib_async",
+        install_command="pip install ib_async",
         setup_hint=(
-            "Apply via the Toss Securities app (더보기 > Open API), then fetch "
-            "account_seq from GET /api/v1/accounts."
+            "Run a local TWS or IB Gateway session with the API enabled. IBKR "
+            "is the only kept connector that can route a Canadian listing, but "
+            "Canada live trading is not wired up in this build."
+        ),
+    ),
+    "robinhood": ConnectorOnboarding(
+        auth_type="oauth",
+        setup_hint=(
+            "Connect the Robinhood MCP server over OAuth. US equities only."
         ),
     ),
 }

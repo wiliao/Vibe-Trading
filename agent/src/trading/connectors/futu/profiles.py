@@ -31,7 +31,7 @@ FUTU_PROFILES: tuple[TradingProfile, ...] = (
         transport="broker_sdk",
         capabilities=_FUTU_READS,
         readonly=True,
-        config={"profile": "paper", "filter_trdmarket": "HK"},
+        config={"profile": "paper", "filter_trdmarket": "US"},
         notes=(
             "Reads a Futu paper (SIMULATE) account via futu-api through a local OpenD "
             "gateway (default 127.0.0.1:11111). OpenD must be running and logged in. "
@@ -47,7 +47,7 @@ FUTU_PROFILES: tuple[TradingProfile, ...] = (
         transport="broker_sdk",
         capabilities=_FUTU_READS,
         readonly=True,
-        config={"profile": "live-readonly", "filter_trdmarket": "HK"},
+        config={"profile": "live-readonly", "filter_trdmarket": "US"},
         notes=(
             "Reads a Futu live (REAL) account only, via futu-api through a local OpenD "
             "gateway (default 127.0.0.1:11111). OpenD must be running and logged in. "
@@ -62,7 +62,7 @@ FUTU_PROFILES: tuple[TradingProfile, ...] = (
         transport="broker_sdk",
         capabilities=_FUTU_READS + ("orders.place",),
         readonly=False,
-        config={"profile": "paper", "filter_trdmarket": "HK"},
+        config={"profile": "paper", "filter_trdmarket": "US"},
         notes=(
             "Places orders on a Futu paper (SIMULATE) account via futu-api through a "
             "local OpenD gateway (default 127.0.0.1:11111). OpenD must be running and "
@@ -79,7 +79,7 @@ FUTU_PROFILES: tuple[TradingProfile, ...] = (
         transport="broker_sdk",
         capabilities=_FUTU_READS + ("orders.place.requires_mandate",),
         readonly=False,
-        config={"profile": "live", "filter_trdmarket": "HK"},
+        config={"profile": "live", "filter_trdmarket": "US"},
         notes=(
             "Places orders on a Futu live (REAL) account via futu-api through a local "
             "OpenD gateway (default 127.0.0.1:11111). OpenD must be running and logged "

@@ -62,9 +62,18 @@ def test_discovery_sees_the_broker_config_files() -> None:
     """Guard the guard: an empty scan would pass the coverage test vacuously."""
     names = _runtime_root_filenames()
 
-    assert {"alpaca.json", "zerodha.json", "connections.json"} <= set(names)
+    # Surviving connector roster: alpaca, futu, ibkr, longbridge, robinhood,
+    # tiger. All but robinhood (MCP-backed, no root config) ship a config file.
+    assert {
+        "alpaca.json",
+        "futu.json",
+        "ibkr-local.json",
+        "longbridge.json",
+        "tiger.json",
+        "connections.json",
+    } <= set(names)
     assert {"agent.json", "agent.yaml", "agent.yml"} <= set(names)
-    assert len(names) >= 20
+    assert len(names) >= 13
 
 
 def test_every_runtime_root_file_is_gitignored() -> None:

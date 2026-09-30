@@ -4,7 +4,8 @@ Confirms the ``in_equity`` asset class flows through the live mandate gate:
   - An IN_EQUITY order is denied (structural universe breach) when the mandate
     does not permit it.
   - It passes the asset-class gate when the mandate permits IN_EQUITY.
-  - The enforcement loader chain resolves IN_EQUITY to the india_equity market.
+  - The enforcement loader chain resolves an asset class to its loader market
+    (via US_EQUITY, the surviving live chain).
 """
 
 from __future__ import annotations
@@ -95,6 +96,12 @@ def test_in_equity_passes_asset_class_gate_when_permitted() -> None:
     assert breach is None or breach.limit != "asset_classes"
 
 
-def test_in_equity_resolves_to_india_equity_loader() -> None:
-    loader = _resolve_loader(AssetClass.IN_EQUITY)
-    assert "india_equity" in loader.markets
+def test_us_equity_resolves_to_us_equity_loader() -> None:
+    """The surviving live chain still resolves its asset class to a loader.
+
+    The former ``india_equity`` chain was removed with the India data layer, so
+    the ``_resolve_loader`` asset-class wiring is exercised through US_EQUITY —
+    the only asset class with live loader sources now.
+    """
+    loader = _resolve_loader(AssetClass.US_EQUITY)
+    assert "us_equity" in loader.markets

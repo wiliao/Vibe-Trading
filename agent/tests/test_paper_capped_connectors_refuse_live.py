@@ -28,7 +28,7 @@ _CONNECTOR_ROOT = Path(__file__).resolve().parents[1] / "src" / "trading" / "con
 
 # Brokers with no runtime paper/live discriminator. Capped at paper; every
 # order entry point must refuse a non-paper config up front.
-_PAPER_CAPPED = frozenset({"longbridge", "dhan", "shoonya", "trading212", "zerodha", "upbit", "toss"})
+_PAPER_CAPPED = frozenset({"longbridge"})
 
 # Brokers with a structural discriminator (host separation, demo flag, account
 # id format, trade environment). Live placement is allowed here, but only
@@ -37,20 +37,10 @@ _PAPER_CAPPED = frozenset({"longbridge", "dhan", "shoonya", "trading212", "zerod
 _LIVE_CAPABLE = frozenset(
     {
         "alpaca",
-        "binance",
-        "etoro",
         "futu",
-        "okx",
         "tiger",
         "robinhood",
         "ibkr",
-        "mt5",
-        "kis",
-        # Scalable Capital publishes no paper environment at all — the same shape
-        # as Robinhood — so there is no ambiguity a discriminator would protect
-        # against. Tier settled as bounded live in #1367; the profile that ships
-        # today is read-only and exposes no order capability.
-        "scalable",
     }
 )
 

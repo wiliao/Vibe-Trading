@@ -1,8 +1,8 @@
 """Pre-trade mandate gate for DIRECT-SDK connectors (SPEC Mandate Enforcement §3).
 
 The MCP :class:`~src.live.order_guard.LiveOrderGuardTool` gates Robinhood by
-wrapping a remote MCP tool. Direct-SDK connectors (tiger / alpaca / okx /
-binance / futu) place orders through a normal Python call, not an MCP tool, so
+wrapping a remote MCP tool. Direct-SDK connectors (tiger / alpaca / futu)
+place orders through a normal Python call, not an MCP tool, so
 they need a function-based gate with the SAME ceremony, all fail-closed before
 any order reaches the broker:
 

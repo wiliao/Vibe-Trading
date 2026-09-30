@@ -254,14 +254,14 @@ def test_discovery_only_profile_cannot_back_a_portfolio_connection(
 
 def test_readonly_broker_sdk_profile_backs_a_portfolio_connection(tmp_path) -> None:
     """A read-only SDK profile that exposes both reads stays eligible."""
-    profile = profile_by_id("binance-live-sdk-readonly")
+    profile = profile_by_id("alpaca-live-sdk-readonly")
     assert is_portfolio_connection_profile(profile) is True
 
     store = ConnectionStore(
         tmp_path / "connections.json",
         credential_store=CredentialStore(_MemoryCredentials()),
     )
-    connection = store.create("main-binance", profile.id, "Main Binance")
+    connection = store.create("main-alpaca", profile.id, "Main Alpaca")
 
-    assert connection.profile_id == "binance-live-sdk-readonly"
+    assert connection.profile_id == "alpaca-live-sdk-readonly"
     assert profile.id in {row.get("id") for row in readonly_profile_catalog()}

@@ -1,4 +1,13 @@
-"""Trading connector profile registry and selected-profile storage."""
+"""Trading connector profile registry and selected-profile storage.
+
+Scope (decision D3): the built-in connectors are **US-broker only**. Canada is
+supported for market data and backtesting (``us_equity`` / ``ca_equity``), but
+there is no Canadian live-trading path — ``ibkr`` is the only kept connector
+that could route a TSX/TSX-V listing, and it ships read-only here. A Canadian
+symbol therefore classifies as an unknown asset class at the live mandate gate
+rather than inventing a ``CA_EQUITY`` bucket the mandate cannot express; see
+``src.trading.service._order_classification``.
+"""
 
 from __future__ import annotations
 
@@ -7,23 +16,11 @@ from pathlib import Path
 
 from src.config.paths import get_runtime_root
 from src.trading.connectors.alpaca.profiles import ALPACA_PROFILES
-from src.trading.connectors.binance.profiles import BINANCE_PROFILES
-from src.trading.connectors.dhan.profiles import DHAN_PROFILES
 from src.trading.connectors.futu.profiles import FUTU_PROFILES
 from src.trading.connectors.ibkr.profiles import IBKR_PROFILES
-from src.trading.connectors.kis.profiles import KIS_PROFILES
 from src.trading.connectors.longbridge.profiles import LONGBRIDGE_PROFILES
-from src.trading.connectors.mt5.profiles import MT5_PROFILES
-from src.trading.connectors.okx.profiles import OKX_PROFILES
 from src.trading.connectors.robinhood.profiles import ROBINHOOD_PROFILES
-from src.trading.connectors.scalable.profiles import SCALABLE_PROFILES
-from src.trading.connectors.shoonya.profiles import SHOONYA_PROFILES
 from src.trading.connectors.tiger.profiles import TIGER_PROFILES
-from src.trading.connectors.etoro.profiles import ETORO_PROFILES
-from src.trading.connectors.toss.profiles import TOSS_PROFILES
-from src.trading.connectors.trading212.profiles import TRADING212_PROFILES
-from src.trading.connectors.upbit.profiles import UPBIT_PROFILES
-from src.trading.connectors.zerodha.profiles import ZERODHA_PROFILES
 from src.trading.types import TradingProfile
 
 CONFIG_FILENAME = "trading-connections.json"
@@ -35,19 +32,7 @@ BUILTIN_PROFILES: tuple[TradingProfile, ...] = (
     *TIGER_PROFILES,
     *LONGBRIDGE_PROFILES,
     *ALPACA_PROFILES,
-    *OKX_PROFILES,
-    *BINANCE_PROFILES,
     *FUTU_PROFILES,
-    *DHAN_PROFILES,
-    *SHOONYA_PROFILES,
-    *TRADING212_PROFILES,
-    *MT5_PROFILES,
-    *ETORO_PROFILES,
-    *ZERODHA_PROFILES,
-    *KIS_PROFILES,
-    *UPBIT_PROFILES,
-    *TOSS_PROFILES,
-    *SCALABLE_PROFILES,
 )
 
 

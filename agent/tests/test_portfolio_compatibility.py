@@ -18,22 +18,11 @@ from src.trading.types import TradingProfile
 def test_every_builtin_portfolio_connector_has_an_explicit_compatibility_tier():
     expected = {
         "alpaca": "contract_tested",
-        "binance": "native",
-        "dhan": "experimental",
-        "etoro": "experimental",
         "futu": "experimental",
         "ibkr": "native",
-        "kis": "experimental",
         "longbridge": "native",
-        "mt5": "experimental",
-        "okx": "contract_tested",
-        "shoonya": "experimental",
-        "tiger": "experimental",
-        "trading212": "experimental",
-        "zerodha": "experimental",
-        "upbit": "experimental",
-        "toss": "experimental",
         "robinhood": "experimental",
+        "tiger": "experimental",
     }
 
     observed = {profile.connector: profile_compatibility(profile)["level"] for profile in eligible_profiles()}
@@ -74,57 +63,6 @@ def test_contract_rejects_a_positions_read_without_a_positions_list():
 
     _, positions = adapt_and_validate_payloads("sample", {"account": {}}, {"positions": []})
     assert positions["positions"] == []
-
-
-def test_okx_account_details_are_adapted_to_spot_positions():
-    account, positions = adapt_and_validate_payloads(
-        "okx",
-        {
-            "account": {
-                "total_equity": "65250",
-                "details": [
-                    {
-                        "currency": "BTC",
-                        "equity": "1.5",
-                        "available": "1.0",
-                        "frozen": "0.5",
-                    },
-                    {
-                        "currency": "USDT",
-                        "equity": "250",
-                        "available": "250",
-                        "frozen": "0",
-                    },
-                    {"currency": "ETH", "equity": "0"},
-                ],
-            }
-        },
-        {"positions": []},
-    )
-
-    assert account["account"]["total_equity"] == "65250"
-    assert positions["positions"] == [
-        {
-            "symbol": "BTC",
-            "quantity": "1.5",
-            "currency": "USD",
-            "quote_symbol": "BTC-USDT",
-            "asset_type": "crypto",
-            "free": "1.0",
-            "used": "0.5",
-            "source": "spot",
-        },
-        {
-            "symbol": "USDT",
-            "quantity": "250",
-            "currency": "USD",
-            "quote_symbol": "USDT",
-            "asset_type": "stablecoin",
-            "free": "250",
-            "used": "0",
-            "source": "spot",
-        },
-    ]
 
 
 def test_contract_propagates_account_currency_and_decouples_iso_from_fx():

@@ -29,15 +29,15 @@ def test_connection_registry_never_serializes_credentials(tmp_path):
     credentials = CredentialStore(_MemoryCredentials())
     store = ConnectionStore(tmp_path / "connections.json", credential_store=credentials)
     connection = store.create(
-        "main-binance",
-        "binance-live-sdk-readonly",
-        "Main Binance",
+        "main-alpaca",
+        "alpaca-live-sdk-readonly",
+        "Main Alpaca",
     )
     credentials.save(connection.id, {"api_key": "secret-value"})
 
     payload = (tmp_path / "connections.json").read_text(encoding="utf-8")
     assert "secret-value" not in payload
-    assert connection.credential_ref == "keyring://vibe-trading/main-binance"
+    assert connection.credential_ref == "keyring://vibe-trading/main-alpaca"
     if os.name == "posix":
         assert (tmp_path / "connections.json").stat().st_mode & 0o777 == 0o600
 
@@ -47,10 +47,10 @@ def test_connection_registry_normalizes_ids_before_duplicate_checks(tmp_path):
         tmp_path / "connections.json",
         credential_store=CredentialStore(_MemoryCredentials()),
     )
-    store.create("main-account", "binance-live-sdk-readonly", "Main account")
+    store.create("main-account", "alpaca-live-sdk-readonly", "Main account")
 
     with pytest.raises(ValueError, match="already exists"):
-        store.create(" MAIN-ACCOUNT ", "binance-live-sdk-readonly", "Replacement")
+        store.create(" MAIN-ACCOUNT ", "alpaca-live-sdk-readonly", "Replacement")
 
     assert store.get("main-account").label == "Main account"
 
@@ -62,7 +62,7 @@ def test_connection_registry_rejects_control_characters_in_labels(tmp_path):
     )
 
     with pytest.raises(ValueError, match="printable"):
-        store.create("main-account", "binance-live-sdk-readonly", "Main\naccount")
+        store.create("main-account", "alpaca-live-sdk-readonly", "Main\naccount")
 
 
 def test_scaffold_generates_a_valid_readonly_connector(tmp_path):
@@ -165,24 +165,24 @@ def test_builtin_sdk_connections_use_isolated_keyring_credentials(
     monkeypatch.setattr(connections, "get_runtime_root", lambda: tmp_path)
     monkeypatch.setattr(connections, "CredentialStore", CredentialFactory)
     store = ConnectionStore()
-    store.create("binance-one", "binance-live-sdk-readonly", "Binance one")
-    store.create("binance-two", "binance-live-sdk-readonly", "Binance two")
+    store.create("alpaca-one", "alpaca-live-sdk-readonly", "Alpaca one")
+    store.create("alpaca-two", "alpaca-live-sdk-readonly", "Alpaca two")
     credentials.save(
-        "binance-one",
-        {"api_key": "first-key", "api_secret": "first-secret"},
+        "alpaca-one",
+        {"api_key": "first-key", "secret_key": "first-secret"},
     )
     credentials.save(
-        "binance-two",
-        {"api_key": "second-key", "api_secret": "second-secret"},
+        "alpaca-two",
+        {"api_key": "second-key", "secret_key": "second-secret"},
     )
 
-    profile = profile_by_id("binance-live-sdk-readonly")
-    module = _sdk_module("binance")
-    first = _sdk_config(profile, module, {"connection_id": "binance-one"})
-    second = _sdk_config(profile, module, {"connection_id": "binance-two"})
+    profile = profile_by_id("alpaca-live-sdk-readonly")
+    module = _sdk_module("alpaca")
+    first = _sdk_config(profile, module, {"connection_id": "alpaca-one"})
+    second = _sdk_config(profile, module, {"connection_id": "alpaca-two"})
 
-    assert (first.api_key, first.api_secret) == ("first-key", "first-secret")
-    assert (second.api_key, second.api_secret) == ("second-key", "second-secret")
+    assert (first.api_key, first.secret_key) == ("first-key", "first-secret")
+    assert (second.api_key, second.secret_key) == ("second-key", "second-secret")
 
 
 def test_builtin_sdk_connection_rejects_partial_vault_set(tmp_path, monkeypatch):
@@ -201,17 +201,17 @@ def test_builtin_sdk_connection_rejects_partial_vault_set(tmp_path, monkeypatch)
     monkeypatch.setattr(connections, "get_runtime_root", lambda: tmp_path)
     monkeypatch.setattr(connections, "CredentialStore", CredentialFactory)
     ConnectionStore().create(
-        "partial-okx",
-        "okx-live-sdk-readonly",
-        "Partial OKX",
+        "partial-longbridge",
+        "longbridge-live-sdk-readonly",
+        "Partial Longbridge",
     )
-    credentials.save("partial-okx", {"api_key": "only-one-field"})
+    credentials.save("partial-longbridge", {"app_key": "only-one-field"})
 
-    with pytest.raises(ValueError, match="api_secret, passphrase"):
+    with pytest.raises(ValueError, match="access_token, app_secret"):
         _sdk_config(
-            profile_by_id("okx-live-sdk-readonly"),
-            _sdk_module("okx"),
-            {"connection_id": "partial-okx"},
+            profile_by_id("longbridge-live-sdk-readonly"),
+            _sdk_module("longbridge"),
+            {"connection_id": "partial-longbridge"},
         )
 
 
@@ -219,15 +219,17 @@ def test_mcp_connector_discovery_exposes_onboarding_contract_without_values():
     from src.tools.trading_connector_tool import TradingConnectionsTool
 
     payload = json.loads(TradingConnectionsTool().execute())
-    okx = next(profile for profile in payload["profiles"] if profile["id"] == "okx-live-sdk-readonly")
+    longbridge = next(
+        profile for profile in payload["profiles"] if profile["id"] == "longbridge-live-sdk-readonly"
+    )
 
-    assert okx["onboarding"]["dependency"] == "python-okx"
-    assert [field["name"] for field in okx["onboarding"]["credential_fields"]] == [
-        "api_key",
-        "api_secret",
-        "passphrase",
+    assert longbridge["onboarding"]["dependency"] == "longbridge"
+    assert [field["name"] for field in longbridge["onboarding"]["credential_fields"]] == [
+        "app_key",
+        "app_secret",
+        "access_token",
     ]
-    assert "credential_values" not in okx["onboarding"]
+    assert "credential_values" not in longbridge["onboarding"]
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +247,8 @@ def _vault_store(tmp_path, connection_id, profile_id):
 def test_connection_scoped_overrides_obey_the_connector_allowlist(tmp_path, monkeypatch):
     """A vault-backed call must not widen what a caller may override.
 
-    Every SDK connector narrows overrides on purpose: OKX and Binance both
-    exclude ``readonly`` ("always true for this layer") and ``timeout``, and
+    Every SDK connector narrows overrides on purpose: Alpaca excludes
+    ``readonly`` ("always true for this layer") and ``timeout``, and
     Longbridge's overlay is ``profile``/``region`` only so a caller "cannot mix
     or bypass the shared resolver". ``build_config`` enforces that; a config
     built from a raw merged mapping would not — and ``overrides`` is the one
@@ -254,33 +256,33 @@ def test_connection_scoped_overrides_obey_the_connector_allowlist(tmp_path, monk
     """
     import src.trading.connections as conns
     from src.trading import service
-    from src.trading.connectors.okx import sdk as okx_sdk
+    from src.trading.connectors.alpaca import sdk as alpaca_sdk
     from src.trading.profiles import profile_by_id
 
-    store, credentials = _vault_store(tmp_path, "main-okx", "okx-live-sdk-readonly")
-    credentials.save("main-okx", {"api_key": "k", "api_secret": "s", "passphrase": "p"})
+    store, credentials = _vault_store(tmp_path, "main-alpaca", "alpaca-live-sdk-readonly")
+    credentials.save("main-alpaca", {"api_key": "k", "secret_key": "s"})
     monkeypatch.setattr(conns, "ConnectionStore", lambda *a, **k: store)
 
-    profile = profile_by_id("okx-live-sdk-readonly")
+    profile = profile_by_id("alpaca-live-sdk-readonly")
     out_of_allowlist = {"readonly": False, "timeout": 999.0}
 
     # The connector's own builder drops them...
-    legacy = okx_sdk.build_config(profile.config, out_of_allowlist)
+    legacy = alpaca_sdk.build_config(profile.config, out_of_allowlist)
     assert legacy.readonly is True
     assert legacy.timeout == 15.0
 
     # ...and so must the vault-backed path.
     vaulted = service._sdk_config(
-        profile, okx_sdk, {"connection_id": "main-okx", **out_of_allowlist}
+        profile, alpaca_sdk, {"connection_id": "main-alpaca", **out_of_allowlist}
     )
     assert vaulted.readonly is True
     assert vaulted.timeout == 15.0
     # An allowlisted override still works.
     assert (
         service._sdk_config(
-            profile, okx_sdk, {"connection_id": "main-okx", "expected_uid": "uid-1"}
-        ).expected_uid
-        == "uid-1"
+            profile, alpaca_sdk, {"connection_id": "main-alpaca", "feed": "sip"}
+        ).feed
+        == "sip"
     )
     # And the vault credentials really were used, or the assertions are vacuous.
     assert vaulted.api_key == "k"

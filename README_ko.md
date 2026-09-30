@@ -588,18 +588,12 @@ connector-first 프로필. 대부분의 브로커가 read + 페이퍼 계정 주
 
 | Broker | Markets | Capabilities |
 |--------|---------|--------------|
-| **IBKR** | global | local TWS / Gateway, read-only |
+| **IBKR** | US / Canada | local TWS / Gateway, read-only |
 | **Robinhood** | US | Agentic MCP (desktop OAuth) — read + bounded live |
-| **Scalable Capital** | DE / EU | Agentic MCP (desktop OAuth) — 완전 읽기 전용, 페이퍼 계정 없음 |
-| **Tiger** | US / HK / A | read + paper + bounded live |
+| **Tiger** | US | read + paper + bounded live |
 | **Alpaca** | US | read + paper + bounded live (+ TAP credential-isolation mode) |
-| **OKX** · **Binance** | crypto | read + paper + bounded live |
-| **Futu** | HK / US / A | read + paper + bounded live |
-| **eToro** | global | read + paper + bounded live (Public API; demo 키는 구조적으로 `/demo` 경로에만 도달하며, 카피 트레이딩 워크플로도 지원) |
-| **MetaTrader 5** | forex / CFD | read + paper + bounded live (Exness-style; demo ⇔ paper identity guard) |
-| **KIS** (한국투자증권) | 한국 (KOSPI/KOSDAQ) | read + 진짜 페이퍼(모의투자 — 별도 호스트의 실제 증권사 사이드 샌드박스) — 이 시장의 실거래 주문 실행은 아직 연결되지 않음 |
-| **Longbridge** · **Dhan** · **Shoonya** · **Zerodha** · **Upbit** | US / HK · India (NSE/BSE) · Korea (crypto) | read + paper only — no runtime paper/live discriminator, so live order placement is hard-refused |
-| **Trading 212** · **Toss Securities** | UK / EU · 한국/US | fully read-only — `place_order` / `cancel_order` hard-refuse even paper (no verified sandbox) |
+| **Futu** | US | read + paper + bounded live |
+| **Longbridge** | US | read + paper only — no runtime paper/live discriminator, so live order placement is hard-refused |
 
 Paper-vs-live는 **구조적 브로커별 런타임 가드**(account-id 형식, 호스트 분리, demo 플래그, 또는 trade environment)이며, agent가 뒤집을 수 있는 config 플래그가 아닙니다. 그런 구분자를 노출하지 않는 브로커는 페이퍼 + 읽기 전용으로 제한됩니다.
 

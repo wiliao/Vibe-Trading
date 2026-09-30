@@ -18,14 +18,14 @@ def _settings_store(tmp_path):
     store = PortfolioSettingsStore(tmp_path / "portfolio.json")
     store.connection_store.ensure("ibkr", "ibkr-live-local-readonly", "IBKR")
     store.connection_store.ensure("longbridge", "longbridge-live-sdk-readonly", "Longbridge")
-    store.connection_store.ensure("binance", "binance-live-sdk-readonly", "Binance")
+    store.connection_store.ensure("alpaca", "alpaca-paper-sdk", "Alpaca")
     store.save(
         {
             "display_currency": "USD",
             "sources": [
                 {"connection_id": "ibkr", "label": "IBKR", "order": 0},
                 {"connection_id": "longbridge", "label": "Longbridge", "order": 1},
-                {"connection_id": "binance", "label": "Binance", "order": 2},
+                {"connection_id": "alpaca", "label": "Alpaca", "order": 2},
             ],
         }
     )
@@ -36,7 +36,7 @@ def test_refresh_aggregates_three_readonly_connectors(tmp_path):
     accounts = {
         "ibkr-live-local-readonly": {"summary": [{"tag": "NetLiquidation", "value": "1000", "currency": "USD"}]},
         "longbridge-live-sdk-readonly": {"balances": [{"net_assets": "7800", "currency": "HKD"}]},
-        "binance-live-sdk-readonly": {"balances": []},
+        "alpaca-paper-sdk": {"balances": []},
     }
     positions = {
         "ibkr-live-local-readonly": {
@@ -63,10 +63,24 @@ def test_refresh_aggregates_three_readonly_connectors(tmp_path):
                 }
             ]
         },
-        "binance-live-sdk-readonly": {
+        "alpaca-paper-sdk": {
             "positions": [
-                {"symbol": "BTC", "quantity": 0.1, "free": 0.1, "used": 0},
-                {"symbol": "USDT", "quantity": 50, "free": 50, "used": 0},
+                {
+                    "symbol": "BTC",
+                    "quantity": 0.1,
+                    "market_price": 60000,
+                    "asset_type": "crypto",
+                    "free": 0.1,
+                    "used": 0,
+                },
+                {
+                    "symbol": "USDT",
+                    "quantity": 50,
+                    "market_price": 1,
+                    "asset_type": "stablecoin",
+                    "free": 50,
+                    "used": 0,
+                },
             ]
         },
     }
@@ -78,7 +92,7 @@ def test_refresh_aggregates_three_readonly_connectors(tmp_path):
         return positions[profile_id]
 
     def get_quote(symbol, profile_id, **kwargs):
-        prices = {"AAPL": 150, "700.HK": 390, "BTC/USDT": 60000}
+        prices = {"AAPL": 150, "700.HK": 390}
         return {"quote": {"last": prices[symbol]}}
 
     service = PortfolioService(
@@ -119,7 +133,7 @@ def test_latest_enriches_legacy_snapshot_with_current_compatibility(tmp_path):
             "complete": True,
             "totals": {"usd": 0, "cny": 0},
             "accounts": [
-                {"source_id": source, "broker": source, "status": "ok"} for source in ("ibkr", "longbridge", "binance")
+                {"source_id": source, "broker": source, "status": "ok"} for source in ("ibkr", "longbridge", "alpaca")
             ],
             "positions": [],
             "warnings": [],
@@ -129,7 +143,7 @@ def test_latest_enriches_legacy_snapshot_with_current_compatibility(tmp_path):
     latest = PortfolioService(store, settings_store=settings).latest()
 
     assert latest is not None
-    assert {row["portfolio_compatibility"]["level"] for row in latest["accounts"]} == {"native"}
+    assert {row["portfolio_compatibility"]["level"] for row in latest["accounts"]} == {"native", "contract_tested"}
 
 
 def test_partial_refresh_is_saved_and_marked_incomplete(tmp_path):
@@ -182,7 +196,7 @@ def test_a_positions_read_without_a_positions_list_is_an_error_not_an_empty_sour
     assert statuses["ibkr"] == "error"
     assert {broker: status for broker, status in statuses.items() if broker != "ibkr"} == {
         "longbridge": "ok",
-        "binance": "ok",
+        "alpaca": "ok",
     }
     ibkr = next(row for row in snapshot["accounts"] if row["broker"] == "ibkr")
     assert "must contain a list" in ibkr["error"]
@@ -461,7 +475,7 @@ def test_analysis_context_supplies_risk_xray_arguments(tmp_path):
     accounts = {
         "ibkr-live-local-readonly": {"summary": [{"tag": "NetLiquidation", "value": "300", "currency": "USD"}]},
         "longbridge-live-sdk-readonly": {"balances": [{"net_assets": "3900", "currency": "HKD"}]},
-        "binance-live-sdk-readonly": {"balances": []},
+        "alpaca-paper-sdk": {"balances": []},
     }
     positions = {
         "ibkr-live-local-readonly": {
@@ -479,19 +493,33 @@ def test_analysis_context_supplies_risk_xray_arguments(tmp_path):
         "longbridge-live-sdk-readonly": {
             "positions": [
                 {
-                    "symbol": "700.HK",
-                    "symbol_name": "Tencent",
+                    "symbol": "MSFT",
+                    "symbol_name": "Microsoft",
                     "quantity": 10,
-                    "cost_price": 300,
-                    "currency": "HKD",
-                    "market": "HK",
+                    "cost_price": 50,
+                    "currency": "USD",
+                    "market": "US",
                 }
             ]
         },
-        "binance-live-sdk-readonly": {
+        "alpaca-paper-sdk": {
             "positions": [
-                {"symbol": "BTC", "quantity": 0.1, "free": 0.1, "used": 0},
-                {"symbol": "USDT", "quantity": 50, "free": 50, "used": 0},
+                {
+                    "symbol": "BTC",
+                    "quantity": 0.1,
+                    "market_price": 60000,
+                    "asset_type": "crypto",
+                    "free": 0.1,
+                    "used": 0,
+                },
+                {
+                    "symbol": "USDT",
+                    "quantity": 50,
+                    "market_price": 1,
+                    "asset_type": "stablecoin",
+                    "free": 50,
+                    "used": 0,
+                },
             ]
         },
     }
@@ -502,7 +530,7 @@ def test_analysis_context_supplies_risk_xray_arguments(tmp_path):
         get_account=lambda profile_id: accounts[profile_id],
         get_positions=lambda profile_id: positions[profile_id],
         get_quote=lambda symbol, profile_id, **kwargs: {
-            "quote": {"last": {"AAPL": 150, "700.HK": 390, "BTC/USDT": 60000}[symbol]}
+            "quote": {"last": {"AAPL": 150, "MSFT": 50}[symbol]}
         },
         fx_fetcher=lambda: (
             Decimal("7.2"),
@@ -515,9 +543,9 @@ def test_analysis_context_supplies_risk_xray_arguments(tmp_path):
 
     # Symbols carry the market suffix the risk x-ray's loaders route on: a bare
     # "AAPL" is read as an A-share code by src.market_data.detect_source.
-    assert args["symbols"] == ["700.HK", "AAPL.US"]
+    assert args["symbols"] == ["MSFT.US", "AAPL.US"]
     assert set(args["weights"]) == set(args["symbols"])
-    assert args["weights"]["700.HK"] == pytest.approx(0.625)
+    assert args["weights"]["MSFT.US"] == pytest.approx(0.625)
     assert args["weights"]["AAPL.US"] == pytest.approx(0.375)
     assert sum(args["weights"].values()) == pytest.approx(1.0)
     # Crypto and stablecoins are not priced by the daily-bar loaders.
@@ -602,64 +630,6 @@ def test_generic_readonly_profile_uses_common_account_and_position_fields(tmp_pa
     assert account["cash_usd"] == 0.0
     assert position["source_label"] == "Main stocks"
     assert position["market_value_usd"] == 800.0
-
-
-def test_okx_spot_balances_flow_through_the_generic_portfolio_contract(tmp_path):
-    settings = PortfolioSettingsStore(tmp_path / "portfolio.json")
-    settings.connection_store.ensure(
-        "okx-spot",
-        "okx-live-sdk-readonly",
-        "OKX Spot",
-    )
-    settings.save(
-        {
-            "display_currency": "USD",
-            "sources": [
-                {
-                    "connection_id": "okx-spot",
-                    "label": "OKX Spot",
-                    "enabled": True,
-                    "order": 0,
-                    "include_cash": True,
-                }
-            ],
-        }
-    )
-    quoted = []
-
-    def get_quote(symbol, profile_id, **kwargs):
-        quoted.append((symbol, profile_id))
-        return {"quote": {"last": "40000"}}
-
-    service = PortfolioService(
-        PortfolioStore(tmp_path / "portfolio.sqlite3"),
-        settings_store=settings,
-        get_account=lambda profile_id: {
-            "account": {
-                "total_equity": "60250",
-                "details": [
-                    {"currency": "BTC", "equity": "1.5", "available": "1.5"},
-                    {"currency": "USDT", "equity": "250", "available": "250"},
-                ],
-            }
-        },
-        get_positions=lambda profile_id: {"positions": []},
-        get_quote=get_quote,
-        fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
-            "2026-08-25T00:00:00+00:00",
-        ),
-    )
-
-    snapshot = service.refresh()
-
-    assert snapshot["complete"] is True
-    assert snapshot["totals"]["usd"] == 60250.0
-    assert [row["symbol"] for row in snapshot["positions"]] == ["BTC", "USDT"]
-    assert quoted == [("BTC-USDT", "okx-live-sdk-readonly")]
-    assert snapshot["accounts"][0]["portfolio_compatibility"]["level"] == ("contract_tested")
-    assert any("okx" in warning.lower() for warning in snapshot["warnings"])
 
 
 def test_auth_metadata_describes_the_profile_without_claiming_key_permissions():

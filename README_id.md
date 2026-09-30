@@ -746,24 +746,18 @@ run from a clone (`pip install -e .`).
 </details>
 
 <details>
-<summary><b>Broker Connectors</b> <sub>18 broker — read + paper, bounded-live bila didukung</sub></summary>
+<summary><b>Broker Connectors</b> <sub>6 broker — read + paper, bounded-live bila didukung</sub></summary>
 
 Profil berorientasi connector. Sebagian besar mendukung read + penempatan order akun paper — IBKR read-only, Robinhood live-only (tanpa akun paper), Scalable Capital read-only (tidak memiliki akun paper sama sekali), sedangkan Trading 212 dan Toss Securities menolak penempatan order sepenuhnya, termasuk paper; penempatan order live dibatasi oleh mandat yang ditentukan pengguna (allowlist simbol, batas ukuran order / eksposur, batas trade harian, dan penghentian darurat) serta tidak pernah menyimpan dana — broker yang mengeksekusi. Tool penempatan order tetap nonaktif di MCP (hanya agent + CLI). Jalur riset / backtest secara struktural tidak dapat mengakses endpoint live.
 
-| Broker | Market | Kapabilitas |
+| Broker | Markets | Capabilities |
 |--------|---------|--------------|
-| **IBKR** | global | local TWS / Gateway, read-only |
+| **IBKR** | US / Canada | local TWS / Gateway, read-only |
 | **Robinhood** | US | Agentic MCP (desktop OAuth) — read + bounded live |
-| **Scalable Capital** | DE / EU | Agentic MCP (desktop OAuth) — fully read-only; no paper account exists |
-| **Tiger** | US / HK / A | read + paper + bounded live |
+| **Tiger** | US | read + paper + bounded live |
 | **Alpaca** | US | read + paper + bounded live (+ TAP credential-isolation mode) |
-| **OKX** · **Binance** | crypto | read + paper + bounded live |
-| **Futu** | HK / US / A | read + paper + bounded live |
-| **eToro** | global | read + paper + bounded live (Public API; demo keys reach only `/demo` paths, plus copy-trading workflows) |
-| **MetaTrader 5** | forex / CFD | read + paper + bounded live (Exness-style; demo ⇔ paper identity guard) |
-| **KIS** (한국투자증권) | Korea (KOSPI/KOSDAQ) | read + genuine paper (모의투자, a real broker-side sandbox on a separate host) — live order placement not yet wired for this market |
-| **Longbridge** · **Dhan** · **Shoonya** · **Zerodha** · **Upbit** | US / HK · India (NSE/BSE) · Korea (crypto) | read + paper only — no runtime paper/live discriminator, so live order placement is hard-refused |
-| **Trading 212** · **Toss Securities** | UK / EU · Korea/US | fully read-only — `place_order` / `cancel_order` hard-refuse even paper (no verified sandbox) |
+| **Futu** | US | read + paper + bounded live |
+| **Longbridge** | US | read + paper only — no runtime paper/live discriminator, so live order placement is hard-refused |
 
 Pemisahan paper-vs-live adalah **guard runtime struktural per broker** (format account-id, pemisahan host, demo flag, atau trade environment), bukan config flag yang dapat diubah agent. Broker yang tidak menyediakan discriminator tersebut dibatasi pada paper + read-only.
 

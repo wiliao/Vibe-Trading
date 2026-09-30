@@ -26,7 +26,6 @@ from src.portfolio.compatibility import (
 )
 from src.portfolio.fx import Rates, build_rates, from_usd
 from src.portfolio.normalization import (
-    STABLECOINS,
     account_cash_usd,
     account_total_usd,
     auth_metadata,
@@ -39,14 +38,14 @@ from src.trading.profiles import profile_by_id
 from src.trading.types import TradingProfile
 
 # ``portfolio_risk_xray`` caps a basket at 50 symbols, and its loaders route on
-# the market suffix: ``AAPL`` alone is read as an A-share code, ``AAPL.US`` is
-# not (see ``src.market_data._SOURCE_PATTERNS``).
+# the market suffix: a bare ticker carries no venue signal, ``AAPL.US`` does
+# (see ``src.market_data._SOURCE_PATTERNS``).
 _RISK_XRAY_MAX_SYMBOLS = 50
 # Version 3 makes all valuation use an explicit FX rates map. Existing v2
 # snapshots/history are intentionally hidden after upgrade, including
 # USD/HKD/CNY snapshots whose numeric values would otherwise remain valid.
 PORTFOLIO_VALUATION_VERSION = 3
-_LOADER_MARKET_SUFFIXES = frozenset({"US", "HK", "SZ", "SH", "BJ", "KS", "KQ", "NS", "BO", "TO", "V"})
+_LOADER_MARKET_SUFFIXES = frozenset({"US", "TO", "V"})
 _NON_EQUITY_ASSET_TYPES = frozenset({"crypto", "stablecoin", "cash"})
 
 
@@ -302,8 +301,6 @@ class PortfolioService:
                     rates,
                     priced_total,
                 )
-                if broker == "binance":
-                    account_total = priced_total
                 cash_total = min(
                     account_total,
                     account_cash_usd(broker, result["account"], rates),
@@ -885,11 +882,7 @@ class PortfolioService:
             if quantity == 0:
                 continue
             try:
-                if broker in {"binance", "okx"} and normalized["symbol"] in STABLECOINS:
-                    normalized["market_price"] = 1.0
-                    normalized["price_currency"] = "USD"
-                    normalized["pricing_basis"] = "USDT/USD proxy"
-                elif _decimal(normalized.get("market_price")) > 0:
+                if _decimal(normalized.get("market_price")) > 0:
                     normalized["price_currency"] = normalized["currency"]
                     normalized["pricing_basis"] = f"{broker} position snapshot"
                 elif broker == "longbridge" and longbridge_prices is not None:
@@ -1053,9 +1046,4 @@ class PortfolioService:
                 "Experimental portfolio connectors require broker-specific "
                 "verification: " + ", ".join(experimental) + "."
             )
-        crypto_proxies = sorted(
-            {str(row.get("broker")) for row in positions if row.get("broker") in {"binance", "okx"}}
-        )
-        if crypto_proxies:
-            warnings.append(", ".join(crypto_proxies) + " spot balances are valued with USDT treated as 1 USD.")
         return warnings

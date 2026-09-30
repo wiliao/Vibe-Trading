@@ -77,7 +77,7 @@ class FutuConfig:
         port: OpenD socket port (default 11111).
         profile: ``paper``, ``live-readonly`` or ``live``.
         security_firm: Futu security firm, e.g. ``FUTUSECURITIES``.
-        filter_trdmarket: Trade market filter for the trade context, e.g. ``HK``.
+        filter_trdmarket: Trade market filter for the trade context (``US``).
         acc_id: Account id; ``0`` means resolve by ``trd_env``.
         timeout: Network/connect timeout in seconds.
         readonly: Always true for this layer; order methods are not exposed.
@@ -87,7 +87,7 @@ class FutuConfig:
     port: int = DEFAULT_PORT
     profile: str = "paper"
     security_firm: str = "FUTUSECURITIES"
-    filter_trdmarket: str = "HK"
+    filter_trdmarket: str = "US"
     acc_id: int = 0
     timeout: float = 15.0
     readonly: bool = True
@@ -114,7 +114,7 @@ class FutuConfig:
             port=int(payload.get("port") or DEFAULT_PORT),
             profile=profile,
             security_firm=str(payload.get("security_firm") or "FUTUSECURITIES").strip().upper(),
-            filter_trdmarket=str(payload.get("filter_trdmarket") or "HK").strip().upper(),
+            filter_trdmarket=str(payload.get("filter_trdmarket") or "US").strip().upper(),
             acc_id=int(payload.get("acc_id") or 0),
             timeout=float(payload.get("timeout") or 15.0),
             readonly=bool(payload.get("readonly", True)),
@@ -708,7 +708,7 @@ def get_earnings_calendar(
     """Fetch upcoming earnings-release dates and EPS / revenue consensus.
 
     Args:
-        market: ``US`` / ``HK``.
+        market: ``US``.
         begin_date: Start ``YYYY-MM-DD``. Defaults to today.
         end_date: End ``YYYY-MM-DD``. Defaults to begin_date + 30 days.
         config: Effective connector config; loaded from disk when omitted.
@@ -722,7 +722,7 @@ def get_earnings_calendar(
     quote_ctx = _quote_ctx(cfg)
     try:
         futu = _require_futu()
-        market_attr = "US" if market.upper() == "US" else "HK"
+        market_attr = "US"
         m = getattr(futu.Market, market_attr)
         ret_tuple = quote_ctx.get_earnings_calendar(
             market=m,
@@ -1031,7 +1031,7 @@ def _trade_ctx(cfg: FutuConfig):
     """Open an ``OpenSecTradeContext`` against the local OpenD gateway."""
     _assert_gateway(cfg)
     futu = _require_futu()
-    trd_market = getattr(futu.TrdMarket, cfg.filter_trdmarket, getattr(futu.TrdMarket, "HK"))
+    trd_market = getattr(futu.TrdMarket, cfg.filter_trdmarket, getattr(futu.TrdMarket, "US"))
     security_firm = getattr(futu.SecurityFirm, cfg.security_firm, getattr(futu.SecurityFirm, "FUTUSECURITIES"))
     try:
         return futu.OpenSecTradeContext(

@@ -10,8 +10,8 @@ have dedicated branches:
 * ``longbridge`` — the account is a per-currency ``balances`` list, and
   positions are market-suffixed symbols with a ``symbol_name``.
 
-Inside the generic path, ``binance`` and ``okx`` additionally classify holdings
-as crypto/stablecoin and quote against USDT. Everything else falls through
+Inside the generic path a row may still declare its own ``asset_type``
+(crypto / stablecoin) and ``quote_symbol``; anything undeclared falls through
 unchanged, so adding a connector needs no edit to this module.
 """
 
@@ -102,7 +102,7 @@ def normalize_position(broker: str, row: dict[str, Any]) -> dict[str, Any]:
         }
 
     symbol = str(row.get("symbol") or row.get("code") or row.get("ticker") or "").upper()
-    source = str(row.get("source") or ("spot" if broker == "binance" else "account"))
+    source = str(row.get("source") or "account")
     market = str(row.get("market") or row.get("exchange") or broker).upper()
     currency = str(row.get("currency") or "").upper()
     if not currency:
@@ -154,7 +154,7 @@ def normalize_position(broker: str, row: dict[str, Any]) -> dict[str, Any]:
         market_price = abs(_decimal(source_market_value) / quantity)
     sec_type = str(row.get("sec_type") or "").upper()
     declared_asset_type = str(row.get("asset_type") or "").strip().lower()
-    crypto = broker in {"binance", "okx"} or declared_asset_type in {
+    crypto = declared_asset_type in {
         "crypto",
         "stablecoin",
     }
@@ -164,7 +164,7 @@ def normalize_position(broker: str, row: dict[str, Any]) -> dict[str, Any]:
     return {
         "broker": broker,
         "symbol": symbol,
-        "quote_symbol": str(row.get("quote_symbol") or (f"{symbol}/USDT" if broker == "binance" else symbol)),
+        "quote_symbol": str(row.get("quote_symbol") or symbol),
         "name": str(
             row.get("name")
             or row.get("symbol_name")

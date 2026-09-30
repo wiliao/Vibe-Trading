@@ -24,18 +24,18 @@ def test_connector_setup_parser_exposes_a_safe_local_onboarding_command():
         [
             "connector",
             "setup",
-            "okx-live-sdk-readonly",
+            "longbridge-live-sdk-readonly",
             "--connection-id",
-            "main-okx",
+            "main-longbridge",
             "--label",
-            "Main OKX",
+            "Main Longbridge",
             "--skip-check",
         ]
     )
 
     assert args.connector_command == "setup"
-    assert args.connection_id == "main-okx"
-    assert args.label == "Main OKX"
+    assert args.connection_id == "main-longbridge"
+    assert args.label == "Main Longbridge"
     assert args.skip_check is True
 
 
@@ -49,22 +49,22 @@ def test_connector_setup_prompts_locally_and_never_writes_secrets_to_registry(
     store = ConnectionStore(tmp_path / "connections.json", credential_store=credentials)
     monkeypatch.setattr(connections, "ConnectionStore", lambda: store)
     monkeypatch.setattr(service, "check_connection", lambda *args, **kwargs: {"status": "ok"})
-    answers = iter(("key-value", "secret-value", "passphrase-value"))
+    answers = iter(("key-value", "secret-value", "token-value"))
     monkeypatch.setattr(_legacy.Prompt, "ask", lambda *args, **kwargs: next(answers))
 
     result = _legacy.cmd_connector_setup(
-        "okx-live-sdk-readonly",
-        connection_id="main-okx",
-        label="Main OKX",
+        "longbridge-live-sdk-readonly",
+        connection_id="main-longbridge",
+        label="Main Longbridge",
     )
 
     assert result == _legacy.EXIT_SUCCESS
-    assert credentials.load("main-okx", ("api_key", "api_secret", "passphrase")) == {
-        "api_key": "key-value",
-        "api_secret": "secret-value",
-        "passphrase": "passphrase-value",
+    assert credentials.load("main-longbridge", ("app_key", "app_secret", "access_token")) == {
+        "app_key": "key-value",
+        "app_secret": "secret-value",
+        "access_token": "token-value",
     }
     registry = (tmp_path / "connections.json").read_text(encoding="utf-8")
     assert "key-value" not in registry
     assert "secret-value" not in registry
-    assert "passphrase-value" not in registry
+    assert "token-value" not in registry

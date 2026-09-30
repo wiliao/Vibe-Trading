@@ -51,22 +51,12 @@ _CONNECTOR_COMPATIBILITY: dict[str, PortfolioCompatibility] = {
         "stocks_etfs",
         "Dedicated Longbridge mapping and quote fallback.",
     ),
-    "binance": PortfolioCompatibility("native", 1, "spot", "Dedicated spot and Simple Earn balance handling."),
     "alpaca": PortfolioCompatibility(
         "contract_tested",
         1,
         "stocks_etfs",
         "Canonical USD account and position payloads are covered by contract tests.",
     ),
-    "okx": PortfolioCompatibility(
-        "contract_tested",
-        1,
-        "spot_and_positions",
-        "Spot balances are adapted alongside open OKX positions.",
-    ),
-    "dhan": PortfolioCompatibility("experimental", 1, "positions", "INR valuation is not supported yet."),
-    "shoonya": PortfolioCompatibility("experimental", 1, "positions", "INR valuation is not supported yet."),
-    "zerodha": PortfolioCompatibility("experimental", 1, "positions", "INR valuation is not supported yet."),
     "futu": PortfolioCompatibility(
         "experimental",
         1,
@@ -79,36 +69,12 @@ _CONNECTOR_COMPATIBILITY: dict[str, PortfolioCompatibility] = {
         "stocks_etfs",
         "Multi-market account totals still require live verification.",
     ),
-    "trading212": PortfolioCompatibility(
-        "experimental",
-        1,
-        "stocks_etfs",
-        "Position aliases are supported; cash totals still require verification.",
-    ),
-    "mt5": PortfolioCompatibility(
-        "experimental",
-        1,
-        "open_positions",
-        "Contract-size and non-USD account valuation require verification.",
-    ),
-    "etoro": PortfolioCompatibility(
-        "experimental",
-        1,
-        "open_positions",
-        "Account totals and instrument quote resolution require verification.",
-    ),
-    "toss": PortfolioCompatibility("experimental", 1, "positions", "KRW valuation is not supported yet."),
     "robinhood": PortfolioCompatibility(
         "experimental",
         1,
         "stocks_etfs",
         "Equity positions for one selected account, unpriced until the quote reply is mapped.",
     ),
-    # No "scalable" entry: its profile does not declare account.read /
-    # positions.read, so it is not a portfolio-eligible connection. The
-    # holdings reply shape is unverified (no published tool argument schemas),
-    # so a portfolio read could not be mapped; add the entry with the
-    # normalisation once a live tools/list settles the shape (#1367).
 }
 
 _EXPERIMENTAL_DEFAULT = PortfolioCompatibility(
@@ -157,9 +123,6 @@ def adapt_and_validate_payloads(
     if not isinstance(raw_rows, list):
         raise PortfolioContractError("positions payload must contain a list")
     rows = [dict(row) if isinstance(row, dict) else row for row in raw_rows]
-
-    if connector == "okx":
-        rows.extend(_okx_spot_rows(account, rows))
 
     default_currency = _account_currency(account)
     validated: list[dict[str, Any]] = []
@@ -258,36 +221,6 @@ def _account_currency(payload: dict[str, Any]) -> str | None:
         if currency:
             return str(currency).upper()
     return None
-
-
-def _okx_spot_rows(account_payload: dict[str, Any], existing_rows: list[object]) -> list[dict[str, Any]]:
-    account = account_payload.get("account")
-    details = account.get("details", []) if isinstance(account, dict) else []
-    if not isinstance(details, list):
-        return []
-    existing_symbols = {str(row.get("symbol") or "").upper() for row in existing_rows if isinstance(row, dict)}
-    result = []
-    stablecoins = {"USDT", "USDC", "FDUSD", "TUSD", "BUSD"}
-    for detail in details:
-        if not isinstance(detail, dict):
-            continue
-        symbol = str(detail.get("currency") or "").strip().upper()
-        quantity = _decimal(detail.get("equity"))
-        if not symbol or quantity <= 0 or symbol in existing_symbols:
-            continue
-        result.append(
-            {
-                "symbol": symbol,
-                "quantity": str(quantity),
-                "currency": "USD",
-                "quote_symbol": symbol if symbol in stablecoins else f"{symbol}-USDT",
-                "asset_type": "stablecoin" if symbol in stablecoins else "crypto",
-                "free": detail.get("available"),
-                "used": detail.get("frozen"),
-                "source": "spot",
-            }
-        )
-    return result
 
 
 def _decimal(value: Any) -> Decimal:

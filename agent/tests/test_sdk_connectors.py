@@ -1,4 +1,4 @@
-"""Tests for the direct-SDK trading connectors (Tiger, Longbridge).
+"""Tests for the direct-SDK trading connectors (Tiger, Longbridge, Alpaca, Futu).
 
 Layer A is read-only; these tests exercise the parts that do not require the
 optional broker SDKs or live credentials: profile registration, the paper/live
@@ -18,20 +18,10 @@ from src.trading.connectors.longbridge import credentials as lb_credentials
 from src.trading import profiles, service
 from src.trading.connectors.alpaca import sdk as al
 from src.trading.connectors.alpaca.classification import ALPACA_TOOL_CLASS
-from src.trading.connectors.binance import sdk as bn
-from src.trading.connectors.binance.classification import BINANCE_TOOL_CLASS
-from src.trading.connectors.mt5 import sdk as mt5
-from src.trading.connectors.dhan import sdk as dh
-from src.trading.connectors.dhan.classification import DHAN_TOOL_CLASS
 from src.trading.connectors.futu import sdk as ft
 from src.trading.connectors.futu.classification import FUTU_TOOL_CLASS
 from src.trading.connectors.longbridge import sdk as lb
 from src.trading.connectors.longbridge.classification import LONGBRIDGE_TOOL_CLASS
-from src.trading.connectors.okx import sdk as ox
-from src.trading.connectors.okx.classification import OKX_TOOL_CLASS
-from src.trading.connectors.shoonya import sdk as sh
-from src.trading.connectors.shoonya.classification import SHOONYA_TOOL_CLASS
-from src.trading.connectors.etoro import client as etoro_client
 from src.trading.connectors.tiger import sdk as tg
 from src.trading.connectors.tiger.classification import TIGER_TOOL_CLASS
 
@@ -50,25 +40,16 @@ def test_sdk_profiles_registered() -> None:
         "tiger-paper-sdk", "tiger-live-sdk-readonly",
         "longbridge-paper-sdk", "longbridge-live-sdk-readonly",
         "alpaca-paper-sdk", "alpaca-live-sdk-readonly",
-        "okx-paper-sdk", "okx-live-sdk-readonly",
-        "binance-paper-sdk", "binance-live-sdk-readonly",
         "futu-paper-sdk", "futu-live-sdk-readonly",
-        "dhan-paper-sdk", "dhan-live-sdk-readonly",
-        "shoonya-paper-sdk", "shoonya-live-sdk-readonly",
-        "etoro-paper-sdk", "etoro-paper-trade",
-        "etoro-live-sdk-readonly", "etoro-live-trade",
-        "kis-paper-sdk", "kis-paper-trade", "kis-live-sdk-readonly",
-        "upbit-paper-sdk", "upbit-paper-trade", "upbit-live-sdk-readonly",
-        "toss-live-sdk-readonly",
     } <= ids
 
 
 def test_no_discriminator_brokers_expose_no_live_trade_profile() -> None:
-    """Brokers without a runtime paper/live discriminator (Longbridge, Dhan,
-    Shoonya) must NOT register any live order-placing profile — the Longbridge
-    precedent. A ``*-live-trade`` profile here would be a red-line regression."""
+    """Brokers without a runtime paper/live discriminator (Longbridge) must NOT
+    register any live order-placing profile — the Longbridge precedent. A
+    ``*-live-trade`` profile here would be a red-line regression."""
     ids = {p.id for p in profiles.list_profiles()}
-    for broker in ("longbridge", "dhan", "shoonya", "upbit"):
+    for broker in ("longbridge",):
         assert f"{broker}-live-trade" not in ids
         # No live profile for these brokers may advertise an order capability.
         for p in profiles.list_profiles():
@@ -85,18 +66,8 @@ def test_no_discriminator_brokers_expose_no_live_trade_profile() -> None:
         ("longbridge-live-sdk-readonly", "longbridge", "live"),
         ("alpaca-paper-sdk", "alpaca", "paper"),
         ("alpaca-live-sdk-readonly", "alpaca", "live"),
-        ("okx-paper-sdk", "okx", "paper"),
-        ("okx-live-sdk-readonly", "okx", "live"),
-        ("binance-paper-sdk", "binance", "paper"),
-        ("binance-live-sdk-readonly", "binance", "live"),
         ("futu-paper-sdk", "futu", "paper"),
         ("futu-live-sdk-readonly", "futu", "live"),
-        ("dhan-paper-sdk", "dhan", "paper"),
-        ("dhan-live-sdk-readonly", "dhan", "live"),
-        ("shoonya-paper-sdk", "shoonya", "paper"),
-        ("shoonya-live-sdk-readonly", "shoonya", "live"),
-        ("etoro-paper-sdk", "etoro", "paper"),
-        ("etoro-live-sdk-readonly", "etoro", "live"),
     ],
 )
 def test_sdk_profiles_are_readonly_broker_sdk(profile_id, connector, environment) -> None:
@@ -391,17 +362,6 @@ def test_service_check_connection_unconfigured_longbridge(monkeypatch, tmp_path)
     assert result["transport"] == "broker_sdk"
 
 
-def test_service_check_connection_unconfigured_etoro(monkeypatch, tmp_path) -> None:
-    for env_name in ("ETORO_API_KEY", "ETORO_USER_KEY"):
-        monkeypatch.delenv(env_name, raising=False)
-    monkeypatch.setattr(etoro_client, "get_runtime_root", lambda: tmp_path)
-    result = service.check_connection("etoro-paper-sdk")
-    assert result["status"] == "error"
-    assert "not configured" in result["error"]
-    assert result["connector"] == "etoro"
-    assert result["transport"] == "broker_sdk"
-
-
 # --------------------------------------------------------------------------- #
 # Alpaca
 # --------------------------------------------------------------------------- #
@@ -442,219 +402,6 @@ def test_alpaca_service_unconfigured(monkeypatch, tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# OKX
-# --------------------------------------------------------------------------- #
-
-
-def test_okx_flag_mapping() -> None:
-    assert ox.OKXConfig(profile="paper").flag == "1"
-    assert ox.OKXConfig(profile="live-readonly").flag == "0"
-    assert ox.OKXConfig(profile="live").flag == "0"
-
-
-def test_okx_redacts_secrets() -> None:
-    cfg = ox.OKXConfig(api_key="KEYFOURXX", api_secret="sec", passphrase="pass")
-    pub = ox._public_config(cfg)
-    assert pub["api_secret"] == "***redacted***"
-    assert pub["passphrase"] == "***redacted***"
-    assert "sec" not in str(pub) or pub["api_secret"] == "***redacted***"
-
-
-def test_okx_classification() -> None:
-    assert OKX_TOOL_CLASS["place_order"] is ToolClass.WRITE
-    assert OKX_TOOL_CLASS["cancel_order"] is ToolClass.WRITE
-    assert OKX_TOOL_CLASS["get_account_balance"] is ToolClass.READ
-
-
-def test_okx_service_unconfigured(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(ox, "get_runtime_root", lambda: tmp_path)
-    result = service.check_connection("okx-paper-sdk")
-    assert result["status"] == "error"
-    assert result["connector"] == "okx"
-
-
-# --------------------------------------------------------------------------- #
-# Binance
-# --------------------------------------------------------------------------- #
-
-
-def test_binance_testnet_host_mapping() -> None:
-    assert bn.BinanceConfig(profile="paper").is_testnet is True
-    assert "testnet" in bn.BinanceConfig(profile="paper").host
-    assert bn.BinanceConfig(profile="live-readonly").is_testnet is False
-    assert bn.BinanceConfig(profile="live-readonly").host == "https://api.binance.com"
-
-
-def test_binance_classification() -> None:
-    assert BINANCE_TOOL_CLASS["create_order"] is ToolClass.WRITE
-    assert BINANCE_TOOL_CLASS["cancel_order"] is ToolClass.WRITE
-    assert BINANCE_TOOL_CLASS["fetch_balance"] is ToolClass.READ
-    assert BINANCE_TOOL_CLASS["load_markets"] is ToolClass.READ
-
-
-def test_binance_search_instruments_resolves_exact_active_spot_pair(monkeypatch) -> None:
-    class FakeExchange:
-        def load_markets(self):
-            return {
-                "ETH/USDT": {
-                    "id": "ETHUSDT",
-                    "symbol": "ETH/USDT",
-                    "spot": True,
-                    "active": True,
-                },
-                "ETH/USDT:USDT": {
-                    "id": "ETHUSDT",
-                    "symbol": "ETH/USDT:USDT",
-                    "spot": False,
-                    "active": True,
-                },
-                "BTC/USDT": {
-                    "id": "BTCUSDT",
-                    "symbol": "BTC/USDT",
-                    "spot": True,
-                    "active": True,
-                },
-            }
-
-    monkeypatch.setattr(bn, "_exchange", lambda _cfg: FakeExchange())
-
-    result = bn.search_instruments(
-        "ETHUSDT",
-        config=bn.BinanceConfig(profile="paper"),
-    )
-
-    assert result == {
-        "status": "ok",
-        "query": "ETHUSDT",
-        "instruments": [
-            {
-                "symbol": "ETH-USDT",
-                "native_symbol": "ETH/USDT",
-                "exchange_symbol": "ETHUSDT",
-                "base": "ETH",
-                "quote": "USDT",
-                "market": "crypto",
-                "type": "cryptocurrency",
-                "exchange": "BINANCE",
-                "active": True,
-            }
-        ],
-    }
-
-
-def test_binance_search_instruments_does_not_guess_prose(monkeypatch) -> None:
-    def _unexpected_exchange(_cfg):
-        raise AssertionError("prose lookup must not load the Binance market catalog")
-
-    monkeypatch.setattr(bn, "_exchange", _unexpected_exchange)
-
-    result = bn.search_instruments(
-        "Ethereum",
-        config=bn.BinanceConfig(profile="paper"),
-    )
-
-    assert result == {"status": "ok", "query": "Ethereum", "instruments": []}
-
-
-def test_service_routes_instrument_search_to_selected_binance_profile(monkeypatch) -> None:
-    captured = {}
-
-    def _search(query, *, config, limit):
-        captured.update(query=query, profile=config.profile, limit=limit)
-        return {"status": "ok", "instruments": [{"symbol": "ETH-USDT"}]}
-
-    monkeypatch.setattr(bn, "search_instruments", _search)
-
-    result = service.search_instruments(
-        "ETH-USDT",
-        "binance-paper-trade",
-        limit=3,
-    )
-
-    assert captured == {"query": "ETH-USDT", "profile": "paper", "limit": 3}
-    assert result["profile_id"] == "binance-paper-trade"
-    assert result["connector"] == "binance"
-
-
-def test_service_routes_instrument_search_to_selected_mt5_profile(monkeypatch) -> None:
-    captured = {}
-
-    def _build_config(profile_config, overrides):
-        return SimpleNamespace(profile=profile_config["profile"])
-
-    def _search(query, *, config, limit):
-        captured.update(query=query, profile=config.profile, limit=limit)
-        return {"status": "ok", "instruments": [{"symbol": "XAUUSDm"}]}
-
-    monkeypatch.setattr(mt5, "build_config", _build_config)
-    monkeypatch.setattr(mt5, "search_instruments", _search)
-
-    result = service.search_instruments("XAUUSD", "mt5-paper-sdk", limit=3)
-
-    assert captured == {"query": "XAUUSD", "profile": "paper", "limit": 3}
-    assert result["profile_id"] == "mt5-paper-sdk"
-    assert result["connector"] == "mt5"
-
-
-def test_binance_service_unconfigured(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(bn, "get_runtime_root", lambda: tmp_path)
-    result = service.check_connection("binance-paper-sdk")
-    assert result["status"] == "error"
-    assert result["connector"] == "binance"
-
-
-def test_binance_positions_replace_ld_wrappers_with_simple_earn(monkeypatch) -> None:
-    class FakeExchange:
-        def fetch_balance(self):
-            return {
-                "USDT": {"free": 12, "used": 0, "total": 12},
-                "LDBTC": {"free": 0, "used": 0.9, "total": 0.9},
-            }
-
-        def sapi_get_simple_earn_flexible_position(self, params):
-            assert params == {"size": 100}
-            return {"rows": [{"asset": "BTC", "totalAmount": "1.0"}]}
-
-    monkeypatch.setattr(bn, "_exchange", lambda _cfg: FakeExchange())
-    result = bn.get_positions(
-        bn.BinanceConfig(api_key="key", api_secret="secret", profile="live-readonly")
-    )
-
-    assert result["positions"] == [
-        {"symbol": "USDT", "quantity": 12.0, "free": 12.0, "used": 0.0, "source": "spot"},
-        {
-            "symbol": "BTC",
-            "quantity": 1.0,
-            "free": 0.0,
-            "used": 1.0,
-            "source": "simple_earn_flexible",
-        },
-    ]
-
-
-def test_binance_exchange_adjusts_for_server_time(monkeypatch) -> None:
-    captured = {}
-
-    class FakeExchange:
-        def __init__(self, config):
-            captured.update(config)
-
-        def set_sandbox_mode(self, enabled):
-            captured["sandbox"] = enabled
-
-    monkeypatch.setattr(bn, "_require_ccxt", lambda: SimpleNamespace(binance=FakeExchange))
-    monkeypatch.setattr(bn, "getproxies", lambda: {})
-
-    bn._exchange(bn.BinanceConfig(api_key="key", api_secret="secret", profile="live-readonly"))
-
-    assert captured["options"] == {
-        "adjustForTimeDifference": True,
-        "recvWindow": 10_000,
-    }
-    assert captured["sandbox"] is False
-
-
-# --------------------------------------------------------------------------- #
 # Futu (local OpenD gateway)
 # --------------------------------------------------------------------------- #
 
@@ -680,33 +427,6 @@ def test_futu_service_unconfigured_gateway_down(monkeypatch, tmp_path) -> None:
     assert result["transport"] == "broker_sdk"
 
 
-def test_binance_redacts_secrets() -> None:
-    cfg = bn.BinanceConfig(api_key="ABCD1234", api_secret="topsecret")
-    pub = bn._public_config(cfg)
-    assert pub["api_secret"] == "***redacted***"
-    assert "topsecret" not in str(pub)
-    assert pub["api_key"].endswith("***")
-
-
-def test_binance_assert_host_consistent_profiles_pass() -> None:
-    """Host property is the guard: paper→testnet host, live→api.binance.com.
-
-    The host is derived from the profile (paper→``testnet_host``,
-    live→``api.binance.com``), so a paper profile structurally cannot resolve to
-    the live host. ``_assert_host`` is defense-in-depth over that derivation and
-    must accept both consistent profiles without raising.
-    """
-    bn._assert_host(bn.BinanceConfig(profile="paper"))
-    bn._assert_host(bn.BinanceConfig(profile="live-readonly"))
-    assert "testnet" in bn.BinanceConfig(profile="paper").host
-    assert bn.BinanceConfig(profile="live-readonly").host == "https://api.binance.com"
-
-
-def test_okx_invalid_profile_rejected() -> None:
-    with pytest.raises(ox.OKXConfigError):
-        ox.OKXConfig.from_mapping({"profile": "go-live-now"})
-
-
 # --------------------------------------------------------------------------- #
 # Live gate: order ops are WRITE-pinned through the real classifier + registry
 # --------------------------------------------------------------------------- #
@@ -718,11 +438,7 @@ def test_okx_invalid_profile_rejected() -> None:
         ("tiger", "place_order"),
         ("longbridge", "submit_order"),
         ("alpaca", "submit_order"),
-        ("okx", "place_order"),
-        ("binance", "create_order"),
         ("futu", "place_order"),
-        ("dhan", "place_order"),
-        ("shoonya", "place_order"),
     ],
 )
 def test_order_ops_write_pinned_via_registry(broker, order_op) -> None:
@@ -740,7 +456,7 @@ def test_unknown_op_does_not_classify_read() -> None:
     from src.live import registry
     from src.live.classification import classify_tool
 
-    curated = registry._BROKER_CURATED_MAPS["okx"]
+    curated = registry._BROKER_CURATED_MAPS["alpaca"]
     verdict = classify_tool("some_unmapped_future_tool", None, curated)
     assert verdict is not ToolClass.READ
     assert verdict in (ToolClass.WRITE, ToolClass.UNKNOWN)
@@ -754,7 +470,6 @@ def test_unknown_op_does_not_classify_read() -> None:
 def test_period_maps_distinguish_minute_from_month() -> None:
     """The 1m (minute) vs 1M (month) tokens must not collide in any map."""
     assert tg._PERIOD_MAP["1m"] == "1min" and tg._PERIOD_MAP["1M"] == "month"
-    assert ox._BAR_MAP["1m"] == "1m" and ox._BAR_MAP["1M"] == "1M"
     assert ft._KLTYPE_MAP["1m"] == "K_1M" and ft._KLTYPE_MAP["1M"] == "K_MON"
 
 
@@ -812,173 +527,3 @@ def test_trading_history_tool_exposes_period_and_limit() -> None:
 
     props = TradingHistoryTool.parameters["properties"]
     assert "period" in props and "limit" in props
-
-
-class _FakeOkxMarket:
-    def get_candlesticks(self, instId=None, bar=None, limit=None):
-        return {"code": "0", "data": [["1700000000000", "100", "110", "90", "105", "12", "1200", "1200", "1"]]}
-
-
-def test_okx_history_maps_candles_and_period(monkeypatch) -> None:
-    monkeypatch.setattr(ox, "_market_client", lambda cfg: _FakeOkxMarket())
-    out = ox.get_historical_bars("BTC-USDT", config=ox.OKXConfig(api_key="k", api_secret="s", passphrase="p"), period="1h")
-    assert out["period"] == "1h" and out["bar"] == "1H"
-    assert len(out["bars"]) == 1
-    bar = out["bars"][0]
-    assert bar["open"] == "100" and bar["close"] == "105" and bar["confirm"] == "1"
-
-
-# --------------------------------------------------------------------------- #
-# Dhan + Shoonya: structural paper-only cap (no runtime discriminator)
-#
-# Like Longbridge, these brokers expose no sandbox / no runtime paper/live
-# discriminator (same token/login reaches the same real account). The order
-# path is therefore structurally capped at paper: any non-paper config is
-# refused at the first line, so a flipped ``profile`` override can never reach a
-# live order. Paper orders are simulated locally (neither broker has a sandbox).
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.parametrize("mod, Config", [(dh, dh.DhanConfig), (sh, sh.ShoonyaConfig)])
-@pytest.mark.parametrize("profile", ["live", "live-readonly"])
-def test_in_broker_place_order_refuses_non_paper(mod, Config, profile) -> None:
-    """A non-paper config is refused before any SDK call (fail-closed)."""
-    result = mod.place_order(Config(profile=profile), symbol="RELIANCE", side="buy", quantity=1)
-    assert result["status"] == "error"
-    assert "paper-only" in result["error"]
-
-
-@pytest.mark.parametrize("mod, Config", [(dh, dh.DhanConfig), (sh, sh.ShoonyaConfig)])
-def test_in_broker_cancel_order_refuses_non_paper(mod, Config) -> None:
-    result = mod.cancel_order(Config(profile="live"), "ORD1")
-    assert result["status"] == "error"
-    assert "paper-only" in result["error"]
-
-
-@pytest.mark.parametrize("mod, Config", [(dh, dh.DhanConfig), (sh, sh.ShoonyaConfig)])
-def test_in_broker_paper_place_order_simulated_locally(mod, Config) -> None:
-    """Paper config simulates locally — no real money, no SDK call."""
-    result = mod.place_order(Config(profile="paper"), symbol="RELIANCE", side="buy", quantity=10)
-    assert result["status"] == "ok"
-    assert result["is_paper"] is True
-    assert result["order_status"] == "simulated_fill"
-    assert result["paper_guard"] == "simulated_locally"
-
-
-@pytest.mark.parametrize("quantity", [0.5, 1.5, "1.5", "1.00000000000000001"])
-def test_dhan_place_order_rejects_fractional_quantity(quantity) -> None:
-    """A fractional quantity must not silently truncate to a zero-share fill.
-
-    Before the fix, ``int(0.5)`` truncated to 0 after the ``> 0`` check had
-    already passed, so a fractional order came back ``status: ok`` with
-    ``quantity: 0`` — a fabricated successful fill for zero shares.
-    """
-    result = dh.place_order(
-        dh.DhanConfig(profile="paper"), symbol="RELIANCE", side="buy", quantity=quantity
-    )
-    assert result["status"] == "error"
-    assert "whole number" in result["error"]
-
-
-@pytest.mark.parametrize("quantity", [None, 0, -1, "invalid", "", True, [], float("nan"), float("inf"), "-Infinity"])
-def test_dhan_invalid_quantity_returns_an_error(quantity) -> None:
-    result = dh.place_order(
-        dh.DhanConfig(profile="paper"), symbol="RELIANCE", side="buy", quantity=quantity,
-    )
-
-    assert result["status"] == "error"
-    assert "quantity" in result["error"]
-    assert "order_id" not in result
-
-
-@pytest.mark.parametrize("quantity,expected", [(1, 1), (2.0, 2), ("3.0", 3), ("9007199254740993", 9007199254740993)])
-def test_dhan_whole_quantity_is_preserved_in_the_paper_fill(quantity, expected) -> None:
-    result = dh.place_order(
-        dh.DhanConfig(profile="paper"), symbol="RELIANCE", side="buy", quantity=quantity,
-    )
-
-    assert result["status"] == "ok"
-    assert result["quantity"] == expected
-    assert result["paper_guard"] == "simulated_locally"
-
-
-@pytest.mark.parametrize("mod, Config", [(dh, dh.DhanConfig), (sh, sh.ShoonyaConfig)])
-def test_in_broker_paper_cancel_order_simulated(mod, Config) -> None:
-    placed = mod.place_order(Config(profile="paper"), symbol="RELIANCE", side="buy", quantity=10)
-    result = mod.cancel_order(Config(profile="paper"), placed["order_id"])
-    assert result["status"] == "ok"
-    assert result["cancelled"] is True
-    assert result["is_paper"] is True
-
-
-@pytest.mark.parametrize("mod, Config", [(dh, dh.DhanConfig), (sh, sh.ShoonyaConfig)])
-def test_in_broker_paper_cancel_refuses_an_order_it_never_issued(mod, Config) -> None:
-    """The paper profile reads the real account, so a live order id can reach
-    the simulated cancel; acknowledging it would report a cancel that never
-    happened while the real order keeps working."""
-    result = mod.cancel_order(Config(profile="paper"), "ORD1")
-    assert result["status"] == "error"
-    assert "cancelled" not in result
-    assert "not issued by this paper simulator" in result["error"]
-
-
-def test_in_broker_order_ops_classified_write() -> None:
-    for name in ("place_order", "modify_order", "cancel_order"):
-        assert DHAN_TOOL_CLASS[name] is ToolClass.WRITE
-        assert SHOONYA_TOOL_CLASS[name] is ToolClass.WRITE
-    for name in ("get_positions", "get_holdings"):
-        assert DHAN_TOOL_CLASS[name] is ToolClass.READ
-        assert SHOONYA_TOOL_CLASS[name] is ToolClass.READ
-
-
-def test_dhan_redacts_access_token() -> None:
-    cfg = dh.DhanConfig(client_id="C1", access_token="tok-abcdefgh-secret")
-    pub = dh._public_config(cfg)
-    assert "secret" not in str(pub)
-    assert pub["access_token"].endswith("***")
-
-
-def test_shoonya_redacts_secrets() -> None:
-    cfg = sh.ShoonyaConfig(
-        user_id="USER1", password="pw", vendor_code="V", api_secret="sec", totp_secret="totp"
-    )
-    pub = sh._public_config(cfg)
-    for secret in ("password", "api_secret", "totp_secret"):
-        assert pub[secret] == "***redacted***"
-    assert "sec" not in str(pub) or pub["api_secret"] == "***redacted***"
-    assert pub["user_id"].endswith("***")
-
-
-def test_dhan_invalid_profile_rejected() -> None:
-    with pytest.raises(dh.DhanConfigError):
-        dh.DhanConfig.from_mapping({"profile": "go-live"})
-
-
-def test_shoonya_invalid_profile_rejected() -> None:
-    with pytest.raises(sh.ShoonyaConfigError):
-        sh.ShoonyaConfig.from_mapping({"profile": "go-live"})
-
-
-def test_dhan_service_unconfigured(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(dh, "get_runtime_root", lambda: tmp_path)
-    result = service.check_connection("dhan-paper-sdk")
-    assert result["status"] == "error"
-    assert result["connector"] == "dhan"
-    assert result["transport"] == "broker_sdk"
-
-
-def test_shoonya_service_unconfigured(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(sh, "get_runtime_root", lambda: tmp_path)
-    result = service.check_connection("shoonya-paper-sdk")
-    assert result["status"] == "error"
-    assert result["connector"] == "shoonya"
-    assert result["transport"] == "broker_sdk"
-
-
-def test_mt5_instrument_search_refuses_executable_override(monkeypatch):
-    def forbidden(*args, **kwargs):
-        raise AssertionError("must not attach to an overridden executable")
-    monkeypatch.setattr(mt5, "search_instruments", forbidden)
-    result = service.search_instruments("XAUUSD", "mt5-paper-sdk", terminal_path="C:/arbitrary.exe")
-    assert result["status"] == "error"
-    assert result["instruments"] == []

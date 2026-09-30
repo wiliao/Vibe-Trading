@@ -12,9 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.agent.grounding.ledger import GroundingLedger
 from src.trading import profiles as trading_profiles
-from src.trading import service as trading_service
 from src.tools import symbol_search_tool as ss
 
 
@@ -300,60 +298,6 @@ class TestSymbolSearchSuccess:
         payload = json.loads(out)
         assert payload["data"]["sources"]["eastmoney"] == "ok"
 
-    def test_selected_binance_profile_resolves_exact_pair_without_yahoo_collision(
-        self, monkeypatch
-    ):
-        """Issue #1234: an exchange pair must not resolve to a similarly named asset."""
-        connector_calls: list[tuple[str, str, int]] = []
-
-        def _search_connector(query: str, profile_id: str, *, limit: int, **_):
-            connector_calls.append((query, profile_id, limit))
-            return {
-                "status": "ok",
-                "connector": "binance",
-                "profile_id": profile_id,
-                "instruments": [
-                    {
-                        "symbol": "ETH-USDT",
-                        "native_symbol": "ETH/USDT",
-                        "exchange_symbol": "ETHUSDT",
-                        "market": "crypto",
-                        "type": "cryptocurrency",
-                        "exchange": "BINANCE",
-                    }
-                ],
-            }
-
-        monkeypatch.setattr(
-            trading_profiles,
-            "load_selected_profile_id",
-            lambda: "binance-paper-trade",
-        )
-        monkeypatch.setattr(trading_service, "search_instruments", _search_connector)
-
-        yahoo_collision = [
-            {
-                "symbol": "AETHUSDT-USD",
-                "shortname": "Aave Ethereum USDT USD",
-                "exchange": "CCC",
-                "quoteType": "CRYPTOCURRENCY",
-            }
-        ]
-        with patch.object(
-            ss.eastmoney_client,
-            "get_json",
-            return_value={"QuotationCodeTable": {"Data": []}},
-        ), patch.object(ss.yahoo_client, "search", return_value=yahoo_collision):
-            data = json.loads(
-                ss.SymbolSearchTool().execute(query="ETH-USDT", limit=5)
-            )["data"]
-
-        assert connector_calls == [("ETH-USDT", "binance-paper-trade", 5)]
-        assert data["sources"]["binance"] == "ok"
-        assert [candidate["symbol"] for candidate in data["candidates"]] == [
-            "ETH-USDT"
-        ]
-
 
 class TestSymbolSearchErrors:
     """Error envelopes and per-source resilience."""
@@ -385,43 +329,6 @@ class TestSymbolSearchErrors:
         assert sources["yahoo"] == "ok"
         symbols = {c["symbol"] for c in payload["data"]["candidates"]}
         assert "AAPL.US" in symbols
-
-    def test_binance_pair_lookup_failure_rejects_yahoo_near_match(
-        self, monkeypatch
-    ):
-        """A failed exact-pair lookup must not fall back to a different asset."""
-        monkeypatch.setattr(
-            trading_profiles,
-            "load_selected_profile_id",
-            lambda: "binance-paper-trade",
-        )
-
-        def _fail_connector(*_args, **_kwargs):
-            raise RuntimeError("market catalog unavailable")
-
-        monkeypatch.setattr(trading_service, "search_instruments", _fail_connector)
-        yahoo_collision = [
-            {
-                "symbol": "AETHUSDT-USD",
-                "shortname": "Aave Ethereum USDT USD",
-                "exchange": "CCC",
-                "quoteType": "CRYPTOCURRENCY",
-            }
-        ]
-        with patch.object(ss.yahoo_client, "search", return_value=yahoo_collision), \
-                patch.object(
-                    ss, "_load_public_markets", side_effect=RuntimeError("venue down")
-                ):
-            data = json.loads(
-                ss.SymbolSearchTool().execute(query="ETH-USDT", limit=5)
-            )["data"]
-
-        assert data["sources"]["binance"] == (
-            "connector search failed: market catalog unavailable"
-        )
-        assert data["sources"]["eastmoney"].startswith("skipped:")
-        assert "venue down" in data["sources"]["public_exchange"]
-        assert data["candidates"] == []
 
     def test_sec_lookup_failure_recorded_not_fatal(self):
         with patch.object(
@@ -743,102 +650,6 @@ class TestFxPairAlignment:
         assert ss._canonical_crypto_pair("BTC/USDT") == "BTC-USDT"
         assert ss._canonical_crypto_pair("BTCUSDT") == "BTC-USDT"
 
-    @pytest.mark.parametrize("query", ["XAUUSD", "XAU/USD", "XAUUSD=X", "XAUUSD.FX"])
-    def test_selected_mt5_profile_resolves_broker_confirmed_metal(
-        self, monkeypatch, tmp_path, query: str
-    ) -> None:
-        monkeypatch.setattr(
-            trading_profiles, "load_selected_profile_id", lambda: "mt5-paper-sdk"
-        )
-        monkeypatch.setattr(
-            trading_service,
-            "search_instruments",
-            lambda query, profile_id, *, limit: {
-                "status": "ok",
-                "instruments": [
-                    {
-                        "symbol": "XAUUSD",
-                        "native_symbol": "XAUUSDm",
-                        "market": "mt5",
-                        "type": "cfd",
-                        "exchange": "Exness-MT5Trial8",
-                    }
-                ],
-            },
-        )
-        with patch.object(
-            ss.eastmoney_client,
-            "get_json",
-            return_value={"QuotationCodeTable": {"Data": []}},
-        ), patch.object(
-            ss.yahoo_client,
-            "search",
-            return_value=[
-                {
-                    "symbol": "XAUUSD=X",
-                    "shortname": "Gold",
-                    "exchange": "CCY",
-                    "quoteType": "CURRENCY",
-                }
-            ],
-        ):
-            result = ss.SymbolSearchTool().execute(query=query)
-        data = json.loads(result)["data"]
-
-        assert data["sources"]["mt5"] == "ok"
-        assert data["count"] == 1
-        candidate = data["candidates"][0]
-        assert candidate["symbol"] == query.upper()
-        assert candidate["native_symbol"] == "XAUUSDm"
-        assert candidate["venue"] == "Exness-MT5Trial8"
-        assert candidate["profile_id"] == "mt5-paper-sdk"
-
-        ledger = GroundingLedger(run_dir=tmp_path, user_message=f"Quote {query}")
-        ledger.ingest_tool_result(
-            tool_name="search_symbol",
-            arguments={"query": query},
-            result=result,
-            call_id="resolve-mt5-symbol",
-            success=True,
-        )
-        assert ledger.identity_status == "locked"
-
-    @pytest.mark.parametrize(
-        "response",
-        [
-            {"status": "ok", "instruments": []},
-            {"status": "error", "error": "terminal unavailable", "instruments": []},
-        ],
-    )
-    def test_mt5_no_match_does_not_create_candidate(
-        self, monkeypatch, response: dict
-    ) -> None:
-        monkeypatch.setattr(
-            trading_profiles, "load_selected_profile_id", lambda: "mt5-paper-sdk"
-        )
-        monkeypatch.setattr(
-            trading_service, "search_instruments", lambda *args, **kwargs: response
-        )
-        with patch.object(
-            ss.eastmoney_client,
-            "get_json",
-            return_value={"QuotationCodeTable": {"Data": []}},
-        ), patch.object(
-            ss.yahoo_client,
-            "search",
-            return_value=[
-                {
-                    "symbol": "XAUUSD=X",
-                    "shortname": "Gold",
-                    "exchange": "CCY",
-                    "quoteType": "CURRENCY",
-                }
-            ],
-        ):
-            data = json.loads(ss.SymbolSearchTool().execute(query="XAUUSD"))["data"]
-
-        assert data["candidates"] == []
-
     def test_fx_query_returns_canonical_candidate_when_yahoo_unavailable(self) -> None:
         """A throttled/failed Yahoo must not turn a canonical pair into nothing."""
         with patch.object(
@@ -1085,64 +896,3 @@ class TestSpotGoldCandidateFilter:
         symbols = [c["symbol"] for c in data["candidates"]]
         assert "BTC-USD" in symbols
         assert "AAPL.US" in symbols
-
-
-@pytest.mark.parametrize("query", ["XAUUSDm", "EURUSDm", "US500.cash"])
-def test_selected_mt5_native_symbol_uses_only_terminal(monkeypatch, query):
-    monkeypatch.setattr(trading_profiles, "load_selected_profile_id", lambda: "mt5-paper-sdk")
-    monkeypatch.setattr(trading_service, "search_instruments", lambda *args, **kwargs: {
-        "status": "ok", "instruments": [{"symbol": query, "native_symbol": query, "market": "mt5", "type": "cfd"}]
-    })
-    def forbidden(*args, **kwargs):
-        raise AssertionError("MT5 identity must not use web search")
-    monkeypatch.setattr(ss, "_search_eastmoney", forbidden)
-    monkeypatch.setattr(ss, "_search_yahoo", forbidden)
-    data = json.loads(ss.SymbolSearchTool().execute(query=query))["data"]
-    assert data["count"] == 1
-    assert data["candidates"][0]["symbol"] == query
-    assert data["candidates"][0]["market"] == "mt5"
-
-
-def test_mt5_ambiguous_native_rows_are_not_deduplicated_into_identity(monkeypatch):
-    monkeypatch.setattr(trading_profiles, "load_selected_profile_id", lambda: "mt5-paper-sdk")
-    monkeypatch.setattr(trading_service, "search_instruments", lambda *args, **kwargs: {
-        "status": "ok", "instruments": [{"native_symbol": name} for name in ("XAUUSDm", "XAUUSDz")]
-    })
-    data = json.loads(ss.SymbolSearchTool().execute(query="XAUUSD"))["data"]
-    assert data["candidates"] == []
-    assert "ambiguous" in data["sources"]["mt5"]
-
-
-@pytest.mark.parametrize("query,native,market,kind", [
-    ("XAUUSDm", "XAUUSDm", "mt5", "cfd"),
-    ("EURUSDm", "EURUSDm", "fx", "forex"),
-    ("XAUUSD.FX", "XAUUSDm", "mt5", "cfd"),
-    ("EURUSD.FX", "EURUSDm", "fx", "forex"),
-])
-def test_mt5_selected_identity_reaches_grounding_without_substitution(monkeypatch, tmp_path, query, native, market, kind):
-    monkeypatch.setattr(trading_profiles, "load_selected_profile_id", lambda: "mt5-paper-sdk")
-    monkeypatch.setattr(trading_service, "search_instruments", lambda *args, **kwargs: {
-        "status": "ok", "instruments": [{"symbol": native, "native_symbol": native, "market": market, "type": kind, "venue": "MT5"}]
-    })
-    result = ss.SymbolSearchTool().execute(query=query)
-    ledger = GroundingLedger(run_dir=tmp_path, user_message=f"Quote {query}")
-    ledger.ingest_tool_result(tool_name="search_symbol", arguments={"query": query}, result=result, call_id="mt5-identity", success=True)
-    assert json.loads(result)["data"]["candidates"][0]["native_symbol"] == native
-    assert ledger.identity_status == "locked"
-    records = [record for record in ledger.identity_summary()["records"]
-               if record["source_tool_call_id"] == "mt5-identity"]
-    assert len(records) == 1
-    assert records[0]["instrument_type"] == kind
-    assert records[0]["symbol"] == query.upper()
-
-
-def test_mt5_ambiguous_catalog_leaves_grounding_unresolved(monkeypatch, tmp_path):
-    monkeypatch.setattr(trading_profiles, "load_selected_profile_id", lambda: "mt5-paper-sdk")
-    monkeypatch.setattr(trading_service, "search_instruments", lambda *args, **kwargs: {
-        "status": "ok", "instruments": [{"native_symbol": name} for name in ("XAUUSDm", "XAUUSDz")]
-    })
-    result = ss.SymbolSearchTool().execute(query="XAUUSD")
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="Quote XAUUSD")
-    ledger.ingest_tool_result(tool_name="search_symbol", arguments={"query": "XAUUSD"}, result=result, call_id="ambiguous-mt5", success=True)
-    assert ledger.identity_status != "locked"
-    assert ledger.identity_summary()["authorized_symbols"] == []
