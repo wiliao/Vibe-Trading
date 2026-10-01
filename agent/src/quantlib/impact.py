@@ -61,7 +61,7 @@ DEFAULT_LINEAR_IMPACT_COEFF = 0.1
 #: Default square-root impact elasticity; 0.3-0.8 is the usual calibrated range.
 DEFAULT_SQRT_IMPACT_ETA = 0.5
 
-#: Default execution lag in bars. 1 bar matches the China A-share T+1 rule.
+#: Default execution lag in bars. 1 bar matches a T+1 settlement convention.
 DEFAULT_DELAY_BARS = 1
 
 #: Basis points in one unit (100%).

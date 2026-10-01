@@ -1,8 +1,10 @@
 {
-  "description": "US/CA-only refactor deny-list (docs/refactor-plan.md Phase 10): removed markets, data sources, and symbols that must not reappear in shipped code. Matched case-insensitively as substrings, scoped to agent/src, agent/backtest, and frontend/src. Intentional mentions belong in `allow` below, each with a non-empty reason; an allow entry suppresses exactly the listed tokens for the matching path (repo-relative path or fnmatch glob). agent/tests/test_us_ca_scope_gate.py enforces both the deny-list and the allowlist's honesty (every entry must carry a reason and must still suppress a real hit). Phase 11 token-spelling note: the matcher is a case-insensitive SUBSTRING search, so short exchange suffixes and currency codes cannot be added bare. Measured collisions in the scan roots at Phase 11: nse 2131 hits (response/sense/expense), bse 1088, hose 533 (those/whose/chose), lse 4987 (false/else/pulse), .BO 127 (\".bold\"/\".bootstrap\"/\".body\"), .BA 473 (\".back\"/\".base\"), .SS 25 (\".ssl\"/\".sse\"), .SH 398 (\".sh\"/\".sha256\"), .L 2665, ARS 2794 (years/args), and HKD/CNY/GBP/INR/JPY/KRW/VND all collide with the surviving multi-currency portfolio/FX tables (portfolio/service.py, portfolio/iso4217.py, market_data.py). Those bare forms are therefore omitted. Exchange suffixes are an exception: in code a suffix can only be a string literal (a comment cannot route a market), so the suffix tokens below carry their CLOSING double quote - '.SS\"' matches \".SS\" in a suffix table, endswith(\".SS\") and f\"{code}.SS\", but never '.ssl'/'.sse'. '.SH\"' is the one suffix that still collides (file-extension lists like \".sh\") and '.HK\"' still matches surviving portfolio HK-journal handling, so both are omitted and the exact symbols stay as guards. crypto/forex/futures stay untokened for the same reason: crypto is a surviving Robinhood instrument class and MARKET_SPECS market, while forex/futures appear in generic prose and surviving symbol classification. Longer multi-word venue names (hong kong, shanghai, shenzhen, buenos aires) plus kospi/kosdaq are specific enough to include; their surviving prose mentions are allowlisted below.",
+  "description": "US/CA-only refactor deny-list (docs/refactor-plan.md Phase 10): removed markets, data sources, and symbols that must not reappear in shipped code. Matched case-insensitively as substrings, scoped to agent/src, agent/backtest, and frontend/src. Intentional mentions belong in `allow` below, each with a non-empty reason; an allow entry suppresses exactly the listed tokens for the matching path (repo-relative path or fnmatch glob). agent/tests/test_us_ca_scope_gate.py enforces both the deny-list and the allowlist's honesty (every entry must carry a reason and must still suppress a real hit). Phase 11 token-spelling note: the matcher is a case-insensitive SUBSTRING search, so short exchange suffixes and currency codes cannot be added bare. Measured collisions in the scan roots at Phase 11: nse 2131 hits (response/sense/expense), bse 1088, hose 533 (those/whose/chose), lse 4987 (false/else/pulse), .BO 127 (\".bold\"/\".bootstrap\"/\".body\"), .BA 473 (\".back\"/\".base\"), .SS 25 (\".ssl\"/\".sse\"), .SH 398 (\".sh\"/\".sha256\"), .L 2665, ARS 2794 (years/args), and HKD/CNY/GBP/INR/JPY/KRW/VND all collide with the surviving multi-currency portfolio/FX tables (portfolio/service.py, portfolio/iso4217.py, market_data.py). Those bare forms are therefore omitted. Exchange suffixes are an exception: in code a suffix can only be a string literal (a comment cannot route a market), so the suffix tokens below carry their CLOSING double quote - '.SS\"' matches \".SS\" in a suffix table, endswith(\".SS\") and f\"{code}.SS\", but never '.ssl'/'.sse'. '.SH\"' is the one suffix that still collides (file-extension lists like \".sh\") and '.HK\"' still matches surviving portfolio HK-journal handling, so both are omitted and the exact symbols stay as guards. crypto/forex/futures stay untokened for the same reason: crypto is a surviving Robinhood instrument class and MARKET_SPECS market, while forex/futures appear in generic prose and surviving symbol classification. Longer multi-word venue names (hong kong, shanghai, shenzhen, buenos aires) plus kospi/kosdaq are specific enough to include; their surviving prose mentions are allowlisted below. Phase 13 token-spelling note: two spellings that Phase 10/11 missed because they are neither the internal market id nor a denylisted token are now covered. 'china_a' is the hyphen-free internal market id the shadow-account skill still used in prose; it has exactly one hit in the scan roots (agent/src/skills/shadow-account/SKILL.md) and that line was corrected to us/ca rather than allowlisted, so the token carries no allow entry. 'a-share' is the human spelling; adding it is a deliberate exception to the 'prose collisions stay un-tokened' rule above, because the failure it catches is precisely a PROMPT surface (a bundled skill or context file naming a removed market), which no other token covers. Measured at Phase 13: 16 hits across 13 files, with zero substring collisions (checked against data-shared / meta-share / beta-share / delta-share / alpha-share / extra-shared and the [a-z]a-share shape). Every one of those 13 files uses the term only in explanatory prose about the removal itself, or in research_papers_tool's intentional topic regex, so each is allowlisted individually with its own reason rather than left as a blind spot.",
   "case_insensitive": true,
   "deny": [
     "a_share",
+    "a-share",
+    "china_a",
     "hk_equity",
     "india_equity",
     "kr_equity",
@@ -114,23 +116,63 @@
     },
     {
       "path": "agent/src/tools/symbol_search_tool.py",
-      "tokens": ["okx", "binance", "ccxt", "mt5"],
-      "reason": "Connector names are user-defined local connector plugin ids, not built-in profiles: the tool must still dispatch to whatever connector a user's profile declares. The built-in okx/binance/ccxt/mt5 loaders and connectors are gone (see agent/scripts/us_ca_prune.py)."
-    },
-    {
-      "path": "agent/src/trading/service.py",
-      "tokens": ["binance", "mt5"],
-      "reason": "Same reason: these branches dispatch user-defined local connector plugins by connector id; no built-in binance/mt5 connector ships any more."
+      "tokens": ["binance", "okx", "mt5"],
+      "reason": "Two surviving, non-routing uses. (1) Connector-id dispatch: 'binance' and 'mt5' are user-definable local connector plugin ids in _search_selected_connector, and a broker-native MT5 identity must not be substituted by web search. (2) Measurement provenance in the _CRYPTO_USD_BASES comments, which document the venue catalogs that whitelist was checked against. The built-in okx/binance/ccxt loaders and connectors are gone (see agent/scripts/us_ca_prune.py), and the ccxt public-venue catalog path was deleted in Phase 13 together with the ccxt dependency."
     },
     {
       "path": "agent/src/tools/research_papers_tool.py",
-      "tokens": ["hong kong", "shanghai", "shenzhen"],
-      "reason": "This tool tags the *topic* of a research paper, not a tradable market. The refactor plan (Phase 5 table) kept its regional tags and only asked to drop the JP/KR/IN ones, so the China/HK venue names in _MARKET_TERMS are intentional classification vocabulary."
+      "tokens": ["hong kong", "shanghai", "shenzhen", "a-share"],
+      "reason": "This tool tags the *topic* of a research paper, not a tradable market. The refactor plan (Phase 5 table) kept its regional tags and only asked to drop the JP/KR/IN ones, so the China/HK venue names in _MARKET_TERMS are intentional classification vocabulary. 'a-share' is part of the same _MARKET_TERMS topic regex (r\"A[- ]share|Shanghai Stock Exchange|...\")."
     },
     {
       "path": "agent/src/skills/geopolitical-risk/SKILL.md",
       "tokens": ["shanghai"],
       "reason": "Documents the SCFI Shanghai Containerized Freight Index, a macro freight-rate indicator used by geopolitical analysis - not a tradable market or a removed data route."
+    },
+    {
+      "path": "agent/backtest/engines/base.py",
+      "tokens": ["a-share"],
+      "reason": "Refactor archaeology in a docstring: records that the A-share statement-enrichment provider was deleted with the US/CA build. Prose explaining a removal, not a removed market route."
+    },
+    {
+      "path": "agent/backtest/loaders/eastmoney_loader.py",
+      "tokens": ["a-share"],
+      "reason": "Refactor archaeology in a comment: records that the A-share board-lot and HK share declarations left with the removed markets. The loader itself is US-only (markets = {\"us_equity\"})."
+    },
+    {
+      "path": "agent/backtest/loaders/registry.py",
+      "tokens": ["a-share"],
+      "reason": "Refactor archaeology in comments: names the deleted A-share index special case and the A-share dividend convention. No A-share chain or source survives in this module."
+    },
+    {
+      "path": "agent/backtest/loaders/tiingo_loader.py",
+      "tokens": ["a-share"],
+      "reason": "Refactor archaeology in a comment: lists the symbol shapes this US loader rejects (HK/crypto/A-share). The rejection is the US/CA-correct behaviour."
+    },
+    {
+      "path": "agent/src/agent/grounding/evidence.py",
+      "tokens": ["a-share"],
+      "reason": "Refactor archaeology in a comment: explains that a retained token set holds Chinese TOOL FIELD NAMES from the deleted A-share tools, not answer prose."
+    },
+    {
+      "path": "agent/src/api/runs_routes.py",
+      "tokens": ["a-share"],
+      "reason": "Refactor archaeology in docstrings: records that the A-share industry lookup is gone and the field is retained as None for wire compatibility."
+    },
+    {
+      "path": "agent/src/factors/bench_runner_strict.py",
+      "tokens": ["a-share"],
+      "reason": "Module docstring describing the historical Bili_Stock A-share study that motivates the strict benchmark's false-positive controls. Study provenance prose, not a data route."
+    },
+    {
+      "path": "agent/src/live/mandate/model.py",
+      "tokens": ["a-share"],
+      "reason": "Docstring enumerating the removed-market AssetClass buckets (A-share, Korea, Vietnam, Argentina, UK) that this US/CA build deliberately does not define."
+    },
+    {
+      "path": "frontend/src/stores/agent.ts",
+      "tokens": ["a-share"],
+      "reason": "Comment recording which removed A-share/crypto/derivatives tool names were dropped from MARKET_DATA_TOOL. Prose about the removal, and the names themselves are gone."
     }
   ]
 }

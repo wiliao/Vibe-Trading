@@ -538,88 +538,6 @@ class TestTickerNameQueryYahooSkip:
         assert data["sources"]["yahoo"] == "ok"
 
 
-class TestCryptoPairWithoutABrokerConnection:
-    """Resolving an exchange pair must not require a broker account.
-
-    #1242 routes exact pairs through the *selected* Binance connector, which
-    needs a configured profile and credentials. Identity resolution is a
-    read-only lookup against a public catalog — the same unauthenticated ccxt
-    connectivity ``orderbook_depth`` already uses to serve these pairs — so a
-    user with no broker connection must still get an identity rather than
-    nothing (or, before #1234, a near-string Yahoo asset).
-    """
-
-    @staticmethod
-    def _markets(*symbols):
-        return {sym: {"symbol": sym, "spot": True, "active": True} for sym in symbols}
-
-    def _run(self, monkeypatch, query, markets_by_exchange, yahoo=None):
-        monkeypatch.setattr(
-            trading_profiles, "load_selected_profile_id", lambda: "tiger-paper-sdk"
-        )
-
-        def _markets(exchange_id):
-            payload = markets_by_exchange.get(exchange_id)
-            if payload is None:
-                raise RuntimeError(f"{exchange_id} unavailable")
-            return payload
-
-        monkeypatch.setattr(ss, "_load_public_markets", _markets)
-        with patch.object(ss.yahoo_client, "search", return_value=yahoo or []):
-            return json.loads(ss.SymbolSearchTool().execute(query=query, limit=5))["data"]
-
-    def test_pair_resolves_with_no_connector_selected(self, monkeypatch):
-        data = self._run(
-            monkeypatch,
-            "ETH-USDT",
-            {"binance": self._markets("ETH/USDT", "BTC/USDT")},
-            yahoo=[
-                {
-                    "symbol": "AETHUSDT-USD",
-                    "shortname": "Aave Ethereum USDT USD",
-                    "exchange": "CCC",
-                    "quoteType": "CRYPTOCURRENCY",
-                }
-            ],
-        )
-        assert [c["symbol"] for c in data["candidates"]] == ["ETH-USDT"]
-        assert data["candidates"][0]["exchange"] == "BINANCE"
-        assert data["sources"]["public_exchange"] == "ok"
-
-    def test_second_venue_is_consulted_when_the_first_is_down(self, monkeypatch):
-        data = self._run(
-            monkeypatch, "SOL-USDT", {"okx": self._markets("SOL/USDT")}
-        )
-        assert [c["symbol"] for c in data["candidates"]] == ["SOL-USDT"]
-        assert data["candidates"][0]["exchange"] == "OKX"
-
-    def test_a_pair_no_venue_lists_resolves_to_nothing(self, monkeypatch):
-        data = self._run(
-            monkeypatch,
-            "NOTREAL-USDT",
-            {"binance": self._markets("ETH/USDT"), "okx": self._markets("ETH/USDT")},
-        )
-        assert data["candidates"] == []
-        assert data["sources"]["public_exchange"].startswith("skipped:")
-
-    def test_an_equity_query_never_reaches_the_venue_catalogs(self, monkeypatch):
-        called: list[str] = []
-
-        def _markets(exchange_id):
-            called.append(exchange_id)
-            return {}
-
-        monkeypatch.setattr(ss, "_load_public_markets", _markets)
-        monkeypatch.setattr(
-            trading_profiles, "load_selected_profile_id", lambda: "tiger-paper-sdk"
-        )
-        with patch.object(
-            ss.eastmoney_client, "get_json", return_value=_eastmoney_payload()
-        ), patch.object(ss.yahoo_client, "search", return_value=[]):
-            ss.SymbolSearchTool().execute(query="apple", limit=5)
-        assert called == []
-
-
 # --------------------------------------------------------------------------
 # Pair spellings + index symbols: the crypto pair classifier is now the only
 # pair path. Forex is a removed market, so a pair string off the crypto
@@ -769,7 +687,6 @@ class TestExactPairCandidateFilter:
         with patch.object(
             ss.eastmoney_client, "get_json", return_value=em_payload
         ), patch.object(ss.yahoo_client, "search", return_value=yahoo_hits), \
-             patch.object(ss, "_load_public_markets", return_value={}), \
              patch.object(ss, "_enrich_us_cik", side_effect=lambda c, s="ok": (c, s)), \
              patch.object(
                  trading_profiles, "load_selected_profile_id",

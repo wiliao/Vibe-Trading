@@ -65,8 +65,8 @@ _PUT = "put"
 #: Spellings folded to ``"call"``. Beyond case and padding these are the forms
 #: real configs and real chain feeds actually carry: the single letter used in
 #: option symbols and most vendor chains, the plural a chain endpoint returns,
-#: and the two Chinese terms -- ``认购``/``认沽`` being the official SSE/SZSE
-#: wording for exchange-traded options, which an A-share config will use.
+#: and the two Chinese terms -- ``认购``/``认沽`` being the standard exchange
+#: wording for exchange-traded options in Chinese-language configs.
 _CALL_ALIASES: frozenset[str] = frozenset({"call", "calls", "c", "看涨", "认购"})
 
 #: Spellings folded to ``"put"``. See :data:`_CALL_ALIASES`.

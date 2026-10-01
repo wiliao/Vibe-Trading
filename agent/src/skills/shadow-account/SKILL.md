@@ -19,7 +19,7 @@ category: analysis
    - 向用户 confirm："这些规则像你本人吗？" 如果用户说"不像"，提高 `min_support` 重跑
 2. `run_shadow_backtest(shadow_id=..., journal_path=...)`
    - 返回 per-market 指标 + `delta_pnl` + attribution breakdown
-   - 默认四市场并跑（china_a/hk/us/crypto）
+   - 默认美股 + 加股两个市场并跑（us/ca）
 3. `render_shadow_report(shadow_id=...)`
    - 生成 HTML + PDF（weasyprint 失败时自动降级成 HTML-only）
    - 返回 `html_path` / `pdf_path` / `delta_pnl`

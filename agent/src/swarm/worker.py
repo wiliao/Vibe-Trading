@@ -269,7 +269,7 @@ def build_worker_prompt(
 
     # Universal anti-fabrication rule. The grounding_block carries a similar
     # instruction but only renders when user_vars supplies explicit symbols.
-    # Free-form prompts ("look at A-share short-term sentiment") otherwise
+    # Free-form prompts ("look at AAPL short-term sentiment") otherwise
     # leave the worker with no guardrail and it cheerfully cites training-data
     # prices and sector weights. This block applies the rule unconditionally
     # — including to aggregator / synthesis agents that have no data tools

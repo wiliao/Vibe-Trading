@@ -203,19 +203,6 @@ class SymbolSearchTool(BaseTool):
                 "data": {"query": query, "count": len(connector_hits[:limit]),
                          "candidates": connector_hits[:limit], "sources": sources},
             }, ensure_ascii=False)
-        if crypto_pair is not None and not connector_hits:
-            # Resolving a pair must not require a broker account. The venue
-            # catalogs are public, unauthenticated REST — the same connectivity
-            # `orderbook_depth` already uses to serve these very pairs — so a
-            # user with no Binance connection still gets an identity instead of
-            # nothing (or, before #1234, a near-string Yahoo asset).
-            public_hits, public_source, public_status = _search_public_exchanges(
-                crypto_pair
-            )
-            if public_source is not None:
-                sources[public_source] = public_status or "ok"
-                candidates.extend(public_hits)
-
         em_hits, sources["eastmoney"] = _search_eastmoney(query)
         candidates.extend(em_hits)
 
@@ -335,81 +322,6 @@ def _canonical_crypto_pair(value: str) -> str | None:
                     continue
                 return f"{base}-{quote}"
     return None
-
-
-#: Public, no-auth venue catalogs consulted for an explicit pair, in order.
-#: Same venues and same ccxt connectivity as ``orderbook_depth``.
-_PUBLIC_CRYPTO_EXCHANGES = ("binance", "okx")
-
-
-def _load_public_markets(exchange_id: str) -> Dict[str, Any]:
-    """Return one venue's public market catalog via ccxt (no credentials).
-
-    Isolated as its own function so tests monkeypatch exactly this name and
-    never open a socket, the same pattern as
-    ``orderbook_depth_tool._fetch_raw_book``.
-
-    Args:
-        exchange_id: A ccxt exchange id, ``"binance"`` or ``"okx"``.
-
-    Returns:
-        ccxt's unified markets mapping, keyed by ``BASE/QUOTE``.
-
-    Raises:
-        Exception: Whatever ccxt raises for a network or venue error.
-    """
-    import ccxt
-
-    exchange = getattr(ccxt, exchange_id)({"enableRateLimit": True, "timeout": 10_000})
-    return exchange.load_markets()
-
-
-def _search_public_exchanges(
-    crypto_pair: str,
-) -> tuple[List[Dict[str, Any]], str | None, str | None]:
-    """Resolve an exact pair against the public venue catalogs.
-
-    Args:
-        crypto_pair: Canonical ``BASE-QUOTE`` spelling.
-
-    Returns:
-        ``(candidates, source, status)``; ``source`` is ``None`` only when
-        ccxt itself is unavailable.
-    """
-    base, quote = crypto_pair.split("-", 1)
-    ccxt_symbol = f"{base}/{quote}"
-    failures: List[str] = []
-    for exchange_id in _PUBLIC_CRYPTO_EXCHANGES:
-        try:
-            markets = _load_public_markets(exchange_id)
-        except ImportError:
-            return [], None, None
-        except Exception as exc:  # noqa: BLE001 — one venue is non-fatal
-            logger.debug("public %s catalog failed for %r: %s", exchange_id, crypto_pair, exc)
-            failures.append(f"{exchange_id}: {exc}")
-            continue
-        market = markets.get(ccxt_symbol) if isinstance(markets, dict) else None
-        if not isinstance(market, dict) or market.get("active") is False:
-            continue
-        if market.get("spot") is False:
-            continue
-        return (
-            [
-                {
-                    "symbol": crypto_pair,
-                    "name": None,
-                    "market": "crypto",
-                    "type": "cryptocurrency",
-                    "exchange": exchange_id.upper(),
-                    "source": "public_exchange",
-                }
-            ],
-            "public_exchange",
-            "ok",
-        )
-    if failures:
-        return [], "public_exchange", "; ".join(failures)
-    return [], "public_exchange", f"{_SKIPPED}no public venue lists {crypto_pair}"
 
 
 def _search_selected_connector(

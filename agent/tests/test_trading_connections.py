@@ -217,3 +217,32 @@ def test_robinhood_generic_reads_use_current_agentic_mcp_tool_names(
         ("get_equity_orders", {}),
         ("get_equity_quotes", {"symbols": ["AAPL"]}),
     ]
+
+
+def test_instrument_search_is_unsupported_for_every_surviving_profile() -> None:
+    """No surviving US/CA connector implements instrument search.
+
+    Regression guard for the US/CA refactor. ``search_instruments`` used to
+    branch on the removed crypto/forex connector ids and then fall through to a
+    generic ``_sdk_module(...)`` path, which the refactor left unreachable after
+    the ``!= "etoro"`` guard was deleted. Deleting that dead tail is only
+    correct while no kept connector defines ``search_instruments``, so assert
+    both halves: the capability reports unsupported, and the SDK modules the
+    generic path would have dispatched to really do not provide it.
+    """
+    import importlib
+
+    from src.trading.service import _SDK_CONNECTOR_MODULES
+
+    for profile in profiles.list_profiles():
+        result = service.search_instruments("AAPL", profile.id)
+        assert result["status"] == "error", profile.id
+        assert "does not support instruments.search" in result["error"], profile.id
+        assert result["connector"] == profile.connector, profile.id
+
+    for connector, module_path in _SDK_CONNECTOR_MODULES.items():
+        module = importlib.import_module(module_path)
+        assert not hasattr(module, "search_instruments"), (
+            f"{connector} now implements search_instruments; the generic SDK "
+            f"branch in service.search_instruments must be restored"
+        )

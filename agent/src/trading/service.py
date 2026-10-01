@@ -353,43 +353,17 @@ def search_instruments(
     include_rates: bool = False,
     **overrides: Any,
 ) -> dict[str, Any]:
-    """Search the selected connector's own tradable-instrument universe."""
+    """Search the selected connector's own tradable-instrument universe.
+
+    No surviving connector implements instrument search: the SDK modules for the
+    kept US/CA brokers (alpaca, futu, ibkr, longbridge, robinhood, tiger) define
+    quotes, bars, positions and orders but no ``search_instruments``. The
+    removed crypto and forex brokers were the only ones that did, and their
+    connector modules and ``_SDK_CONNECTOR_MODULES`` entries went with them, so
+    this reports the capability as unsupported for every profile.
+    """
     profile = profile_by_id(profile_id)
-    if profile.connector == "binance" and profile.transport == "broker_sdk":
-        module = _sdk_module(profile.connector)
-        return _with_profile(
-            profile,
-            module.search_instruments(
-                query,
-                config=module.build_config(profile.config, overrides),
-                limit=limit,
-            ),
-        )
-    if profile.connector == "mt5" and profile.transport == "broker_sdk":
-        if "terminal_path" in overrides:
-            return {"status": "error", "error": "MT5 search uses the configured terminal path", "instruments": []}
-        module = _sdk_module(profile.connector)
-        return _with_profile(
-            profile,
-            module.search_instruments(
-                query,
-                config=_sdk_config(profile, module, overrides),
-                limit=limit,
-            ),
-        )
     return _unsupported(profile, "instruments.search")
-    module = _sdk_module(profile.connector)
-    return _with_profile(
-        profile,
-        module.search_instruments(
-            query,
-            _sdk_config(profile, module, overrides),
-            limit=limit,
-            mode=mode,
-            instrument_type_id=instrument_type_id,
-            include_rates=include_rates,
-        ),
-    )
 
 
 def get_history(
