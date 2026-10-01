@@ -11,14 +11,13 @@ from src.portfolio.config import parse_settings
 from src.portfolio.fx import build_rates, from_usd, to_usd
 from src.portfolio.normalization import account_total_usd, value_position
 
-RATES = build_rates(Decimal("7"), Decimal("8"))
+RATES = build_rates(Decimal("1.4"))
 
 
 def test_build_rates_anchors_on_usd() -> None:
     assert RATES == {
         "USD": Decimal("1"),
-        "CNY": Decimal("7"),
-        "HKD": Decimal("8"),
+        "CAD": Decimal("1.4"),
     }
 
 
@@ -27,18 +26,18 @@ def test_build_rates_anchors_on_usd() -> None:
     [Decimal("0"), Decimal("-1"), Decimal("NaN"), Decimal("Infinity")],
 )
 def test_build_rates_rejects_non_positive_or_non_finite_rates(bad: Decimal) -> None:
-    with pytest.raises(PortfolioContractError, match="USD/CNY"):
-        build_rates(bad, Decimal("8"))
+    with pytest.raises(PortfolioContractError, match="USD/CAD"):
+        build_rates(bad)
 
 
 def test_to_usd_converts_and_names_a_missing_rate() -> None:
-    assert to_usd(Decimal("800"), "HKD", RATES) == Decimal("100")
+    assert to_usd(Decimal("140"), "CAD", RATES) == Decimal("100")
     with pytest.raises(PortfolioContractError, match="KRW"):
         to_usd(Decimal("130000"), "KRW", RATES)
 
 
 def test_from_usd_round_trip() -> None:
-    assert from_usd(Decimal("100"), "CNY", RATES) == Decimal("700")
+    assert from_usd(Decimal("100"), "CAD", RATES) == Decimal("140")
 
 
 def _krw_row() -> dict:
@@ -61,7 +60,9 @@ def test_value_position_converts_when_rate_exists() -> None:
     row = value_position(_krw_row(), rates={**RATES, "KRW": Decimal("1000")})
     assert row["market_value_usd"] == pytest.approx(600.0)
     assert row["unrealized_pnl_usd"] == pytest.approx(100.0)
-    assert row["market_value_cny"] == pytest.approx(4200.0)
+    # USD is the only value carried on the position wire shape; a secondary
+    # display currency is a snapshot-level concern.
+    assert "market_value_cad" not in row
 
 
 def test_account_total_converts_a_valid_iso_currency_when_rated() -> None:
@@ -78,8 +79,8 @@ def test_parse_settings_rejects_valid_iso_display_currency_without_production_ra
 
 
 def test_parse_settings_accepts_rateable_display_currency() -> None:
-    settings = parse_settings({"display_currency": "hkd", "sources": []})
-    assert settings.display_currency == "HKD"
+    settings = parse_settings({"display_currency": "cad", "sources": []})
+    assert settings.display_currency == "CAD"
 
 
 def test_parse_settings_rejects_non_iso_display_currency() -> None:

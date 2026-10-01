@@ -74,13 +74,13 @@ def test_contract_propagates_account_currency_and_decouples_iso_from_fx():
     assert positions["positions"][0]["currency"] == "INR"
 
     ensure_supported_currencies(positions["positions"], account)
-    rates = {"USD": Decimal("1"), "CNY": Decimal("7"), "HKD": Decimal("8")}
+    rates = {"USD": Decimal("1"), "CAD": Decimal("1.5")}
     with pytest.raises(PortfolioContractError, match="INR"):
         ensure_supported_currencies(positions["positions"], account, rates)
 
 
 def test_cash_only_currency_without_rate_fails_closed() -> None:
-    rates = {"USD": Decimal("1"), "CNY": Decimal("7"), "HKD": Decimal("8")}
+    rates = {"USD": Decimal("1"), "CAD": Decimal("1.5")}
     with pytest.raises(PortfolioContractError, match="INR"):
         ensure_supported_currencies([], {"account": {"currency": "INR"}}, rates)
 

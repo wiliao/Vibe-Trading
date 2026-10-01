@@ -75,7 +75,7 @@ def test_portfolio_routes_are_readonly_and_return_expected_shapes(monkeypatch):
     saved = client.put(
         "/api/portfolio/settings",
         json={
-            "display_currency": "CNY",
+            "display_currency": "CAD",
             "sources": [
                 {
                     "connection_id": "ibkr",
@@ -88,7 +88,7 @@ def test_portfolio_routes_are_readonly_and_return_expected_shapes(monkeypatch):
         },
     )
     assert saved.status_code == 200
-    assert saved.json()["settings"]["display_currency"] == "CNY"
+    assert saved.json()["settings"]["display_currency"] == "CAD"
     reconnect = client.post("/api/portfolio/sources/ibkr/reconnect")
     assert reconnect.status_code == 202
     for _ in range(50):

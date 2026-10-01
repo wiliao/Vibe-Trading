@@ -9,9 +9,9 @@ Venue and currency inference cover the surviving settlement markets only —
 US equities (``.US``) and Canadian equities (``.TO`` / ``.V``). A symbol for a
 market this build no longer routes infers no venue and no currency, so the gate
 fails closed instead of lending it a plausible-looking identity. The canonical
-symbol scan recognizes the same US/CA/index shapes (plus the crypto and FX
-pair spellings the surviving resolver still serves through user connector
-plugins); a removed market's equity suffix is not scanned as a symbol at all.
+symbol scan recognizes the same US/CA/index shapes (plus the crypto pair
+spellings the surviving resolver still serves through user connector plugins);
+a removed market's equity suffix is not scanned as a symbol at all.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from src.agent.resolution_context import candidate_market
-from src.market_data import canonical_fx_pair
 
 _RESOLVER_TOOL = "search_symbol"
 
@@ -150,18 +149,14 @@ def _normalize_symbol(value: Any) -> str:
         joined crypto pair with no separator is rewritten as the dashed form so
         every downstream check sees one identity. Text that is not a symbol is
         returned uppercased and otherwise untouched: a removed market's suffix
-        is preserved verbatim (no ``<code>.<venue>`` fold onto a surviving
-        suffix) so it can never compare equal to a surviving identity.
+        or FX notation is preserved verbatim (no ``<code>.<venue>`` fold onto a
+        surviving suffix) so it can never compare equal to a surviving identity.
     """
-    # A fiat/fiat pair is one FX instrument regardless of spelling: ``GBP/USD``
-    # and ``GBPUSD`` are both ``GBPUSD=X``. Checked BEFORE the slash is
-    # rewritten ("GBP/USD" -> "GBP-USD", the crypto-pair spelling), which
-    # disagreed with the resolver's ``GBPUSD=X`` answer — a contradictory
-    # identity that outranked every later lock and blocked all further tools.
+    # The slash is rewritten to the dashed crypto-pair spelling before the
+    # joined-pair fold below. FX notation is deliberately NOT canonicalized:
+    # forex is a removed market, so ``EUR/USD`` and ``EURUSD`` keep their
+    # spelling and infer no venue or currency.
     raw = str(value or "").strip().upper()
-    fx = canonical_fx_pair(raw)
-    if fx is not None:
-        return fx
     symbol = raw.replace("/", "-")
     if not symbol:
         return ""

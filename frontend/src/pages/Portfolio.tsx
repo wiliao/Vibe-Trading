@@ -61,7 +61,7 @@ function money(value: number | null | undefined, currency: string = "USD") {
   return new Intl.NumberFormat(uiLocale(), {
     style: "currency",
     currency,
-    maximumFractionDigits: currency === "CNY" ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -311,7 +311,7 @@ export function Portfolio() {
     return (snapshot.positions ?? []).reduce((sum, row) => sum + (row.priced ? row.market_value_usd : 0), 0) / snapshot.totals.usd;
   })();
   const displayCurrency = portfolioSettings?.display_currency ?? snapshot?.display_currency ?? "USD";
-  const totalDisplay = snapshot?.totals.display ?? (displayCurrency === "CNY" ? snapshot?.totals.cny : snapshot?.totals.usd);
+  const totalDisplay = snapshot?.totals.display ?? (displayCurrency === "CAD" ? snapshot?.totals.cad : snapshot?.totals.usd);
 
   return (
     <div className="min-h-screen p-4 sm:p-6 lg:p-8">
@@ -326,7 +326,7 @@ export function Portfolio() {
             <p className="mt-2 text-sm text-muted-foreground">{t("portfolio.page.subtitle")}</p>
             {snapshot ? (
               <p className="mt-2 text-xs text-muted-foreground">
-                {t(snapshot.fx.stale ? "portfolio.page.fxCached" : "portfolio.page.fxFresh", { rate: snapshot.fx.usd_cny.toFixed(4) })}
+                {t(snapshot.fx.stale ? "portfolio.page.fxCached" : "portfolio.page.fxFresh", { rate: snapshot.fx.usd_cad.toFixed(4) })}
               </p>
             ) : null}
           </div>
@@ -363,7 +363,7 @@ export function Portfolio() {
               <Metric
                 label={t("portfolio.metrics.total")}
                 value={money(totalDisplay, displayCurrency)}
-                note={displayCurrency === "USD" ? money(snapshot.totals.cny, "CNY") : money(snapshot.totals.usd)}
+                note={displayCurrency === "USD" ? money(snapshot.totals.cad, "CAD") : money(snapshot.totals.usd)}
                 warningNote={failedAccounts.length ? t("portfolio.metrics.excluded", { count: failedAccounts.length }) : undefined}
                 icon={<WalletCards className="h-4 w-4" />}
               />
@@ -424,7 +424,7 @@ export function Portfolio() {
                   <tbody className="divide-y">
                     {positions.map((row) => {
                       const weight = snapshot.totals.usd > 0 ? row.market_value_usd / snapshot.totals.usd : 0;
-                      return <tr key={`${row.source_id ?? row.broker}-${row.symbol}`} className="hover:bg-muted/20"><Td><div className="font-medium">{row.source_label ?? row.broker.toUpperCase()}</div><div className="mt-1 text-xs"><BrokerBadge broker={row.broker} /></div></Td><Td><div className="font-medium">{row.symbol}</div><div className="max-w-52 truncate text-xs text-muted-foreground">{row.name}</div></Td><Td><span className="capitalize text-muted-foreground">{row.asset_type}</span></Td><Td>{quantity(row.quantity)}</Td><Td><div>{price(row.cost_price)}</div><div className="text-xs text-muted-foreground">{price(row.market_price)}</div></Td><Td><div className="font-medium">{row.priced ? money(row.market_value_usd) : "—"}</div><div className="text-xs text-muted-foreground">{row.priced ? money(row.market_value_cny, "CNY") : t("portfolio.holdings.unpriced")}</div></Td><Td>{row.priced ? percentage(weight) : "—"}</Td><Td><span className={row.unrealized_pnl_usd == null ? "text-muted-foreground" : row.unrealized_pnl_usd >= 0 ? "text-positive" : "text-danger"}>{row.unrealized_pnl_usd == null ? "—" : money(row.unrealized_pnl_usd)}</span></Td><Td><DataBadge priced={row.priced} /></Td></tr>;
+                      return <tr key={`${row.source_id ?? row.broker}-${row.symbol}`} className="hover:bg-muted/20"><Td><div className="font-medium">{row.source_label ?? row.broker.toUpperCase()}</div><div className="mt-1 text-xs"><BrokerBadge broker={row.broker} /></div></Td><Td><div className="font-medium">{row.symbol}</div><div className="max-w-52 truncate text-xs text-muted-foreground">{row.name}</div></Td><Td><span className="capitalize text-muted-foreground">{row.asset_type}</span></Td><Td>{quantity(row.quantity)}</Td><Td><div>{price(row.cost_price)}</div><div className="text-xs text-muted-foreground">{price(row.market_price)}</div></Td><Td><div className="font-medium">{row.priced ? money(row.market_value_usd) : "—"}</div><div className="text-xs text-muted-foreground">{row.priced ? money(row.market_value_cad, "CAD") : t("portfolio.holdings.unpriced")}</div></Td><Td>{row.priced ? percentage(weight) : "—"}</Td><Td><span className={row.unrealized_pnl_usd == null ? "text-muted-foreground" : row.unrealized_pnl_usd >= 0 ? "text-positive" : "text-danger"}>{row.unrealized_pnl_usd == null ? "—" : money(row.unrealized_pnl_usd)}</span></Td><Td><DataBadge priced={row.priced} /></Td></tr>;
                     })}
                   </tbody>
                 </table>
@@ -512,7 +512,7 @@ function AccountCard({ account, active, displayCurrency, onClick, onReconnect, o
   const failed = account.status === "error";
   const displayValue = account.total_display ?? (
     displayCurrency === "USD" ? account.total_usd :
-    displayCurrency === "CNY" ? account.total_cny :
+    displayCurrency === "CAD" ? account.total_cad :
     null
   );
   return <div role="button" tabIndex={0} onClick={onClick} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onClick(); }} className={`cursor-pointer rounded-xl border bg-card p-5 transition ${active ? "border-primary ring-1 ring-primary/20" : "hover:border-primary/40"}`}>
@@ -528,7 +528,7 @@ function AccountCard({ account, active, displayCurrency, onClick, onReconnect, o
     ) : (
       <>
         <div className="mt-4 text-2xl font-semibold">{money(displayValue, displayCurrency)}</div>
-        <div className="mt-1 text-xs text-muted-foreground">{displayCurrency === "USD" ? money(account.total_cny, "CNY") : money(account.total_usd)} · {t("portfolio.accounts.positions", { count: account.position_count ?? 0 })}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{displayCurrency === "USD" ? money(account.total_cad, "CAD") : money(account.total_usd)} · {t("portfolio.accounts.positions", { count: account.position_count ?? 0 })}</div>
         <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs"><span className="text-positive">{t("portfolio.accounts.fresh")}</span><span className="text-muted-foreground">{dateTime(account.last_success_at)}</span></div>
       </>
     )}

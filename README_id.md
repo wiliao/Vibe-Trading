@@ -525,7 +525,7 @@ Web UI menambahkan halaman **Portofolio** read-only yang mengagregasi kepemilika
 
 | Perilaku | Yang Anda dapatkan |
 |----------|--------------|
-| **Provenance per sumber** | Setiap kepemilikan menyebut koneksi asalnya, dinilai dalam USD dengan konversi CNY. |
+| **Provenance per sumber** | Setiap kepemilikan menyebut koneksi asalnya, dinilai dalam USD dengan konversi CAD. |
 | **Sumber gagal dikecualikan** | Sumber yang error dilaporkan sebagai error dan dikeluarkan dari total — tidak pernah dibawa ke depan — dan snapshot ditandai tidak lengkap. |
 | **Snapshot immutable** | Setiap refresh disimpan di `~/.vibe-trading/portfolio/portfolio.sqlite3`; pengaturan tanpa kredensial berada di `~/.vibe-trading/portfolio.json` dan `connections.json`. |
 | **Ekspor & analisis** | Ekspor CSV, plus tool agent `portfolio_summary` yang sudah disanitasi; `risk_xray_args` diteruskan langsung ke `portfolio_risk_xray`. Snapshot yang sama dapat dicetak di terminal dengan `vibe-trading portfolio show` (`refresh` / `sources` tersedia juga). |
@@ -540,7 +540,7 @@ termasuk posisi yang dilaporkan broker, dikonversi
 | **Contract-tested** | Fixture berbentuk respons connector telah lolos contract akun/posisi bersama, tetapi ini bukan jaminan bahwa setiap variasi akun broker sudah diuji secara live. |
 | **Experimental** | Profil secara struktural read-only dan dapat dipilih, tetapi mata uang, total akun, atau semantik instrumennya masih memerlukan verifikasi khusus broker. |
 
-Every position row must provide a symbol and quantity. Unsupported currencies fail the source explicitly instead of being silently treated as USD. The current valuation core supports USD, HKD and CNY; IBKR, Longbridge and Alpaca use native handling. Robinhood reads the one account you pick from the broker's own list (`vibe-trading connector select-account <id>` or the connection center) and never falls back to a default account; its equity positions are listed unpriced until the quote reply is mapped, and an account that also holds options, crypto, futures, event contracts, mutual funds or fixed income fails the source instead of showing an equity-only view. A new built-in connector or local plugin defaults to **Experimental** until its portfolio contract fixtures are added.
+Every position row must provide a symbol and quantity. Unsupported currencies fail the source explicitly instead of being silently treated as USD. The current valuation core supports USD and CAD; IBKR, Longbridge and Alpaca use native handling. Robinhood reads the one account you pick from the broker's own list (`vibe-trading connector select-account <id>` or the connection center) and never falls back to a default account; its equity positions are listed unpriced until the quote reply is mapped, and an account that also holds options, crypto, futures, event contracts, mutual funds or fixed income fails the source instead of showing an equity-only view. A new built-in connector or local plugin defaults to **Experimental** until its portfolio contract fixtures are added.
 
 ### Onboarding connector yang ramah AI
 

@@ -78,7 +78,7 @@ def _service(tmp_path, *, account_ref: str = ACCOUNT) -> PortfolioService:
     return PortfolioService(
         PortfolioStore(tmp_path / "portfolio.sqlite3"),
         settings_store=settings,
-        fx_fetcher=lambda: (Decimal("7.2"), Decimal("7.8"), "2026-09-17T00:00:00+00:00"),
+        fx_fetcher=lambda: (Decimal("1.5"), "2026-09-17T00:00:00+00:00"),
     )
 
 

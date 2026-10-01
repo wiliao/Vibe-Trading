@@ -15,7 +15,7 @@ from src.portfolio.compatibility import PortfolioContractError
 
 Rates = Mapping[str, Decimal]
 
-DISPLAY_RATE_CURRENCIES = frozenset({"USD", "CNY", "HKD"})
+DISPLAY_RATE_CURRENCIES = frozenset({"USD", "CAD"})
 
 
 def _validated_rate(pair: str, value: Decimal) -> Decimal:
@@ -26,12 +26,17 @@ def _validated_rate(pair: str, value: Decimal) -> Decimal:
     return rate
 
 
-def build_rates(usd_cny: Decimal, usd_hkd: Decimal) -> dict[str, Decimal]:
-    """Build the production rates map, anchored on one USD."""
+def build_rates(usd_cad: Decimal) -> dict[str, Decimal]:
+    """Build the production rates map, anchored on one USD.
+
+    The production feed rates one currency, Canadian dollars; both surviving
+    valuation currencies (US USD, Canada CAD) therefore have a rate. Any other
+    ISO-4217 currency a connector reports is still valid metadata but has no
+    rate, so :func:`to_usd` fails that source closed instead of guessing.
+    """
     return {
         "USD": Decimal("1"),
-        "CNY": _validated_rate("USD/CNY", usd_cny),
-        "HKD": _validated_rate("USD/HKD", usd_hkd),
+        "CAD": _validated_rate("USD/CAD", usd_cad),
     }
 
 

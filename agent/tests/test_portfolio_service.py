@@ -35,7 +35,7 @@ def _settings_store(tmp_path):
 def test_refresh_aggregates_three_readonly_connectors(tmp_path):
     accounts = {
         "ibkr-live-local-readonly": {"summary": [{"tag": "NetLiquidation", "value": "1000", "currency": "USD"}]},
-        "longbridge-live-sdk-readonly": {"balances": [{"net_assets": "7800", "currency": "HKD"}]},
+        "longbridge-live-sdk-readonly": {"balances": [{"net_assets": "3000", "currency": "CAD"}]},
         "alpaca-paper-sdk": {"balances": []},
     }
     positions = {
@@ -54,12 +54,12 @@ def test_refresh_aggregates_three_readonly_connectors(tmp_path):
         "longbridge-live-sdk-readonly": {
             "positions": [
                 {
-                    "symbol": "700.HK",
-                    "symbol_name": "Tencent",
+                    "symbol": "SHOP.TO",
+                    "symbol_name": "Shopify",
                     "quantity": 10,
                     "cost_price": 300,
-                    "currency": "HKD",
-                    "market": "HK",
+                    "currency": "CAD",
+                    "market": "CA",
                 }
             ]
         },
@@ -92,7 +92,7 @@ def test_refresh_aggregates_three_readonly_connectors(tmp_path):
         return positions[profile_id]
 
     def get_quote(symbol, profile_id, **kwargs):
-        prices = {"AAPL": 150, "700.HK": 390}
+        prices = {"AAPL": 150, "SHOP.TO": 390}
         return {"quote": {"last": prices[symbol]}}
 
     service = PortfolioService(
@@ -102,15 +102,16 @@ def test_refresh_aggregates_three_readonly_connectors(tmp_path):
         get_positions=get_positions,
         get_quote=get_quote,
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
     snapshot = service.refresh()
 
     assert snapshot["complete"] is True
-    assert snapshot["totals"]["usd"] == 8050.0
+    # One snapshot legitimately holds US (USD) and Canada (CAD) positions.
+    assert snapshot["totals"]["usd"] == 9050.0
+    assert snapshot["totals"]["cad"] == 13575.0
     assert len(snapshot["positions"]) == 4
     assert snapshot["positions"][0]["symbol"] == "BTC"
     assert len(snapshot["combined_holdings"]) == 4
@@ -131,7 +132,7 @@ def test_latest_enriches_legacy_snapshot_with_current_compatibility(tmp_path):
             "valuation_version": portfolio_service.PORTFOLIO_VALUATION_VERSION,
             "created_at": "2026-08-09T00:00:00+00:00",
             "complete": True,
-            "totals": {"usd": 0, "cny": 0},
+            "totals": {"usd": 0, "cad": 0},
             "accounts": [
                 {"source_id": source, "broker": source, "status": "ok"} for source in ("ibkr", "longbridge", "alpaca")
             ],
@@ -159,8 +160,7 @@ def test_partial_refresh_is_saved_and_marked_incomplete(tmp_path):
         get_positions=lambda profile_id: {"positions": []},
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -183,8 +183,7 @@ def test_a_positions_read_without_a_positions_list_is_an_error_not_an_empty_sour
         get_positions=get_positions,
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -235,8 +234,7 @@ def test_unrated_balance_currency_fails_only_that_source(tmp_path):
         get_positions=lambda profile_id: {"positions": []},
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -295,8 +293,7 @@ def test_failed_source_is_excluded_from_totals_and_reports_its_last_success(tmp_
         },
         get_quote=lambda *args, **kwargs: {"quote": {"last": 150}},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -312,13 +309,13 @@ def test_failed_source_is_excluded_from_totals_and_reports_its_last_success(tmp_
     # value is never added back into any aggregate.
     assert partial["complete"] is False
     assert partial["totals"]["usd"] == 0.0
-    assert partial["totals"]["cny"] == 0.0
+    assert partial["totals"]["cad"] == 0.0
     assert ibkr["status"] == "error"
     assert ibkr["error_code"] == "ConnectionError"
     assert ibkr["failure_kind"] == "transient"
     assert ibkr["reconnect_required"] is False
     assert ibkr["total_usd"] is None
-    assert ibkr["total_cny"] is None
+    assert ibkr["total_cad"] is None
     assert ibkr["position_count"] == 0
     assert [item["broker"] for item in partial["positions"] if item["broker"] == "ibkr"] == []
     assert [item for item in partial["combined_holdings"] if "ibkr" in item["brokers"]] == []
@@ -355,8 +352,7 @@ def test_a_source_that_never_succeeded_reports_no_last_success_time(tmp_path):
         get_positions=lambda profile_id: {"positions": []},
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -407,8 +403,7 @@ def test_remote_mcp_sources_are_read_without_an_interactive_oauth_prompt(tmp_pat
         get_positions=get_positions,
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -456,8 +451,7 @@ def test_remote_mcp_authorization_failure_is_the_only_reconnectable_failure(
         get_positions=lambda *args, **kwargs: {"positions": []},
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -474,7 +468,7 @@ def test_analysis_context_supplies_risk_xray_arguments(tmp_path):
     """The portfolio feeds the existing risk x-ray; it does not reimplement it."""
     accounts = {
         "ibkr-live-local-readonly": {"summary": [{"tag": "NetLiquidation", "value": "300", "currency": "USD"}]},
-        "longbridge-live-sdk-readonly": {"balances": [{"net_assets": "3900", "currency": "HKD"}]},
+        "longbridge-live-sdk-readonly": {"balances": [{"net_assets": "500", "currency": "USD"}]},
         "alpaca-paper-sdk": {"balances": []},
     }
     positions = {
@@ -533,8 +527,7 @@ def test_analysis_context_supplies_risk_xray_arguments(tmp_path):
             "quote": {"last": {"AAPL": 150, "MSFT": 50}[symbol]}
         },
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -586,7 +579,7 @@ def test_generic_readonly_profile_uses_common_account_and_position_fields(tmp_pa
     )
     settings.save(
         {
-            "display_currency": "CNY",
+            "display_currency": "CAD",
             "sources": [
                 {
                     "connection_id": "main-stocks",
@@ -615,8 +608,7 @@ def test_generic_readonly_profile_uses_common_account_and_position_fields(tmp_pa
         },
         get_quote=lambda *args, **kwargs: {},
         fx_fetcher=lambda: (
-            Decimal("7.2"),
-            Decimal("7.8"),
+            Decimal("1.5"),
             "2026-08-09T00:00:00+00:00",
         ),
     )
@@ -624,7 +616,7 @@ def test_generic_readonly_profile_uses_common_account_and_position_fields(tmp_pa
     snapshot = service.refresh()
     account = snapshot["accounts"][0]
     position = snapshot["positions"][0]
-    assert snapshot["display_currency"] == "CNY"
+    assert snapshot["display_currency"] == "CAD"
     assert snapshot["totals"]["usd"] == 800.0
     assert account["source_id"] == "main-stocks"
     assert account["cash_usd"] == 0.0

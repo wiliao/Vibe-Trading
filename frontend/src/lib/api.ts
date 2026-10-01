@@ -78,7 +78,7 @@ export interface PortfolioPosition {
   cost_price?: number | null;
   market_price?: number | null;
   market_value_usd: number;
-  market_value_cny: number;
+  market_value_cad: number;
   unrealized_pnl_usd?: number | null;
   priced: boolean;
   updated_at: string;
@@ -109,7 +109,7 @@ export interface PortfolioAccount {
   status: "ok" | "error";
   last_success_at?: string;
   total_usd?: number | null;
-  total_cny?: number | null;
+  total_cad?: number | null;
   total_display?: number | null;
   priced_value_usd?: number;
   cash_usd?: number;
@@ -136,14 +136,14 @@ export interface PortfolioSnapshot {
   /** False whenever any enabled source did not reach `status === "ok"`. */
   complete: boolean;
   display_currency?: string;
-  totals: { usd: number; cny: number; display?: number };
+  totals: { usd: number; cad: number; display?: number };
   valuation?: {
     priced_usd: number;
     cash_usd: number;
     unpriced_or_other_usd: number;
     identified_coverage: number;
   };
-  fx: { usd_cny: number; usd_hkd: number; rates?: Record<string, number>; fetched_at: string; stale: boolean };
+  fx: { usd_cad: number; rates?: Record<string, number>; fetched_at: string; stale: boolean };
   accounts: PortfolioAccount[];
   positions: PortfolioPosition[];
   combined_holdings?: Array<{
@@ -162,7 +162,7 @@ export interface PortfolioHistoryPoint {
   created_at: string;
   complete: number;
   total_usd: string;
-  total_cny: string;
+  total_cad: string;
 }
 
 export interface PortfolioRefreshState {

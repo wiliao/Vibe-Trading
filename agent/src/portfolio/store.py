@@ -38,7 +38,7 @@ class PortfolioStore:
                     created_at TEXT NOT NULL,
                     complete INTEGER NOT NULL,
                     total_usd TEXT NOT NULL,
-                    total_cny TEXT NOT NULL,
+                    total_cad TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_created
@@ -51,6 +51,28 @@ class PortfolioStore:
                     PRIMARY KEY (base, quote)
                 );
                 """)
+            self._rename_legacy_total_column(db)
+
+    @staticmethod
+    def _rename_legacy_total_column(db: sqlite3.Connection) -> None:
+        """Rename the retired secondary-total column in a database from before USD/CAD.
+
+        SQLite's ``CREATE TABLE IF NOT EXISTS`` never rewrites an existing
+        table, so a database written by the older multi-currency snapshot shape
+        still carries the retired column and would reject the current insert.
+        Renaming it preserves every retained row - including the payload JSON
+        the history filter reads - instead of dropping history. The migrated
+        value is a retired secondary total, and the service's valuation-version
+        filter keeps those rows out of the current series.
+        """
+        columns = {
+            str(row["name"])
+            for row in db.execute("PRAGMA table_info(portfolio_snapshots)")
+        }
+        if "total_cad" not in columns and "total_cny" in columns:
+            db.execute(
+                "ALTER TABLE portfolio_snapshots RENAME COLUMN total_cny TO total_cad"
+            )
 
     def save_snapshot(self, payload: dict[str, Any]) -> None:
         """Append one immutable snapshot.
@@ -64,7 +86,7 @@ class PortfolioStore:
             db.execute(
                 """
                 INSERT INTO portfolio_snapshots
-                    (id, created_at, complete, total_usd, total_cny, payload)
+                    (id, created_at, complete, total_usd, total_cad, payload)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -72,7 +94,7 @@ class PortfolioStore:
                     payload["created_at"],
                     int(payload["complete"]),
                     str(totals["usd"]),
-                    str(totals["cny"]),
+                    str(totals["cad"]),
                     json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
                 ),
             )
@@ -121,7 +143,7 @@ class PortfolioStore:
         with self._connect() as db:
             rows = db.execute(
                 f"""
-                SELECT id, created_at, complete, total_usd, total_cny, payload
+                SELECT id, created_at, complete, total_usd, total_cad, payload
                 FROM portfolio_snapshots
                 {where}
                 ORDER BY created_at DESC LIMIT ?
@@ -140,7 +162,7 @@ class PortfolioStore:
                     "created_at": row["created_at"],
                     "complete": row["complete"],
                     "total_usd": row["total_usd"],
-                    "total_cny": row["total_cny"],
+                    "total_cad": row["total_cad"],
                 }
             )
             if len(history) >= row_limit:
@@ -198,7 +220,7 @@ class PortfolioStore:
 
         Args:
             base: Base currency code, e.g. ``USD``.
-            quote: Quote currency code, e.g. ``CNY``.
+            quote: Quote currency code, e.g. ``CAD``.
             rate: The rate, stored as text to avoid binary float drift.
             fetched_at: ISO-8601 timestamp of the successful fetch.
         """
@@ -218,7 +240,7 @@ class PortfolioStore:
 
         Args:
             base: Base currency code, e.g. ``USD``.
-            quote: Quote currency code, e.g. ``CNY``.
+            quote: Quote currency code, e.g. ``CAD``.
 
         Returns:
             ``(rate, fetched_at)`` or ``None`` when the pair was never cached.

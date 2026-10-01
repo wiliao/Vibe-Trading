@@ -41,10 +41,11 @@ from src.trading.types import TradingProfile
 # the market suffix: a bare ticker carries no venue signal, ``AAPL.US`` does
 # (see ``src.market_data._SOURCE_PATTERNS``).
 _RISK_XRAY_MAX_SYMBOLS = 50
-# Version 3 makes all valuation use an explicit FX rates map. Existing v2
-# snapshots/history are intentionally hidden after upgrade, including
-# USD/HKD/CNY snapshots whose numeric values would otherwise remain valid.
-PORTFOLIO_VALUATION_VERSION = 3
+# Version 3 made all valuation use an explicit FX rates map. Version 4 trims
+# that map to the two surviving valuation currencies (USD, CAD): a v3 snapshot
+# carries secondary totals and FX fields that no longer exist, so it is hidden
+# from the current series even though its USD numbers would still be valid.
+PORTFOLIO_VALUATION_VERSION = 4
 _LOADER_MARKET_SUFFIXES = frozenset({"US", "TO", "V"})
 _NON_EQUITY_ASSET_TYPES = frozenset({"crypto", "stablecoin", "cash"})
 
@@ -138,7 +139,7 @@ class PortfolioService:
         get_positions: Callable[..., dict[str, Any]] | None = None,
         get_quote: Callable[..., dict[str, Any]] | None = None,
         get_longbridge_quotes: Callable[..., dict[str, Any]] | None = None,
-        fx_fetcher: Callable[[], tuple[Decimal, Decimal, str]] | None = None,
+        fx_fetcher: Callable[[], tuple[Decimal, str]] | None = None,
         progress_callback: Callable[[str, str, str | None], None] | None = None,
     ) -> None:
         """Wire the service to its stores and connector read functions.
@@ -155,8 +156,8 @@ class PortfolioService:
                 ``src.trading.service.get_quote``.
             get_longbridge_quotes: Optional batch quote reader used only for
                 Longbridge positions the connector reports without a price.
-            fx_fetcher: Returns ``(usd_cny, usd_hkd, fetched_at)``. Defaults to
-                the built-in HTTPS fetch.
+            fx_fetcher: Returns ``(usd_cad, fetched_at)``. Defaults to the
+                built-in HTTPS fetch.
             progress_callback: Called as ``(source_id, status, error)`` while a
                 refresh walks its sources.
         """
@@ -244,8 +245,8 @@ class PortfolioService:
         sources = [source for source in settings.sources if source.enabled]
         if not sources:
             raise RuntimeError("Add and enable at least one read-only account on the Portfolio page before refreshing")
-        usd_cny, usd_hkd, fx_at, fx_stale = self._rates()
-        rates = build_rates(usd_cny, usd_hkd)
+        usd_cad, fx_at, fx_stale = self._rates()
+        rates = build_rates(usd_cad)
         display_currency = settings.display_currency
         refreshed_at = _now()
         results: dict[str, dict[str, Any]] = {}
@@ -340,7 +341,7 @@ class PortfolioService:
                     "status": "ok",
                     "last_success_at": refreshed_at,
                     "total_usd": _number(account_total),
-                    "total_cny": _number(from_usd(account_total, "CNY", rates)),
+                    "total_cad": _number(from_usd(account_total, "CAD", rates)),
                     "total_display": _number(
                         from_usd(account_total, display_currency, rates)
                     ),
@@ -375,7 +376,7 @@ class PortfolioService:
             "display_currency": display_currency,
             "totals": {
                 "usd": _number(total_usd),
-                "cny": _number(from_usd(total_usd, "CNY", rates)),
+                "cad": _number(from_usd(total_usd, "CAD", rates)),
                 "display": _number(from_usd(total_usd, display_currency, rates)),
             },
             "valuation": {
@@ -385,8 +386,7 @@ class PortfolioService:
                 "identified_coverage": (_number(identified_usd / total_usd) if total_usd > 0 else 0.0),
             },
             "fx": {
-                "usd_cny": _number(usd_cny),
-                "usd_hkd": _number(usd_hkd),
+                "usd_cad": _number(usd_cad),
                 "rates": {
                     code: _number(rate) for code, rate in sorted(rates.items())
                 },
@@ -441,7 +441,7 @@ class PortfolioService:
             "reconnect_required": bool(result.get("reconnect_required")),
             "last_success_at": cached["created_at"] if cached is not None else None,
             "total_usd": None,
-            "total_cny": None,
+            "total_cad": None,
             "total_display": None,
             "position_count": 0,
             "auth": auth_metadata(profile),
@@ -596,7 +596,6 @@ class PortfolioService:
             "cost_price",
             "market_price",
             "market_value_usd",
-            "market_value_cny",
             "unrealized_pnl_usd",
             "priced",
             "updated_at",
@@ -661,9 +660,10 @@ class PortfolioService:
 
         The loader chain routes on the market suffix, so the connector-reported
         ticker is used as-is when it already carries one (``SHOP.TO``,
-        ``TD.TO``) and is qualified from the position's currency/market
-        otherwise (IBKR reports a bare ``AAPL``, whose venue is unstated). A
-        symbol whose market cannot be established is not guessed at.
+        ``TD.TO``) and is qualified from the position's currency otherwise
+        (IBKR reports a bare ``AAPL`` in USD, whose US venue is then
+        unambiguous). A symbol whose market cannot be established is not
+        guessed at.
 
         Args:
             position: A valued position row from a stored snapshot.
@@ -678,9 +678,6 @@ class PortfolioService:
         if head and suffix in _LOADER_MARKET_SUFFIXES:
             return symbol
         currency = str(position.get("price_currency") or position.get("currency") or "").upper()
-        market = str(position.get("market") or "").upper()
-        if currency == "HKD" or market == "HK":
-            return f"{symbol}.HK" if symbol.isdigit() else None
         if currency == "USD" and symbol.isalpha():
             return f"{symbol}.US"
         return None
@@ -739,18 +736,12 @@ class PortfolioService:
         grouped: dict[str, dict[str, Any]] = {}
         for row in positions:
             symbol = str(row.get("symbol") or "").upper()
-            currency = str(row.get("currency") or "").upper()
-            market = str(row.get("market") or "").upper()
             if symbol.endswith(".US"):
                 canonical = symbol[:-3]
-            elif symbol.endswith(".HK"):
-                canonical = symbol[:-3].lstrip("0") or "0"
             else:
                 canonical = symbol
             region = (
-                "HK"
-                if currency == "HKD" or market == "HK" or symbol.endswith(".HK")
-                else ("CRYPTO" if row.get("asset_type") in {"crypto", "stablecoin"} else "US")
+                "CRYPTO" if row.get("asset_type") in {"crypto", "stablecoin"} else "US"
             )
             key = f"{region}:{canonical}"
             item = grouped.setdefault(
@@ -763,7 +754,6 @@ class PortfolioService:
                     "sources": [],
                     "markets": [],
                     "market_value_usd": Decimal("0"),
-                    "market_value_cny": Decimal("0"),
                     "unrealized_pnl_usd": Decimal("0"),
                 },
             )
@@ -775,7 +765,6 @@ class PortfolioService:
             if row.get("market") not in item["markets"]:
                 item["markets"].append(row.get("market"))
             item["market_value_usd"] += _decimal(row.get("market_value_usd"))
-            item["market_value_cny"] += _decimal(row.get("market_value_cny"))
             item["unrealized_pnl_usd"] += _decimal(row.get("unrealized_pnl_usd"))
         result = []
         for item in grouped.values():
@@ -783,7 +772,7 @@ class PortfolioService:
             item["sources"].sort()
             item["markets"] = sorted(str(value) for value in item["markets"] if value)
             item["duplicate_across_brokers"] = len(item["brokers"]) > 1
-            for key in ("market_value_usd", "market_value_cny", "unrealized_pnl_usd"):
+            for key in ("market_value_usd", "unrealized_pnl_usd"):
                 item[key] = _number(item[key])
             result.append(item)
         return sorted(result, key=lambda row: _decimal(row["market_value_usd"]), reverse=True)
@@ -968,42 +957,39 @@ class PortfolioService:
             raise RuntimeError("Longbridge isolated reader returned an incomplete payload")
         return payload
 
-    def _rates(self) -> tuple[Decimal, Decimal, str, bool]:
-        """Return the USD/CNY and USD/HKD rates used to value this snapshot.
+    def _rates(self) -> tuple[Decimal, str, bool]:
+        """Return the USD/CAD rate used to value this snapshot.
 
         Returns:
-            ``(usd_cny, usd_hkd, fetched_at, stale)`` where ``stale`` marks a
-            fall back to the cached rates.
+            ``(usd_cad, fetched_at, stale)`` where ``stale`` marks a fall back
+            to the cached rate.
 
         Raises:
-            RuntimeError: If the fetch fails and no cached pair exists.
+            RuntimeError: If the fetch fails and no cached rate exists.
         """
         try:
-            usd_cny, usd_hkd, fetched_at = self._fx_fetcher()
-            self.store.save_fx("USD", "CNY", str(usd_cny), fetched_at)
-            self.store.save_fx("USD", "HKD", str(usd_hkd), fetched_at)
-            return usd_cny, usd_hkd, fetched_at, False
+            usd_cad, fetched_at = self._fx_fetcher()
+            self.store.save_fx("USD", "CAD", str(usd_cad), fetched_at)
+            return usd_cad, fetched_at, False
         except Exception:
-            cny = self.store.load_fx("USD", "CNY")
-            hkd = self.store.load_fx("USD", "HKD")
-            if cny is None or hkd is None:
-                raise RuntimeError("FX service unavailable and no prior USD/CNY + USD/HKD cache exists")
-            return _decimal(cny[0]), _decimal(hkd[0]), min(cny[1], hkd[1]), True
+            cad = self.store.load_fx("USD", "CAD")
+            if cad is None:
+                raise RuntimeError("FX service unavailable and no prior USD/CAD cache exists")
+            return _decimal(cad[0]), cad[1], True
 
     @staticmethod
-    def _fetch_fx() -> tuple[Decimal, Decimal, str]:
-        """Fetch USD/CNY and USD/HKD from the public reference-rate endpoint.
+    def _fetch_fx() -> tuple[Decimal, str]:
+        """Fetch USD/CAD from the public reference-rate endpoint.
 
         Returns:
-            ``(usd_cny, usd_hkd, fetched_at)``.
+            ``(usd_cad, fetched_at)``.
         """
-        url = "https://api.frankfurter.app/latest?from=USD&to=CNY,HKD"
+        url = "https://api.frankfurter.app/latest?from=USD&to=CAD"
         request = urllib.request.Request(url, headers={"User-Agent": "Vibe-Trading/portfolio"})
         with urllib.request.urlopen(request, timeout=8) as response:  # noqa: S310 - fixed HTTPS host
             payload = json.load(response)
         return (
-            _decimal(payload["rates"]["CNY"]),
-            _decimal(payload["rates"]["HKD"]),
+            _decimal(payload["rates"]["CAD"]),
             _now(),
         )
 
@@ -1023,7 +1009,7 @@ class PortfolioService:
         if fx_stale:
             warnings.append(
                 "Exchange-rate service unavailable; valued with the last "
-                "successfully fetched USD/CNY and USD/HKD rates."
+                "successfully fetched USD/CAD rate."
             )
         failed = [str(row.get("label") or row["broker"]) for row in accounts if row["status"] != "ok"]
         if failed:

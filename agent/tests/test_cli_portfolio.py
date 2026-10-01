@@ -46,7 +46,7 @@ _SNAPSHOT = {
     "snapshot_id": "abc",
     "created_at": "2026-08-22T05:00:00+00:00",
     "complete": False,
-    "totals": {"usd": 1500.0, "cny": 10800.0},
+    "totals": {"usd": 1500.0, "cad": 2025.0},
     "accounts": [
         {
             "source_id": "ibkr",

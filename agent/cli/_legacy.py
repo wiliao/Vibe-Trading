@@ -4155,11 +4155,11 @@ def _print_portfolio_snapshot(snapshot: dict[str, Any]) -> None:
     """
     totals = snapshot.get("totals") or {}
     usd = float(totals.get("usd") or 0.0)
-    cny = float(totals.get("cny") or 0.0)
+    cad = float(totals.get("cad") or 0.0)
     state = "[green]complete[/green]" if snapshot.get("complete") else "[yellow]INCOMPLETE[/yellow]"
     console.print(
         f"Snapshot [cyan]{rich_escape(str(snapshot.get('created_at') or '?'))}[/cyan] · {state} · "
-        f"total [bold]{usd:,.2f} USD[/bold] / {cny:,.0f} CNY"
+        f"total [bold]{usd:,.2f} USD[/bold] / {cad:,.2f} CAD"
     )
 
     accounts = Table(title="Sources", box=box.SIMPLE_HEAVY, show_lines=False)

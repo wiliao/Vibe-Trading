@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from src.portfolio.fx import Rates, from_usd, to_usd
+from src.portfolio.fx import Rates, to_usd
 from src.trading.types import TradingProfile
 
 STABLECOINS = frozenset({"USDT", "USDC", "FDUSD", "TUSD", "BUSD"})
@@ -106,13 +106,10 @@ def normalize_position(broker: str, row: dict[str, Any]) -> dict[str, Any]:
     market = str(row.get("market") or row.get("exchange") or broker).upper()
     currency = str(row.get("currency") or "").upper()
     if not currency:
-        currency = (
-            "HKD"
-            if symbol.endswith(".HK") or symbol.startswith("HK.")
-            else "CNY"
-            if symbol.startswith(("SH.", "SZ.", "BJ."))
-            else "USD"
-        )
+        # A row that declares no currency and inherits none from its account is
+        # read as USD. The venue is never guessed from the ticker: the market
+        # suffix alone cannot distinguish a US listing from a Canadian one.
+        currency = "USD"
     quantity = _decimal(
         row.get(
             "quantity",
@@ -190,7 +187,7 @@ def normalize_position(broker: str, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def value_position(row: dict[str, Any], *, rates: Rates) -> dict[str, Any]:
-    """Calculate USD/CNY market value and unrealized P/L.
+    """Calculate the USD market value and unrealized P/L.
 
     Args:
         row: A normalized position row; it is updated in place.
@@ -199,9 +196,8 @@ def value_position(row: dict[str, Any], *, rates: Rates) -> dict[str, Any]:
             being priced as USD.
 
     Returns:
-        The same row, with ``priced``, ``market_value_usd``,
-        ``market_value_cny`` and ``unrealized_pnl_usd`` filled in and the
-        connector-only fields dropped.
+        The same row, with ``priced``, ``market_value_usd`` and
+        ``unrealized_pnl_usd`` filled in and the connector-only fields dropped.
     """
     price = _decimal(row.get("market_price"))
     quantity = _decimal(row.get("quantity"))
@@ -220,7 +216,6 @@ def value_position(row: dict[str, Any], *, rates: Rates) -> dict[str, Any]:
     row.update(
         priced=priced,
         market_value_usd=_number(market_usd),
-        market_value_cny=_number(from_usd(market_usd, "CNY", rates)),
         unrealized_pnl_usd=_number(pnl_usd) if pnl_usd is not None else None,
     )
     for key in (

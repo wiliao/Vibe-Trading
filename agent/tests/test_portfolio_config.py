@@ -20,7 +20,7 @@ def test_portfolio_settings_round_trip_without_credentials(tmp_path):
     store = PortfolioSettingsStore(tmp_path / "portfolio.json")
     settings = store.save(
         {
-            "display_currency": "CNY",
+            "display_currency": "CAD",
             "sources": [
                 {
                     "id": "main-stocks",
