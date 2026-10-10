@@ -389,8 +389,11 @@ _LOADER_CACHE_TRUE_VALUES = {"1", "true", "yes", "on"}
 # v8: US/CA refactor — removed-market loaders and their source names are gone;
 # a frame cached by a deleted source must not be served into a build whose
 # chain no longer contains it.
-_LOADER_CACHE_VERSION = 8
-_LOADER_FRAME_METADATA_ATTRS = ("quote_currency", "currency_conversion")
+# v9: FMP/Tiingo keep one adjusted/raw basis, and the served frame carries its
+# actual adjustment stamp in `attrs`. Entries cached without that stamp hold a
+# basis the metadata cannot describe and must not be served.
+_LOADER_CACHE_VERSION = 9
+_LOADER_FRAME_METADATA_ATTRS = ("quote_currency", "currency_conversion", "adjustment")
 
 
 def loader_cache_enabled() -> bool:

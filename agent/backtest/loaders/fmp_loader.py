@@ -319,4 +319,7 @@ def _parse_historical(payload: Any) -> Optional[pd.DataFrame]:
     df = df[list(_OHLCV_FIELDS)].dropna(subset=["open", "high", "low", "close"])
     if df.empty:
         return None
+    # One basis per series: an all-raw response must override the static
+    # split_dividend default so frame metadata reports what was served.
+    df.attrs["adjustment"] = "split_dividend" if has_adjusted_data else "raw"
     return df

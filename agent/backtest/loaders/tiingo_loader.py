@@ -231,6 +231,9 @@ def _rows_to_frame(rows: List[dict]) -> Optional[pd.DataFrame]:
     frame["volume"] = frame["volume"].fillna(0.0)
     frame = frame.loc[:, _OHLCV_COLUMNS].sort_index()
     frame = frame.dropna(subset=["open", "high", "low", "close"])
+    # One basis per series: an all-raw response must override the static
+    # split_dividend default so frame metadata reports what was served.
+    frame.attrs["adjustment"] = "split_dividend" if has_adjusted_data else "raw"
     return frame if not frame.empty else None
 
 
