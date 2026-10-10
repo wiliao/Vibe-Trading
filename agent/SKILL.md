@@ -1,6 +1,6 @@
 ---
 name: vibe-trading
-version: 0.1.15
+version: 0.1.16
 description: Professional finance research toolkit — backtesting (2 engines + benchmark comparison panel), factor analysis, Alpha Zoo (271 pre-built alphas across qlib158/alpha101/academic/fundamental), options pricing, 58 finance skills, 25 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 10 market-data sources (yahoo, yfinance, stooq, sina, eastmoney, local, plus optional-key finnhub/alphavantage/tiingo/fmp).
 dependencies:
   python: ">=3.11"

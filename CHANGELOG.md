@@ -3,7 +3,7 @@
 All notable changes to Vibe-Trading are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.1.16] — 2026-10-10
 
 ### Changed
 
