@@ -527,6 +527,9 @@ One `get_market_data` call, **10 market-data sources**. Set `source: "auto"` —
 | `tiingo` · `fmp` · `finnhub` · `alphavantage` | US | key | optional key-gated providers |
 | `local` | any | none | your own CSV / Parquet / DuckDB via `local:` prefix |
 
+Local sources can read bar dates from a `DatetimeIndex`, with or without a
+configured `date_format`; an explicitly mapped date column takes precedence.
+
 **Fallback chains (by IP-ban risk):**
 
 - **US equities** → `yahoo` · `stooq` · `sina` · `eastmoney` · `yfinance` · `tiingo` · `fmp` · `finnhub` · `alphavantage` · `local`
