@@ -18,9 +18,10 @@ class InstrumentType(str, Enum):
     """Instrument classes the broker may report or accept.
 
     ``CFD`` covers margin contracts-for-difference that are not spot forex
-    pairs (metals like XAUUSD, index/energy CFDs). Like ``OPTION``
-    it has no universe asset-class bucket and is admitted only when the user's
-    mandate explicitly lists ``"cfd"`` in ``allowed_instruments``.
+    pairs (metals like XAUUSD, index/energy/crypto CFDs). It has no universe
+    asset-class bucket and requires ``"cfd"`` in ``allowed_instruments``.
+    ``OPTION`` is representable for classification, but order enforcement
+    refuses it until an options-specific risk gate is available.
     """
 
     EQUITY = "equity"
@@ -43,9 +44,8 @@ class AssetClass(str, Enum):
       ``cryptocurrency`` as ``InstrumentType.CRYPTO``, which the gate buckets
       here. Robinhood is a surviving broker.
 
-    The removed-market buckets (A-share, Korea, Vietnam, Argentina, UK,
-    forex, …) have no surviving producer or loader chain: their connectors and
-    loader markets are gone from this build. Canada is market-data + backtest
+    The buckets for markets this build no longer ships have no surviving
+    producer or loader chain: their connectors and loader markets are gone. Canada is market-data + backtest
     only (decision D3), so there is deliberately no ``CA_EQUITY`` bucket.
     """
 

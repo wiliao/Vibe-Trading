@@ -49,16 +49,16 @@ def _run_card(
         "schema_version": "1.0",
         "generated_at": "2026-09-30T00:00:00Z",
         "backtest": {
-            "codes": codes if codes is not None else ["BTC-USDT"],
+            "codes": codes if codes is not None else ["AAPL.US"],
             "start_date": "2024-01-01",
             "end_date": "2024-06-30",
             "interval": "1D",
             "engine": "crypto",
             "initial_cash": 1000000,
-            "source": "okx",
+            "source": "yahoo",
         },
         "reproducibility": {"config_hash": "0" * 64},
-        "data_sources": ["okx"],
+        "data_sources": ["yahoo"],
         "metrics": dict(CARD_METRICS),
         "warnings": warnings or [],
         "artifacts": [],
@@ -104,18 +104,18 @@ def summary_run_dir(tmp_path, monkeypatch) -> Path:
     (run_dir / "code").mkdir(parents=True)
     (run_dir / "artifacts").mkdir(parents=True)
     (run_dir / "config.json").write_text(
-        json.dumps({"source": "okx"}), encoding="utf-8"
+        json.dumps({"source": "yahoo"}), encoding="utf-8"
     )
     (run_dir / "code" / "signal_engine.py").write_text("", encoding="utf-8")
     (run_dir / "run_card.json").write_text(json.dumps(_run_card()), encoding="utf-8")
     _write_equity_csv(run_dir / "artifacts" / "equity.csv", _equity_rows(5))
     (run_dir / "artifacts" / "trades.csv").write_text(
-        "symbol,pnl\nBTC-USDT,10\n", encoding="utf-8"
+        "symbol,pnl\nAAPL.US,10\n", encoding="utf-8"
     )
     (run_dir / "artifacts" / "metrics.csv").write_text(
         "sharpe\n1.25\n", encoding="utf-8"
     )
-    (run_dir / "artifacts" / "ohlcv_BTC-USDT.csv").write_text(
+    (run_dir / "artifacts" / "ohlcv_AAPL.US.csv").write_text(
         "timestamp,open\n", encoding="utf-8"
     )
     return run_dir
@@ -149,8 +149,8 @@ def test_summary_matches_run_card_and_equity_fixture(summary_run_dir):
 
     assert summary["schema_version"] == "1.0"
     assert summary["run_id"] == summary_run_dir.name
-    assert summary["title"] == "BTC-USDT"
-    assert summary["codes"] == ["BTC-USDT"]
+    assert summary["title"] == "AAPL.US"
+    assert summary["codes"] == ["AAPL.US"]
     assert summary["start_date"] == "2024-01-01"
     assert summary["end_date"] == "2024-06-30"
     assert summary["interval"] == "1D"
@@ -163,18 +163,18 @@ def test_summary_matches_run_card_and_equity_fixture(summary_run_dir):
         "trades": str(artifacts / "trades.csv"),
         "metrics": str(artifacts / "metrics.csv"),
         "run_card_json": str(summary_run_dir / "run_card.json"),
-        "ohlcv": {"BTC-USDT": str(artifacts / "ohlcv_BTC-USDT.csv")},
+        "ohlcv": {"AAPL.US": str(artifacts / "ohlcv_AAPL.US.csv")},
     }
 
 
 def test_title_joins_codes_with_middle_dot(summary_run_dir):
-    card = _run_card(codes=["BTC-USDT", "ETH-USDT", "600519.SH"])
+    card = _run_card(codes=["AAPL.US", "MSFT.US", "TD.TO"])
     (summary_run_dir / "run_card.json").write_text(json.dumps(card), encoding="utf-8")
 
     summary = build_backtest_summary(summary_run_dir)
 
-    assert summary["title"] == "BTC-USDT \u00b7 ETH-USDT \u00b7 600519.SH"
-    assert summary["codes"] == ["BTC-USDT", "ETH-USDT", "600519.SH"]
+    assert summary["title"] == "AAPL.US \u00b7 MSFT.US \u00b7 TD.TO"
+    assert summary["codes"] == ["AAPL.US", "MSFT.US", "TD.TO"]
 
 
 def test_warnings_come_from_the_run_card(summary_run_dir):
@@ -327,7 +327,7 @@ def test_corrupt_run_card_keeps_envelope_ok_without_summary(summary_run_dir):
     assert envelope["status"] == "ok"
     assert "summary" not in envelope
     assert envelope["artifacts"]["ohlcv"] == {
-        "BTC-USDT": str(summary_run_dir / "artifacts" / "ohlcv_BTC-USDT.csv")
+        "AAPL.US": str(summary_run_dir / "artifacts" / "ohlcv_AAPL.US.csv")
     }
     assert try_build_backtest_summary(summary_run_dir) is None
 
@@ -373,12 +373,12 @@ def test_summary_metrics_stay_complete_when_stdout_truncates(summary_run_dir):
 
 def test_ohlcv_glob_maps_every_code(summary_run_dir):
     artifacts = summary_run_dir / "artifacts"
-    (artifacts / "ohlcv_ETH-USDT.csv").write_text("timestamp,open\n", encoding="utf-8")
-    (artifacts / "ohlcv_600519.SH.csv").write_text("timestamp,open\n", encoding="utf-8")
+    (artifacts / "ohlcv_MSFT.US.csv").write_text("timestamp,open\n", encoding="utf-8")
+    (artifacts / "ohlcv_TD.TO.csv").write_text("timestamp,open\n", encoding="utf-8")
     expected = {
-        "600519.SH": str(artifacts / "ohlcv_600519.SH.csv"),
-        "BTC-USDT": str(artifacts / "ohlcv_BTC-USDT.csv"),
-        "ETH-USDT": str(artifacts / "ohlcv_ETH-USDT.csv"),
+        "TD.TO": str(artifacts / "ohlcv_TD.TO.csv"),
+        "AAPL.US": str(artifacts / "ohlcv_AAPL.US.csv"),
+        "MSFT.US": str(artifacts / "ohlcv_MSFT.US.csv"),
     }
 
     assert collect_ohlcv_paths(summary_run_dir) == expected
@@ -389,7 +389,7 @@ def test_ohlcv_glob_maps_every_code(summary_run_dir):
 
 
 def test_ohlcv_map_is_empty_without_files(summary_run_dir):
-    (summary_run_dir / "artifacts" / "ohlcv_BTC-USDT.csv").unlink()
+    (summary_run_dir / "artifacts" / "ohlcv_AAPL.US.csv").unlink()
 
     assert collect_ohlcv_paths(summary_run_dir) == {}
 
@@ -404,7 +404,7 @@ def test_ohlcv_glob_ignores_other_artifacts(summary_run_dir):
     (artifacts / "ohlcv_.csv").write_text("timestamp,open\n", encoding="utf-8")
 
     assert collect_ohlcv_paths(summary_run_dir) == {
-        "BTC-USDT": str(artifacts / "ohlcv_BTC-USDT.csv")
+        "AAPL.US": str(artifacts / "ohlcv_AAPL.US.csv")
     }
 
 
@@ -492,13 +492,13 @@ def test_ohlcv_paths_skip_external_symlinks_and_directories(summary_run_dir, tmp
     external.write_text("timestamp,open\n2024-01-01,1\n")
     (summary_run_dir / "artifacts/ohlcv_SECRET.csv").symlink_to(external)
     (summary_run_dir / "artifacts/ohlcv_DIRECTORY.csv").mkdir()
-    assert set(collect_ohlcv_paths(summary_run_dir)) == {"BTC-USDT"}
+    assert set(collect_ohlcv_paths(summary_run_dir)) == {"AAPL.US"}
 
 
 def test_real_run_card_structured_metrics_reach_summary(summary_run_dir):
     from backtest.run_card import write_run_card
-    card = write_run_card(summary_run_dir, {"codes": ["BTC-USDT"]}, {
-        "sharpe": 1.25, "unfilled_plan_rejections_by_symbol": {"BTC-USDT": 2},
+    card = write_run_card(summary_run_dir, {"codes": ["AAPL.US"]}, {
+        "sharpe": 1.25, "unfilled_plan_rejections_by_symbol": {"AAPL.US": 2},
         "validation": {"passed": False}, "warnings": ["annualisation adjusted"],
     })
     summary = build_backtest_summary(summary_run_dir)

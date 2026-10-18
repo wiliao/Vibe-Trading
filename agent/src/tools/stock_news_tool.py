@@ -209,6 +209,10 @@ class StockNewsTool(BaseTool):
             return self._error(f"invalid code: {code!r}")
 
         if suffix in _YAHOO_SUFFIXES:
+            # A bare B3 code (PETR4) is ambiguous on Yahoo search; its own
+            # spelling (PETR4.SA) is the listing.
+            if suffix == "SA":
+                query = code.upper()
             return self._stock_via_yahoo(code, query, limit)
         return self._error(
             f"unsupported market for code {code!r}; expected suffix "

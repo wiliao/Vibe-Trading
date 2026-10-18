@@ -26,6 +26,8 @@
 #       agent/backtest and frontend/src, minus its allow entries; uses
 #       `tools/ci_us_ca_scope_gate.py`. The Python twin of this gate is
 #       `agent/tests/test_us_ca_scope_gate.py` (same JSON policy).
+#   (h) No internal documents in the Git index, even if force-added.
+#       Uses `tools/ci_private_files_gate.py`; ignored local files are allowed.
 #
 # Exclusions: .git, node_modules, __pycache__, .venv, dist, build, this
 # script itself. The HTML scan in (c) is scoped to wiki/alpha-library/**
@@ -70,8 +72,8 @@ fi
 # -------------------------------------------------------------- gate (b)
 # docs/ is excluded: those are internal planning docs that discuss the
 # trademark policy itself (e.g. "the string 'WorldQuant' must not appear in
-# user-facing artifacts"). docs/ is not shipped to PyPI / public consumers
-# (memory: feedback_no_push_docs). The gate's real target is source code,
+# user-facing artifacts"). Gate (g) prevents these local documents from
+# being tracked. This gate's target is source code,
 # READMEs, HTML/JSON manifests, and the wiki.
 echo "[gate b] no 'WorldQuant' trademark string in shipped artifacts ..."
 B_HITS=$(grep -rni --include='*.py' --include='*.md' --include='*.html' --include='*.json' \
@@ -185,6 +187,12 @@ if [ "$G_RC" -ne 0 ]; then
     FAILED=1
 else
     echo "${GREEN}ok${NC}"
+fi
+
+# -------------------------------------------------------------- gate (h)
+echo "[gate h] no tracked internal documents ..."
+if ! "$PY" tools/ci_private_files_gate.py; then
+    FAILED=1
 fi
 
 # --------------------------------------------------------------- result

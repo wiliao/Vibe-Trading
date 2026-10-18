@@ -10,7 +10,7 @@ import subprocess
 import sys
 import urllib.request
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 
@@ -211,6 +211,7 @@ class PortfolioService:
         return source_catalog(
             self.settings_store.load(),
             self.settings_store.connection_store,
+            self.settings_store.import_store,
         )
 
     def _connection_profile(self, source: PortfolioSource):
@@ -222,6 +223,8 @@ class PortfolioService:
         Returns:
             A ``(connection, profile)`` pair.
         """
+        if source.source_kind != "connection":
+            raise ValueError("file imports have no broker connection")
         connection = self.settings_store.connection_store.get(source.connection_id)
         return connection, profile_by_id(connection.profile_id)
 
@@ -248,6 +251,8 @@ class PortfolioService:
         usd_cad, fx_at, fx_stale = self._rates()
         rates = build_rates(usd_cad)
         display_currency = settings.display_currency
+        if display_currency not in rates:
+            raise RuntimeError(f"FX rate for {display_currency} is unavailable; refresh when the reference feed recovers")
         refreshed_at = _now()
         results: dict[str, dict[str, Any]] = {}
         # The Longbridge Python SDK wraps a native runtime whose contexts are
@@ -283,10 +288,16 @@ class PortfolioService:
         accounts: list[dict[str, Any]] = []
         for source in sources:
             result = results[source.id]
-            connection, profile = self._connection_profile(source)
-            broker = profile.connector
+            if source.source_kind == "extraetf":
+                profile = None
+                profile_id = None
+                broker = "extraetf"
+            else:
+                connection, profile = self._connection_profile(source)
+                profile_id = connection.profile_id
+                broker = profile.connector
             if result["status"] != "ok":
-                accounts.append(self._failed_account(source, connection.profile_id, profile, result))
+                accounts.append(self._failed_account(source, profile_id, profile, result))
                 continue
             try:
                 broker_positions = [
@@ -325,7 +336,7 @@ class PortfolioService:
                 }
                 accounts.append(
                     self._failed_account(
-                        source, connection.profile_id, profile, failure
+                        source, profile_id, profile, failure
                     )
                 )
                 if self._progress_callback is not None:
@@ -335,9 +346,11 @@ class PortfolioService:
             accounts.append(
                 {
                     "source_id": source.id,
-                    "profile_id": connection.profile_id,
+                    "profile_id": profile_id,
                     "label": source.label,
                     "broker": broker,
+                    "source_kind": source.source_kind,
+                    "import_metadata": result.get("import_metadata"),
                     "status": "ok",
                     "last_success_at": refreshed_at,
                     "total_usd": _number(account_total),
@@ -351,15 +364,13 @@ class PortfolioService:
                     "position_count": len(broker_positions),
                     "priced_position_count": priced_count,
                     "unpriced_position_count": len(broker_positions) - priced_count,
-                    "auth": auth_metadata(profile),
-                    "portfolio_compatibility": profile_compatibility(profile),
+                    "auth": auth_metadata(profile) if profile is not None else None,
+                    "portfolio_compatibility": profile_compatibility(profile) if profile is not None else None,
                 }
             )
             positions.extend(broker_positions)
 
         total_usd = sum((_decimal(row.get("total_usd")) for row in accounts), Decimal("0"))
-        # Every enabled source produces exactly one account row, so a snapshot
-        # is complete only when none of them failed.
         complete = all(row["status"] == "ok" for row in accounts)
         priced_usd = sum((_decimal(row.get("priced_value_usd")) for row in accounts), Decimal("0"))
         cash_usd = sum((_decimal(row.get("cash_usd")) for row in accounts), Decimal("0"))
@@ -408,8 +419,8 @@ class PortfolioService:
     def _failed_account(
         self,
         source: PortfolioSource,
-        profile_id: str,
-        profile: TradingProfile,
+        profile_id: str | None,
+        profile: TradingProfile | None,
         result: dict[str, Any],
     ) -> dict[str, Any]:
         """Build the account row for a source that could not be read.
@@ -433,7 +444,8 @@ class PortfolioService:
             "source_id": source.id,
             "profile_id": profile_id,
             "label": source.label,
-            "broker": profile.connector,
+            "broker": profile.connector if profile is not None else "extraetf",
+            "source_kind": source.source_kind,
             "status": "error",
             "error": result.get("error"),
             "error_code": result.get("error_code"),
@@ -444,8 +456,8 @@ class PortfolioService:
             "total_cad": None,
             "total_display": None,
             "position_count": 0,
-            "auth": auth_metadata(profile),
-            "portfolio_compatibility": profile_compatibility(profile),
+            "auth": auth_metadata(profile) if profile is not None else None,
+            "portfolio_compatibility": profile_compatibility(profile) if profile is not None else None,
         }
 
     def latest(self) -> dict[str, Any] | None:
@@ -467,6 +479,12 @@ class PortfolioService:
         if not enabled or observed != enabled:
             return None
 
+        for source in enabled_sources:
+            if source.source_kind == "extraetf" and any(row.get("source_id") == source.id and row.get("status") == "ok" for row in snapshot["accounts"]):
+                try:
+                    self.settings_store.import_store.get(source.id, require_fresh=True)
+                except ValueError:
+                    return None
         compatibility_by_source = {}
         for source in enabled_sources:
             try:
@@ -483,6 +501,24 @@ class PortfolioService:
             for account in snapshot.get("accounts", [])
         ]
         return snapshot
+
+    def snapshot_by_id(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Return one stored snapshot exactly as persisted, never recomputed.
+
+        Args:
+            snapshot_id: Exact persisted snapshot identifier.
+
+        Returns:
+            The stored envelope, or ``None`` when the id is unknown, was valued
+            under another contract version, or includes a source that is no
+            longer enabled (a removed or revoked connector's data stays hidden).
+        """
+        snapshot = self.store.get(snapshot_id)
+        if snapshot is None or snapshot.get("valuation_version") != PORTFOLIO_VALUATION_VERSION:
+            return None
+        enabled = {source.id for source in self.settings_store.load().sources if source.enabled}
+        observed = {str(account.get("source_id") or account.get("broker")) for account in snapshot.get("accounts", [])}
+        return snapshot if observed <= enabled else None
 
     def reconnect_source(self, source_id: str) -> dict[str, Any]:
         """Run a source's interactive OAuth flow on explicit user request.
@@ -599,6 +635,7 @@ class PortfolioService:
             "unrealized_pnl_usd",
             "priced",
             "updated_at",
+            "portfolio_id", "portfolio_name", "instrument_id_kind", "source_mtime", "as_of_source",
         ]
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
@@ -606,8 +643,12 @@ class PortfolioService:
         writer.writerows(snapshot["positions"])
         return output.getvalue()
 
-    def analysis_context(self) -> dict[str, Any] | None:
+    def analysis_context(self, snapshot_id: str | None = None) -> dict[str, Any] | None:
         """Return a credential/account-id-free snapshot suitable for an LLM.
+
+        With ``snapshot_id`` the read is pinned to that stored snapshot (no
+        fallback to the latest one when it is unavailable); without it the
+        latest semantics are unchanged.
 
         The context also carries ``risk_xray_args`` — the ``symbols`` and
         ``weights`` arguments for the existing ``portfolio_risk_xray`` tool.
@@ -617,7 +658,7 @@ class PortfolioService:
         Returns:
             The sanitized context, or ``None`` when no usable snapshot exists.
         """
-        snapshot = self.latest()
+        snapshot = self.latest() if snapshot_id is None else self.snapshot_by_id(snapshot_id)
         if snapshot is None:
             return None
         total = _decimal(snapshot["totals"]["usd"])
@@ -626,6 +667,7 @@ class PortfolioService:
             market_value = _decimal(row.get("market_value_usd"))
             holdings.append(
                 {
+                    "canonical_id": row["canonical_id"],
                     "symbol": row["symbol"],
                     "asset_type": row["asset_type"],
                     "markets": row["markets"],
@@ -636,7 +678,14 @@ class PortfolioService:
                 }
             )
         return {
+            "snapshot_id": snapshot.get("snapshot_id"),
             "as_of": snapshot["created_at"],
+            "read_identity": {
+                "mode": "latest" if snapshot_id is None else "pinned",
+                "snapshot_id": snapshot.get("snapshot_id"),
+                "as_of": snapshot["created_at"],
+                "valuation_version": snapshot.get("valuation_version"),
+            },
             "complete": snapshot["complete"],
             "totals": snapshot["totals"],
             "account_allocation": [
@@ -645,6 +694,11 @@ class PortfolioService:
                     "asset_provider_type": row["broker"],
                     "status": row["status"],
                     "total_usd": row.get("total_usd"),
+                    "source_kind": row.get("source_kind", "connection"),
+                    "file_evidence": {
+                        key: row["import_metadata"].get(key)
+                        for key in ("source_mtime", "as_of_source", "expires_at", "valuation_basis", "cash_included")
+                    } if row.get("import_metadata") else None,
                 }
                 for index, row in enumerate(snapshot["accounts"])
             ],
@@ -653,6 +707,15 @@ class PortfolioService:
             "warnings": snapshot["warnings"],
             "privacy": "No account numbers, credentials, order IDs, names, or local paths included.",
         }
+
+    def rebalance(self, snapshot_id: str, target_weights: dict[str, Any]) -> dict[str, Any]:
+        """Return value-only allocation changes against one explicitly pinned snapshot."""
+        from src.portfolio.rebalance import propose_rebalance
+
+        snapshot = self.snapshot_by_id(snapshot_id)
+        if snapshot is None:
+            raise ValueError("portfolio snapshot unavailable")
+        return propose_rebalance(snapshot, target_weights)
 
     @staticmethod
     def _risk_xray_symbol(position: dict[str, Any]) -> str | None:
@@ -671,6 +734,8 @@ class PortfolioService:
         Returns:
             A loader-routable symbol, or ``None`` when the market is unknown.
         """
+        if position.get("instrument_id_kind") or position.get("source_kind") == "extraetf":
+            return None  # An ISIN or exported pair is not an observed listing/venue.
         symbol = str(position.get("symbol") or "").strip().upper()
         if not symbol:
             return None
@@ -743,7 +808,8 @@ class PortfolioService:
             region = (
                 "CRYPTO" if row.get("asset_type") in {"crypto", "stablecoin"} else "US"
             )
-            key = f"{region}:{canonical}"
+            key = (f"{row['instrument_id_kind'].upper()}:{row['instrument_id']}"
+                   if row.get("instrument_id_kind") else f"{region}:{canonical}")
             item = grouped.setdefault(
                 key,
                 {
@@ -794,6 +860,8 @@ class PortfolioService:
             RuntimeError: If the profile is not read-only, or either connector
                 read returns a non-success status.
         """
+        if source.source_kind == "extraetf":
+            return self.settings_store.import_store.collect(source)
         connection, profile = self._connection_profile(source)
         if not profile.readonly:
             raise RuntimeError("portfolio sources must use a read-only connector profile")
@@ -1006,6 +1074,17 @@ class PortfolioService:
             English warning strings, safe to render verbatim in any UI.
         """
         warnings = []
+        for account in accounts:
+            metadata = account.get("import_metadata")
+            if metadata:
+                warnings.append(
+                    f"extraETF file modified {metadata['source_mtime']}; file mtime is not a price observation. "
+                    f"Expires {metadata['expires_at']} under your freshness policy. "
+                    "Totals cover exported holdings only; cash and unexported assets are not included. "
+                    "ISIN/venue identity is unresolved, so these holdings are excluded from risk-series tools."
+                )
+        if any(row.get("source_kind") == "extraetf" for row in accounts) and len(accounts) > 1:
+            warnings.append("Imported views may overlap other selected sources; duplicate accounts cannot be detected. Select disjoint sources only.")
         if fx_stale:
             warnings.append(
                 "Exchange-rate service unavailable; valued with the last "
@@ -1020,11 +1099,25 @@ class PortfolioService:
             )
         unpriced = [f"{row['broker']}:{row['symbol']}" for row in positions if not row.get("priced")]
         if unpriced:
-            warnings.append("No price available for these positions: " + ", ".join(unpriced[:20]))
+            warnings.append(
+                "No price available for these positions: "
+                + ", ".join(unpriced[:20])
+            )
+        incomplete_unpriced = [
+            f"{row['broker']}:{row['symbol']}"
+            for row in positions
+            if not row.get("priced")
+        ]
+        if incomplete_unpriced:
+            warnings.append(
+                "Account totals are built from priced positions; these "
+                "holdings are excluded, so this snapshot is incomplete: "
+                + ", ".join(incomplete_unpriced[:20])
+            )
         experimental = [
             str(row.get("label") or row.get("broker"))
             for row in accounts
-            if row.get("portfolio_compatibility", {}).get("level") == "experimental"
+            if (row.get("portfolio_compatibility") or {}).get("level") == "experimental"
         ]
         if experimental:
             warnings.append(

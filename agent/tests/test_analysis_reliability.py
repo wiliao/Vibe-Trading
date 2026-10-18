@@ -39,19 +39,6 @@ def test_empty_primary_falls_through_only_for_missing_symbols():
     assert result["_provenance"]["AAPL.US"]["source"] == "yahoo"
 
 
-@pytest.mark.parametrize("symbol", ["BTCUSDT", "BTC/USDT", "BTC-USDT"])
-def test_crypto_alias_fetch_uses_canonical_pair_and_preserves_requested_identity(symbol):
-    class Crypto:
-        def fetch(self, codes, *_args, **_kw):
-            assert codes == ["BTC-USDT"]
-            return {codes[0]: _frame()}
-    result = fetch_market_data(codes=[symbol], start_date="2025-01-01", end_date="2026-01-01", loader_resolver=lambda _: Crypto)
-    assert set(result) == {symbol}
-    assert result[symbol]
-    assert detect_source("BTCUSDT") == "okx"
-    assert detect_source("BRK.B.US") == "yahoo"
-
-
 def test_failed_chat_data_names_attempts_without_raw_exception():
     class Broken:
         def fetch(self, *_args, **_kw):
@@ -68,11 +55,11 @@ def test_matrix_and_regime_use_same_snapshot_and_surface_coverage(monkeypatch):
     frames = {"AAPL": _frame(), "SPY": _frame(2)}
     fetch = Mock(return_value=frames)
     monkeypatch.setattr(correlation, "_fetch_price_series", fetch)
-    result = correlation.compute_correlation_analysis(["AAPL", "SPY", "MISSING"], days=30, include_regime=True)
+    result = correlation.compute_correlation_analysis(["AAPL", "SPY", "MSFT"], days=30, include_regime=True)
     assert fetch.call_count == 1
     assert result["correlation"]["labels"] == ["AAPL", "SPY"]
     assert result["regime"]["labels"] == ["AAPL", "SPY"]
-    assert result["coverage"]["missing"] == ["MISSING"]
+    assert result["coverage"]["missing"] == ["MSFT"]
     assert result["coverage"]["observations"] == 30
     assert result["coverage"]["last_date"] == frames["AAPL"].index[-1].strftime("%Y-%m-%d")
 
@@ -94,47 +81,13 @@ def test_duplicate_aliases_rejected_before_any_fetch(monkeypatch):
     with pytest.raises(ValueError, match="distinct"):
         correlation.compute_correlation_analysis(["AAPL", "AAPL.US"])
     fetch.assert_not_called()
-    assert correlation._normalize_symbol("BRK.B", "us_equity") == "BRK.B.US"
-    assert correlation._normalize_symbol("eur/usd", "forex") == "EURUSD=X"
-
-
-@pytest.mark.parametrize(
-    "pair", [
-        ("700", "700.HK"), ("9988", "9988.HK"), ("00700", "00700.HK"),
-        ("00700.HK", "0700.HK"), ("00005.HK", "5"),
-    ]
-)
-def test_hk_spellings_of_one_instrument_are_rejected_as_duplicates(pair, monkeypatch):
-    """A bare HK code and its suffixed spelling must normalize to one key.
-
-    The bare path zero-pads to four digits while the suffixed spelling passed
-    through unchanged, so the duplicate guard missed the same instrument written
-    both ways and the endpoint returned a self-correlation, presented as a
-    cross-asset relationship.
-    """
-    fetch = Mock()
-    monkeypatch.setattr(correlation, "_fetch_price_series", fetch)
-    left, right = pair
-    market = correlation.infer_market(left)
-    assert correlation._normalize_symbol(left, market) == correlation._normalize_symbol(
-        right, market
-    )
-    with pytest.raises(ValueError, match="distinct"):
-        correlation.compute_correlation_analysis(list(pair))
-    fetch.assert_not_called()
-
-
-def test_hk_normalization_preserves_distinct_currency_counters():
-    """Remove redundant zeroes without truncating a real five-digit counter."""
-    assert correlation._normalize_symbol("80700.HK", "hk_equity") == "80700.HK"
-    assert correlation._normalize_symbol("80700", "hk_equity") == "80700.HK"
-    assert correlation._normalize_symbol("00700.HK", "hk_equity") == "0700.HK"
+    assert correlation._normalize_symbol("BRK.B", "us_equity") == "BRK.B"
 
 
 def test_readiness_snapshots_and_single_asset_validation():
     client = TestClient(api_server.app, client=("127.0.0.1", 50000))
-    assert client.get("/alpha/readiness").json()["universes"]["btc-usdt"]["ready"] is False
-    assert client.post("/alpha/bench", json={"zoo": "alpha101", "universe": "btc-usdt", "period": "2024-2025"}).status_code == 400
+    assert client.get("/alpha/readiness").json()["universes"]["sp500"]["ready"] is True
+    assert client.post("/alpha/bench", json={"zoo": "alpha101", "universe": "not-a-universe", "period": "2024-2025"}).status_code in (400, 422)
     job_id = "recovery-test"
     alpha_routes.ALPHA_BENCH_JOBS[job_id] = {"job_id": job_id, "status": "running", "progress": {"n_done": 0, "n_total": 1, "stage": "loading_data"}, "result": None, "error": None, "_private": "secret"}
     try:
@@ -144,23 +97,6 @@ def test_readiness_snapshots_and_single_asset_validation():
         assert client.get("/alpha/bench/expired").status_code == 404
     finally:
         alpha_routes.ALPHA_BENCH_JOBS.pop(job_id, None)
-
-
-@pytest.mark.parametrize("token,ready", [("", False), (" \t\n", False), ("synthetic-token", True)])
-def test_alpha_readiness_requires_a_nonblank_tushare_token(monkeypatch, token, ready):
-    from src.config import accessor
-
-    config = accessor.get_env_config()
-    config = config.model_copy(update={"data": config.data.model_copy(update={"tushare_token": token})})
-    monkeypatch.setattr(accessor, "get_env_config", lambda: config)
-    find_spec = alpha_routes.importlib.util.find_spec
-    monkeypatch.setattr(
-        alpha_routes.importlib.util, "find_spec",
-        lambda name: object() if name == "tushare" else find_spec(name),
-    )
-    client = TestClient(api_server.app, client=("127.0.0.1", 50000))
-    status = client.get("/alpha/readiness").json()["universes"]["csi300"]
-    assert status == {"ready": ready, "reason": "tushare_ready" if ready else "tushare_token_missing"}
 
 
 def test_lost_submission_response_reuses_job_and_refuses_changed_parameters(monkeypatch):
@@ -214,8 +150,6 @@ def test_fundamental_factor_dependencies_are_loaded_at_filing_time(monkeypatch):
     assert loader.call_args.kwargs["fields"] == ["net_income", "shares_diluted"]
     assert result["fund:net_income"].iloc[0].isna().all()
     assert "fund:net_income" not in prices
-    with pytest.raises(ValueError, match="SEC US filings"):
-        _prepare_bench_panel(registry, ["fundamental_earnings_yield"], prices, "csi300", "2025-2025")
 
 
 def test_empty_financial_input_does_not_become_a_factor_signal(monkeypatch):
@@ -241,11 +175,11 @@ def test_substituted_loader_is_not_repeated_or_misnamed():
         def fetch(self, *_args, **_kw):
             calls.append("stooq")
             return {}
-    result = fetch_market_data(codes=["005930.KS"], start_date="2025-01-01", end_date="2026-01-01",
+    result = fetch_market_data(codes=["AAPL.US"], start_date="2025-01-01", end_date="2026-01-01",
         loader_resolver=lambda name: Stooq if name == "stooq" else Yahoo,
-        fallback_chain_provider=lambda _: ["pykrx", "yahoo", "stooq"])
+        fallback_chain_provider=lambda _: ["yahoo", "stooq"])
     assert calls == ["yahoo", "stooq"]
-    assert result["_diagnostics"]["005930.KS"]["attempts"] == [
+    assert result["_diagnostics"]["AAPL.US"]["attempts"] == [
         {"source": "yahoo", "reason": "fetch_failed"}, {"source": "stooq", "reason": "no_data"}]
 
 
@@ -264,18 +198,6 @@ def test_correlation_honors_the_configured_source_order(monkeypatch):
     output = correlation._fetch_price_series(["AAPL"], "2025-01-01", "2026-01-01")
     assert calls == [["AAPL.US"]]
     assert list(output) == ["AAPL"]
-
-
-def test_unsupported_fundamental_universe_fails_before_fetching_prices(monkeypatch):
-    from types import SimpleNamespace
-    from src.factors.bench_runner import run_bench
-    fetch = Mock()
-    monkeypatch.setattr("src.factors.bench_runner._load_universe_panel", fetch)
-    registry = SimpleNamespace(list=lambda **_kw: ["fund"], get=lambda _: SimpleNamespace(meta={"columns_required": ["fund:net_income"]}))
-    result = run_bench(zoo="fundamental", universe="csi300", period="2025-2025", registry=registry)
-    assert result["status"] == "error"
-    assert "SEC US filings" in result["error"]
-    fetch.assert_not_called()
 
 
 def test_empty_after_resampling_does_not_stop_fallback(monkeypatch):

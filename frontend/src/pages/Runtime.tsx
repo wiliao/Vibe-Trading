@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RunnerBudgetControls } from "@/components/chat/RunnerBudgetControls";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -82,7 +81,6 @@ export function Runtime() {
   }, [loadStatus]);
 
   const summary = useMemo(() => summarizeRuntime(status), [status]);
-  const sortedBrokers = useMemo(() => sortBrokersByStatus(status), [status]);
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
@@ -96,7 +94,7 @@ export function Runtime() {
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{t("runtime.title")}</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                {t("runtime.subtitlePre")}
+                {t("runtime.subtitlePre")} <span className="font-mono">/live/status</span>
                 {t("runtime.subtitlePost")}
               </p>
             </div>
@@ -163,7 +161,7 @@ export function Runtime() {
               </section>
             ) : (
               <section className="grid gap-4">
-                {sortedBrokers.map((broker) => (
+                {status.brokers.map((broker) => (
                   <BrokerRuntimeCard
                     key={broker.auth.profile_id || broker.auth.broker}
                     broker={broker}
@@ -294,7 +292,6 @@ function BrokerRuntimeCard({
           <p className="text-sm text-muted-foreground">{risk.description}</p>
         </RuntimePanel>
       </div>
-      <div className="mt-3"><RunnerBudgetControls broker={brokerKey} budget={broker.decision_budget} running={runnerAlive} onRefresh={() => { void onRefresh(); }} /></div>
     </article>
   );
 }
@@ -369,39 +366,28 @@ function SdkBrokerRuntimeCard({ broker, t, onRefresh }: { broker: LiveBrokerStat
   );
 }
 
-type ConnectorKind = "not_configured" | "ready" | "connected" | "error" | "unknown";
-
-function connectorKind(auth: LiveBrokerStatus["auth"]): ConnectorKind {
-  if (auth.connection_state === "connected") return "connected";
-  if (auth.connection_state === "not_configured" || auth.configured === false) return "not_configured";
-  if (auth.connection_state === "error") return "error";
-  if (auth.connection_state === "ready") return "ready";
-  return "unknown";
-}
-
 function connectorState(auth: LiveBrokerStatus["auth"], t: TFunction): {
-  kind: ConnectorKind;
+  kind: "not_configured" | "ready" | "connected" | "error" | "unknown";
   label: string;
   tone: "success" | "danger" | "warning" | "neutral";
   action?: "runtime.verifyConnection" | "runtime.retry";
 } {
-  const kind = connectorKind(auth);
-  if (kind === "connected") {
+  if (auth.connection_state === "connected") {
     if (isReadOnlyCompatible(auth)) {
-      return { kind, label: t("runtime.connectedReadOnly"), tone: "success" };
+      return { kind: "connected", label: t("runtime.connectedReadOnly"), tone: "success" };
     }
-    return { kind, label: t("runtime.connectedAccessUnknown"), tone: "neutral" };
+    return { kind: "connected", label: t("runtime.connectedAccessUnknown"), tone: "neutral" };
   }
-  if (kind === "not_configured") {
-    return { kind, label: t("runtime.notConfigured"), tone: "neutral" };
+  if (auth.connection_state === "not_configured" || auth.configured === false) {
+    return { kind: "not_configured", label: t("runtime.notConfigured"), tone: "neutral" };
   }
-  if (kind === "error") {
-    return { kind, label: t("runtime.connectionFailed"), tone: "danger", action: "runtime.retry" };
+  if (auth.connection_state === "error") {
+    return { kind: "error", label: t("runtime.connectionFailed"), tone: "danger", action: "runtime.retry" };
   }
-  if (kind === "ready") {
-    return { kind, label: t("runtime.readyToVerify"), tone: "warning", action: "runtime.verifyConnection" };
+  if (auth.connection_state === "ready") {
+    return { kind: "ready", label: t("runtime.readyToVerify"), tone: "warning", action: "runtime.verifyConnection" };
   }
-  return { kind, label: t("runtime.connectorStatusUnavailable"), tone: "neutral" };
+  return { kind: "unknown", label: t("runtime.connectorStatusUnavailable"), tone: "neutral" };
 }
 
 function connectorDiagnostic(errorCode: string | null | undefined, t: TFunction): string {
@@ -530,27 +516,6 @@ function summarizeRuntime(status: LiveStatus | null) {
     ).length,
     runningCount: brokers.filter((broker) => broker.runner?.alive).length,
   };
-}
-
-function connectorRank(broker: LiveBrokerStatus, globalHalted: boolean): number {
-  const auth = broker.auth;
-  if (auth.transport === "broker_sdk") {
-    const kind = connectorKind(auth);
-    if (kind === "connected") return 0;
-    if (kind === "error") return 1;
-    if (kind === "ready") return 2;
-    return auth.sdk_installed === true ? 3 : 4;
-  }
-  if (auth.oauth_token_present || broker.runner?.alive || broker.mandate) return 0;
-  // `halted` is true for every broker while the global kill switch is set, so a broker's
-  // own switch is only visible when the global one is clear.
-  return broker.halted && !globalHalted ? 1 : 4;
-}
-
-function sortBrokersByStatus(status: LiveStatus | null): LiveBrokerStatus[] {
-  const globalHalted = status?.global_halted ?? false;
-  // Stable sort: peers keep the backend's alphabetical order, so a refresh never reshuffles them.
-  return [...(status?.brokers || [])].sort((a, b) => connectorRank(a, globalHalted) - connectorRank(b, globalHalted));
 }
 
 function deriveRiskState(broker: LiveBrokerStatus, globalHalted: boolean, t: TFunction): {

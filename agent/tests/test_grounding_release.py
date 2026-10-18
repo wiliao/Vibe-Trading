@@ -22,6 +22,7 @@ from typing import Any, Callable
 import pytest
 
 from src.agent.grounding import GroundingLedger, ValidationResult
+from tests.grounding_parameter_helpers import declared_parameter
 from src.agent.grounding.evidence import (
     _REGISTERED_PRICE_INDICATORS,
     _is_registered_price_indicator,
@@ -35,8 +36,8 @@ from tests.message_roles_helpers import assert_system_messages_only_lead
 
 pytestmark = pytest.mark.unit
 
-SYMBOL = "562500.SS"
-HDR = "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。"
+SYMBOL = "AAPL.US"
+HDR = "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美元。"
 
 
 def _market_payload(symbol: str = SYMBOL) -> str:
@@ -107,7 +108,7 @@ def _resolver_payload() -> str:
 
 def _ledger(
     tmp_path: Path,
-    message: str = "请分析 562500.SS 并给出买入价",
+    message: str = "请分析 AAPL.US 并给出买入价",
     *,
     symbol: str = SYMBOL,
     market: bool = True,
@@ -165,8 +166,8 @@ def test_non_price_indicator_values_still_do_not_ground_a_price(tmp_path: Path) 
     """RSI and a volume average are not prices; quoting one as a price stays rejected."""
     ledger = _ledger(tmp_path, volume_ma_20=1.30)
 
-    rsi_as_price = ledger.validate_final_answer(HDR + " 现价 55.2 元。")
-    volume_ma_as_price = ledger.validate_final_answer(HDR + " 现价 1.30 元。")
+    rsi_as_price = ledger.validate_final_answer(HDR + " 现价 55.2 美美元。")
+    volume_ma_as_price = ledger.validate_final_answer(HDR + " 现价 1.30 美美元。")
 
     assert "numeric_claim_conflict" in _codes(rsi_as_price)
     assert "numeric_claim_conflict" in _codes(volume_ma_as_price)
@@ -200,7 +201,7 @@ def test_a_declared_derivation_is_checked_by_its_own_arithmetic(tmp_path: Path) 
     ledger = _ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        HDR + " 建议买入价 1.136 元。"
+        HDR + declared_parameter("97%") + " 建议买入价 1.136 美美元。"
         + _block(HDR_ROW, "1.136 | derived | 1.171 × 0.97 | prices")
     )
 
@@ -212,7 +213,7 @@ def test_a_derivation_whose_arithmetic_misses_is_rejected(tmp_path: Path) -> Non
     ledger = _ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        HDR + " 建议买入价 1.20 元。"
+        HDR + declared_parameter("97%") + " 建议买入价 1.20 美美元。"
         + _block(HDR_ROW, "1.20 | derived | 1.171 × 0.97 | prices")
     )
 
@@ -226,7 +227,7 @@ def test_a_derivation_may_take_a_registered_indicator_as_its_input(tmp_path: Pat
     ledger = _ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        HDR + " 第一档 1.093 元。"
+        HDR + declared_parameter("95%") + " 第一档 1.093 美美元。"
         + _block(HDR_ROW, "1.093 | derived | 1.150 × 0.95 | indicators")
     )
 
@@ -238,7 +239,7 @@ def test_a_derivation_from_an_unregistered_leaf_stays_rejected(tmp_path: Path) -
     ledger = _ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        HDR + " 第一档 1.104 元。"
+        HDR + " 第一档 1.104 美美元。"
         + _block(HDR_ROW, "1.104 | derived | 55.3 × 0.02 | prices")
     )
 
@@ -260,7 +261,7 @@ def test_a_note_that_is_not_arithmetic_is_not_a_derivation(tmp_path: Path) -> No
         ("回测得出", "formula_not_evaluable"),
     ):
         result = ledger.validate_final_answer(
-            HDR + " 建议买入价 1.136 元。"
+            HDR + " 建议买入价 1.136 美美元。"
             + _block(HDR_ROW, f"1.136 | derived | {note} | prices")
         )
         assert result.valid is False, note
@@ -271,7 +272,7 @@ def test_an_entry_without_a_role_that_survives_is_still_rejected(tmp_path: Path)
     """The product rule stands: a proposed entry must be derived or in range."""
     ledger = _ledger(tmp_path)
 
-    result = ledger.validate_final_answer(HDR + " 建议买入价 1.10 元。")
+    result = ledger.validate_final_answer(HDR + " 建议买入价 1.10 美美元。")
 
     assert _codes(result) == ["numeric_claim_conflict"]
     assert [issue["value"] for issue in result.issues] == ["1.10"]
@@ -295,7 +296,7 @@ def test_a_drawdown_is_the_arithmetic_its_note_states(tmp_path: Path) -> None:
 
     for claim in ("6%", "5.9%", "-5.9%"):
         result = ledger.validate_final_answer(
-            HDR + f" 最低价 1.110 元，较高点 1.180 元已回撤约 {claim}。"
+            HDR + f" 最低价 1.110 美美元，较高点 1.180 美美元已回撤约 {claim}。"
             + _block(
                 HDR_ROW,
                 "1.110 | observed | low | prices",
@@ -307,7 +308,7 @@ def test_a_drawdown_is_the_arithmetic_its_note_states(tmp_path: Path) -> None:
 
     for claim in ("8%", "6.31%"):
         result = ledger.validate_final_answer(
-            HDR + f" 最低价 1.110 元，较高点 1.180 元已回撤约 {claim}。"
+            HDR + f" 最低价 1.110 美美元，较高点 1.180 美美元已回撤约 {claim}。"
             + _block(
                 HDR_ROW,
                 "1.110 | observed | low | prices",
@@ -331,7 +332,7 @@ def test_a_return_figure_is_matched_at_its_written_precision(tmp_path: Path) -> 
 
     def check(claim: str) -> bool:
         return ledger.validate_final_answer(
-            HDR + f" 从最低价 1.121 元涨到最高价 1.180 元，区间收益率{claim}。"
+            HDR + f" 从最低价 1.121 美美元涨到最高价 1.180 美美元，区间收益率{claim}。"
             + _block(
                 HDR_ROW,
                 "1.121 | observed | low | prices",
@@ -353,7 +354,7 @@ def test_a_return_figure_is_matched_at_its_written_precision(tmp_path: Path) -> 
 
 def test_repair_provenance_appends_the_missing_words(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, symbol="AAPL.US", message="请分析 AAPL.US 并给出买入价")
-    draft = "AAPL.US 最新收盘价 1.171 美元，处于下行趋势。"
+    draft = "AAPL.US 最新收盘价 1.171 美美美元，处于下行趋势。"
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["data_source_not_surfaced"]
 
@@ -367,7 +368,7 @@ def test_repair_provenance_appends_the_missing_words(tmp_path: Path) -> None:
 
 def test_repair_provenance_refuses_a_draft_with_a_numeric_issue(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
-    draft = "562500.SS 最新收盘价 1.50 元。"
+    draft = "AAPL.US 最新收盘价 1.50 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert "numeric_claim_conflict" in _codes(validation)
 
@@ -388,7 +389,7 @@ def test_repair_provenance_refuses_without_price_evidence(tmp_path: Path) -> Non
 
 def test_redacted_release_keeps_the_analysis_and_cuts_the_figure(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, symbol="AAPL.US", message="请分析 AAPL.US 并给出买入价")
-    draft = "AAPL.US（Yahoo，USD）最新收盘价 1.171 美元。 均线空头排列，处于下行趋势。建议买入价 1.10 美元，分批建仓。"
+    draft = "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美美元。 均线空头排列，处于下行趋势。建议买入价 1.10 美美美元，分批建仓。"
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["numeric_claim_conflict"]
 
@@ -399,14 +400,14 @@ def test_redacted_release_keeps_the_analysis_and_cuts_the_figure(tmp_path: Path)
     assert "1.10" not in released
     assert _REDACTION_MARKER_ZH in released
     assert "※ 略去 1 处" in released
-    assert "（略※）美元" not in released and "建议买入价（略※）" in released
+    assert "（略※）美美美元" not in released and "建议买入价（略※）" in released
     assert "1.11–1.18 USD" in released
     assert ledger.validate_final_answer(released).valid is True
 
 
 def test_redacted_release_reports_every_cut(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 1.10 元。目标买入价 1.05 元。"
+    draft = HDR + " 建议买入价 1.10 美美元。目标买入价 1.05 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert sorted(issue["value"] for issue in validation.issues) == ["1.05", "1.10"]
 
@@ -442,7 +443,7 @@ def test_redacted_release_cuts_every_flagged_figure_in_one_pass(tmp_path: Path) 
 
 def test_redacted_release_adds_provenance_the_cut_draft_still_lacks(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
-    draft = "562500.SS 最新收盘价 1.171 元。建议买入价 1.10 元。"
+    draft = "AAPL.US 最新收盘价 1.171 美美元。建议买入价 1.10 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert set(_codes(validation)) == {"numeric_claim_conflict", "data_source_not_surfaced"}
 
@@ -455,7 +456,7 @@ def test_redacted_release_adds_provenance_the_cut_draft_still_lacks(tmp_path: Pa
 def test_redacted_release_never_cuts_the_ticker(tmp_path: Path) -> None:
     """A clause attributing figures to an unhandled symbol loses its figures, not the ticker."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 同业 ZZZZ.US 收盘价 12.3 元。"
+    draft = HDR + " 同业 ZZZZ.US 收盘价 12.3 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert "unsourced_symbol_figures" in _codes(validation)
 
@@ -467,8 +468,8 @@ def test_redacted_release_never_cuts_the_ticker(tmp_path: Path) -> None:
 
 
 def test_redacted_release_writes_english_for_an_english_user(tmp_path: Path) -> None:
-    ledger = _ledger(tmp_path, message="Analyse 562500.SS and give me an entry price")
-    draft = "562500.SS (Yahoo, CNY) last close 1.171. Suggested entry price $1.10."
+    ledger = _ledger(tmp_path, message="Analyse AAPL.US and give me an entry price")
+    draft = "AAPL.US (Yahoo, USD) last close 1.171. Suggested entry price $1.10."
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["numeric_claim_conflict"]
 
@@ -481,7 +482,7 @@ def test_redacted_release_writes_english_for_an_english_user(tmp_path: Path) -> 
 
 def test_redacted_release_refuses_without_price_evidence(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path, market=False, indicators=False)
-    draft = HDR + " 建议买入价 1.10 元。"
+    draft = HDR + " 建议买入价 1.10 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert "numeric_claim_unavailable" in _codes(validation)
 
@@ -498,7 +499,7 @@ def test_redacted_release_refuses_an_unlocked_identity(tmp_path: Path) -> None:
         call_id="resolve",
         success=False,
     )
-    draft = HDR + " 建议买入价 1.10 元。"
+    draft = HDR + " 建议买入价 1.10 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert "identity_not_locked" in _codes(validation)
 
@@ -510,12 +511,12 @@ def test_redacted_release_refuses_a_code_it_cannot_cut(tmp_path: Path) -> None:
     validation = ValidationResult(
         valid=False,
         issues=[
-            {"code": "numeric_claim_conflict", "claim": "建议买入价 1.10 元", "value": 1.1},
+            {"code": "numeric_claim_conflict", "claim": "建议买入价 1.10 美美元", "value": 1.1},
             {"code": "listed_identity_relabelled_private", "symbols": [SYMBOL]},
         ],
     )
 
-    assert ledger.redacted_release(HDR + " 建议买入价 1.10 元。", validation) is None
+    assert ledger.redacted_release(HDR + " 建议买入价 1.10 美美元。", validation) is None
 
 
 def test_redacted_release_refuses_when_the_clause_cannot_be_located(tmp_path: Path) -> None:
@@ -525,13 +526,13 @@ def test_redacted_release_refuses_when_the_clause_cannot_be_located(tmp_path: Pa
         issues=[{"code": "numeric_claim_conflict", "claim": "not in the draft 1.10", "value": 1.1}],
     )
 
-    assert ledger.redacted_release(HDR + " 建议买入价 1.10 元。", validation) is None
+    assert ledger.redacted_release(HDR + " 建议买入价 1.10 美美元。", validation) is None
 
 
 def test_redacted_release_cuts_a_figure_the_recheck_finds_in_a_table(tmp_path: Path) -> None:
     """A figure withheld from the first pass is still a gate finding on recheck, so it is cut."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 1.10 元。\n\n| 日期 | 收盘价 |\n|---|---|\n| 2026-06-24 | 1.10 |\n"
+    draft = HDR + " 建议买入价 1.10 美美元。\n\n| 日期 | 收盘价 |\n|---|---|\n| 2026-06-24 | 1.10 |\n"
     validation = ledger.validate_final_answer(draft)
     prose_only = ValidationResult(
         valid=False,
@@ -550,7 +551,7 @@ def test_redacted_release_refuses_when_the_recheck_finds_what_it_cannot_cut(
 ) -> None:
     """Only text that passes the gate is released; an identity finding on recheck ends it."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 1.10 元。"
+    draft = HDR + " 建议买入价 1.10 美美元。"
     validation = ledger.validate_final_answer(draft)
     # The release path re-checks through ``_validate(..., record=False)`` so
     # its rechecks are not counted as rejected model drafts.
@@ -633,6 +634,7 @@ class _ScriptedLLM:
         timeout: int | None = None,
         idle_timeout_s: float | None = None,
         should_cancel: Callable[[], bool] | None = None,
+        on_waiting_chunk=None,
     ) -> _Response:
         self.calls += 1
         self.messages_history.append(list(messages))
@@ -689,7 +691,7 @@ _SCRIPT_HEAD = [
 def test_loop_releases_the_redacted_draft_instead_of_the_canned_refusal(tmp_path: Path) -> None:
     """A model that never drops its invented entry still delivers its analysis."""
     stubborn = (
-        "562500.SS（Yahoo，CNY）在 2026-06-23 的已观测收盘价为 1.137，均线空头排列。"
+        "AAPL.US（Yahoo，USD）在 2026-06-23 的已观测收盘价为 1.137，均线空头排列。"
         "建议买入价为 0.881。"
     )
     llm = _ScriptedLLM(_SCRIPT_HEAD + [_Response(content=stubborn)])
@@ -728,10 +730,10 @@ def test_loop_releases_the_redacted_draft_instead_of_the_canned_refusal(tmp_path
 def test_grounding_revision_turn_is_text_only(tmp_path: Path) -> None:
     """A rejected numeric draft is revised without opening another research loop."""
     rejected = (
-        "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。"
+        "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美元。"
         "建议买入价为 0.881。"
     )
-    corrected = "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。"
+    corrected = "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美元。"
     llm = _ScriptedLLM(
         _SCRIPT_HEAD + [_Response(content=rejected), _Response(content=corrected)]
     )
@@ -756,10 +758,10 @@ def test_grounding_revision_blocks_unoffered_tool_calls(tmp_path: Path, monkeypa
     """A provider cannot escape correction-only mode by emitting a tool call anyway."""
     monkeypatch.setattr("src.agent.loop.MAX_GROUNDING_REVISIONS", 3)
     rejected = (
-        "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。"
+        "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美元。"
         "建议买入价为 0.881。"
     )
-    corrected = "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。"
+    corrected = "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美元。"
     llm = _ScriptedLLM(
         _SCRIPT_HEAD
         + [
@@ -914,7 +916,7 @@ def test_goal_continuation_resets_correction_mode_but_not_a_forced_release(
 
 
 def test_loop_repairs_a_missing_source_word_without_another_model_round(tmp_path: Path) -> None:
-    missing_source = "562500.SS 在 2026-06-23 的已观测收盘价为 1.137 CNY，均线空头排列。"
+    missing_source = "AAPL.US 在 2026-06-23 的已观测收盘价为 1.137 USD，均线空头排列。"
     llm = _ScriptedLLM(
         _SCRIPT_HEAD + [_Response(content=missing_source), _Response(content="MUST NOT BE ASKED")]
     )
@@ -951,7 +953,7 @@ WIDE_BARS = [
     {"trade_date": "2026-05-10", "open": 1.050, "high": 1.053, "low": 1.040, "close": 1.050, "volume": 1},
     {"trade_date": "2026-09-09", "open": 0.670, "high": 0.680, "low": 0.660, "close": 0.666, "volume": 1},
 ]
-WIDE_HDR = "562500.SS（Yahoo，CNY）最新收盘价 0.666 元。"
+WIDE_HDR = "AAPL.US（Yahoo，USD）最新收盘价 0.666 美美元。"
 
 
 def _wide_ledger(tmp_path: Path) -> GroundingLedger:
@@ -962,7 +964,7 @@ def _wide_ledger(tmp_path: Path) -> GroundingLedger:
     0.5% of almost any two-decimal number — so the endpoints are sparse and
     far apart on purpose.
     """
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 562500.SS 的回撤")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 AAPL.US 的回撤")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={"codes": [SYMBOL]},
@@ -1005,7 +1007,7 @@ def test_the_note_states_which_direction_was_taken(tmp_path: Path) -> None:
     """
     fall = "(0.666 - 1.053) / 1.053"
     rise = "(1.053 - 0.666) / 0.666"
-    line = "最新收盘 0.666 元 较 5 月高点 1.053 元，{}。"
+    line = "最新收盘 0.666 美美元 较 5 月高点 1.053 美美元，{}。"
 
     for figure, note in (("36.8%", fall), ("37%", fall), ("58.1%", rise), ("58%", rise)):
         result = _wide_ledger(tmp_path).validate_final_answer(
@@ -1032,7 +1034,7 @@ def test_a_percent_figure_is_compared_in_percentage_points_only(tmp_path: Path) 
     move.
     """
     rise = "(1.053 - 0.666) / 0.666"
-    line = "最新收盘 0.666 元 较 5 月高点 1.053 元，区间收益率约 {}。"
+    line = "最新收盘 0.666 美美元 较 5 月高点 1.053 美美元，区间收益率约 {}。"
 
     for figure in ("0%", "1%", "-1%", "2%"):
         result = _wide_ledger(tmp_path).validate_final_answer(
@@ -1059,7 +1061,7 @@ def test_the_written_precision_band_is_half_a_unit_not_more(tmp_path: Path) -> N
 
     def verdict(figure: str) -> bool:
         return ledger.validate_final_answer(
-            HDR + f" 从最低价 1.110 元涨到收盘 1.171 元，区间收益率约 {figure}。"
+            HDR + f" 从最低价 1.110 美美元涨到收盘 1.171 美美元，区间收益率约 {figure}。"
             + _block(
                 HDR_ROW,
                 "1.110 | observed | low | prices",
@@ -1092,7 +1094,7 @@ def test_a_declaration_covers_its_own_value_and_nothing_beside_it(
     ledger = _ledger(tmp_path)
 
     riding_along = ledger.validate_final_answer(
-        HDR + " 建议买入价 0.95 元（收盘 1.171 × 0.97 = 1.136 参考）。"
+        HDR + declared_parameter("97%") + " 建议买入价 0.95 美美元（收盘 1.171 × 0.97 = 1.136 参考）。"
         + _block(
             HDR_ROW,
             "0.97 | count | 折扣系数",
@@ -1100,7 +1102,7 @@ def test_a_declaration_covers_its_own_value_and_nothing_beside_it(
         )
     )
     formula_only = ledger.validate_final_answer(
-        HDR + " 参考价 1.136 元。"
+        HDR + declared_parameter("97%") + " 参考价 1.136 美美元。"
         + _block(HDR_ROW, "1.136 | derived | 1.171 × 0.97 | prices")
     )
 
@@ -1120,8 +1122,8 @@ def test_the_same_figure_gets_the_same_verdict_under_any_prose(
     """
     ledger = _ledger(tmp_path, sma_20=1.150)
     sentences = [
-        "现价 1.150 元。", "最新价 1.150 元。", "成交价 1.150 元。", "报价 1.150 元。",
-        "股价 1.150 元。", "收盘价为 1.150 元。", "20 日均线 1.150 元。",
+        "现价 1.150 美美元。", "最新价 1.150 美美元。", "成交价 1.150 美美元。", "报价 1.150 美美元。",
+        "股价 1.150 美美元。", "收盘价为 1.150 美美元。", "20 日均线 1.150 美美元。",
         "The current price is 1.150.", "The closing price was 1.150.",
         "It last traded at 1.150.", "The 20-day moving average is 1.150.",
         "1.150 is where it sits.",
@@ -1157,7 +1159,7 @@ def test_a_declared_ref_is_what_separates_an_indicator_from_a_close(
 ) -> None:
     """Two surfaces still scope evidence: a table column, and a declared ref.
 
-    The prose surface does not. "收盘价为 1.150 元" was refused because the
+    The prose surface does not. "收盘价为 1.150 美美元" was refused because the
     clause named an OHLC field and the session's sma_20 happened to equal the
     figure — a verdict a word decided, and one whose mirror in the other
     language leaked for a year. What separates them now is what the model
@@ -1167,11 +1169,11 @@ def test_a_declared_ref_is_what_separates_an_indicator_from_a_close(
     ledger = _ledger(tmp_path, sma_20=1.150)
 
     labelled_column = ledger.validate_final_answer(
-        HDR + "\n\n| 代码 | 收盘价 |\n|---|---|\n| 562500.SS | 1.150 |\n"
+        HDR + "\n\n| 代码 | 收盘价 |\n|---|---|\n| AAPL.US | 1.150 |\n"
         + _block(HDR_ROW, "1.150 | observed | close | prices")
     )
     wrong_ref = ledger.validate_final_answer(
-        HDR + " 收盘价为 1.150 元。" + _block(HDR_ROW, "1.150 | observed | 收盘 | prices")
+        HDR + " 收盘价为 1.150 美美元。" + _block(HDR_ROW, "1.150 | observed | 收盘 | prices")
     )
     right_ref = ledger.validate_final_answer(
         HDR + " SMA20 位于 1.150。"
@@ -1226,14 +1228,14 @@ def test_one_symbols_indicator_does_not_ground_an_unattributed_claim(tmp_path: P
     header = "AAPL.US 与 MSFT.US（Yahoo，USD）对比。"
 
     unattributed_indicator = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "布林下轨 1.150 美元为支撑位。"
+        header + "布林下轨 1.150 美美美元为支撑位。"
     )
     # Both halves of the rule the union was argued for stay intact.
     unattributed_ohlc = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "现价 1420 美元。"
+        header + "现价 1420 美美美元。"
     )
     attributed_indicator = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "AAPL.US 布林下轨 1.150 美元为支撑位。"
+        header + "AAPL.US 布林下轨 1.150 美美美元为支撑位。"
     )
 
     assert "numeric_claim_conflict" in _codes(unattributed_indicator)
@@ -1250,7 +1252,7 @@ def test_an_unregistered_tools_leaf_never_grounds_a_price(tmp_path: Path) -> Non
     admitted it. Names are no longer read — a tool has to be registered, leaf
     by leaf, before any of its output can answer a price claim.
     """
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 562500.SS")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 AAPL.US")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={"codes": [SYMBOL]},
@@ -1266,7 +1268,7 @@ def test_an_unregistered_tools_leaf_never_grounds_a_price(tmp_path: Path) -> Non
         success=True,
     )
 
-    result = ledger.validate_final_answer(HDR + " 现价 1.30 元。")
+    result = ledger.validate_final_answer(HDR + " 现价 1.30 美美元。")
 
     assert "numeric_claim_conflict" in _codes(result)
 
@@ -1323,7 +1325,7 @@ def test_every_registration_prefix_matches_something_it_names() -> None:
 
 def test_redacted_release_locates_a_grouped_number(tmp_path: Path) -> None:
     """A price above 999 written the ordinary way must still reach the release path."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 562500.SS 并给出买入价")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 AAPL.US 并给出买入价")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={"codes": [SYMBOL]},
@@ -1339,7 +1341,7 @@ def test_redacted_release_locates_a_grouped_number(tmp_path: Path) -> None:
         call_id="prices",
         success=True,
     )
-    draft = "562500.SS（Yahoo，CNY）最新收盘价 1309.22 元。建议买入价 1,450.50 元。"
+    draft = "AAPL.US（Yahoo，USD）最新收盘价 1309.22 美美元。建议买入价 1,450.50 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["numeric_claim_conflict"]
 
@@ -1367,12 +1369,12 @@ def test_redacted_release_cuts_a_metric_cell_in_a_table(tmp_path: Path) -> None:
 
 
 def test_redacted_release_never_cuts_inside_another_number(tmp_path: Path) -> None:
-    """A bare table cell "1.10" must not be located inside "21.10 亿元"."""
+    """A bare table cell "1.10" must not be located inside "21.10 亿美美元"."""
     ledger = _ledger(tmp_path)
     draft = (
-        "562500.SS（Yahoo，CNY）最新收盘价 1.171 元。成交额约 21.10 亿元。"
+        "AAPL.US（Yahoo，USD）最新收盘价 1.171 美美元。成交额约 21.10 亿美美元。"
         "\n\n| 日期 | 收盘价 |\n|---|---|\n| 2026-06-24 | 1.10 |\n"
-        + _block(HDR_ROW, "21.10 | cited | 成交额（亿元）", "1.10 | observed | close | prices")
+        + _block(HDR_ROW, "21.10 | cited | 成交额（亿美美元）", "1.10 | observed | close | prices")
     )
     validation = ledger.validate_final_answer(draft)
     assert [i["value"] for i in validation.issues] == ["1.10"]
@@ -1380,7 +1382,7 @@ def test_redacted_release_never_cuts_inside_another_number(tmp_path: Path) -> No
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "成交额约 21.10 亿元" in released
+    assert "成交额约 21.10 亿美美元" in released
     assert "| 2026-06-24 |" in released and "| 2026-06-24 | 1.10 |" not in released
     assert "※ 略去 1 处" in released
 
@@ -1397,8 +1399,8 @@ def test_every_surviving_occurrence_was_checked_where_it_stands(tmp_path: Path) 
     supports, which the sweep used to remove anyway.
     """
     ledger = _ledger(tmp_path)
-    in_a_table = HDR + " 建议买入价 1.30 元。\n\n| 档位 | 建议买入价 |\n|---|---|\n| 第一档 | 1.30 |\n"
-    in_a_bullet = HDR + " 建议买入价 1.30 元。\n- 关键位：1.30 / 1.15\n"
+    in_a_table = HDR + " 建议买入价 1.30 美美元。\n\n| 档位 | 建议买入价 |\n|---|---|\n| 第一档 | 1.30 |\n"
+    in_a_bullet = HDR + " 建议买入价 1.30 美美元。\n- 关键位：1.30 / 1.15\n"
 
     for draft in (in_a_table, in_a_bullet):
         validation = ledger.validate_final_answer(draft)
@@ -1423,7 +1425,7 @@ def test_a_metric_cell_restating_observed_closes_is_not_an_invented_metric(
     The prose path exempts an observed value from the analysis check; the
     table path did not, so a peak-to-current row was reported as an
     unevidenced drawdown and the release cut the observed prices out of it
-    (deepseek 159516.SZ E2E, 2026-09-09). A figure the ledger does NOT hold
+    (deepseek AAPL.US E2E, 2026-09-09). A figure the ledger does NOT hold
     stays rejected in the same table.
     """
     ledger = _ledger(tmp_path)
@@ -1448,14 +1450,14 @@ def test_a_declared_derivation_survives_the_cut_beside_a_rejected_figure(
 ) -> None:
     """A rejected entry price is often the multiplier of the correct derivation.
 
-    "建议买入价 0.95 元" is cut, but the 0.95 inside a valid derivation is a
+    "建议买入价 0.95 美美元" is cut, but the 0.95 inside a valid derivation is a
     figure this gate accepted where it stands, so it is not flagged and not
     cut — which is what the document-wide sweep used to get wrong, leaving
     "× （略※） =" and destroying the one derivation the answer got right.
     """
     ledger = _ledger(tmp_path)
     draft = (
-        HDR + " 第一档 1.093 元。建议买入价 0.95 元。"
+        HDR + declared_parameter("95%") + " 第一档 1.093 美美元。建议买入价 0.95 美美元。"
         + _block(
             HDR_ROW,
             "1.093 | derived | 1.150 × 0.95 | indicators",
@@ -1468,7 +1470,7 @@ def test_a_declared_derivation_survives_the_cut_beside_a_rejected_figure(
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "第一档 1.093 元。" in released
+    assert "第一档 1.093 美美元。" in released
     assert "建议买入价（略※）。" in released
     assert "※ 略去 1 处" in released
 
@@ -1482,14 +1484,14 @@ def test_redacted_release_never_cuts_an_observed_price(tmp_path: Path) -> None:
     its own now, so only the metric is flagged.
     """
     ledger = _ledger(tmp_path)
-    draft = HDR + " 最新收盘 1.171 元且策略最大回撤 12%。"
+    draft = HDR + " 最新收盘 1.171 美美元且策略最大回撤 12%。"
     validation = ledger.validate_final_answer(draft)
     assert [issue.get("value") for issue in validation.issues] == ["12%"]
 
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "最新收盘 1.171 元" in released
+    assert "最新收盘 1.171 美美元" in released
     assert "12%" not in released
     assert "※ 略去 1 处" in released
 
@@ -1497,17 +1499,17 @@ def test_redacted_release_never_cuts_an_observed_price(tmp_path: Path) -> None:
 def test_redacted_release_swallows_the_unit_flush_against_the_marker(tmp_path: Path) -> None:
     """The marker replaces the figure AND its unit, in either language."""
     zh = _ledger(tmp_path)
-    zh_draft = HDR + " 建议买入价 1.10 元，分批建仓。"
+    zh_draft = HDR + " 建议买入价 1.10 美美元，分批建仓。"
     zh_released = zh.redacted_release(zh_draft, zh.validate_final_answer(zh_draft))
 
     no_space = _ledger(tmp_path)
-    no_space_draft = HDR + " 建议买入价 1.10元，分批建仓。"
+    no_space_draft = HDR + " 建议买入价 1.10美美元，分批建仓。"
     no_space_released = no_space.redacted_release(
         no_space_draft, no_space.validate_final_answer(no_space_draft)
     )
 
-    en = _ledger(tmp_path, message="Analyse 562500.SS and give me an entry price")
-    en_draft = "562500.SS (Yahoo, CNY) last close 1.171. Suggested entry price 1.10 USD."
+    en = _ledger(tmp_path, message="Analyse AAPL.US and give me an entry price")
+    en_draft = "AAPL.US (Yahoo, USD) last close 1.171. Suggested entry price 1.10 USD."
     en_released = en.redacted_release(en_draft, en.validate_final_answer(en_draft))
 
     assert zh_released is not None and "建议买入价（略※），分批建仓。" in zh_released
@@ -1516,15 +1518,15 @@ def test_redacted_release_swallows_the_unit_flush_against_the_marker(tmp_path: P
 
 
 def test_a_unit_character_that_starts_a_word_is_not_swallowed(tmp_path: Path) -> None:
-    """"0.95 元宵节" must not become "（略※）宵节"."""
+    """"0.95 美美元宵节" must not become "（略※）宵节"."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 0.95 元宵节后关注。"
+    draft = HDR + " 建议买入价 0.95 美美元宵节后关注。"
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "元宵节后关注" in released
+    assert "美美元宵节后关注" in released
     assert "（略※）宵节" not in released
     assert "0.95" not in released
 
@@ -1532,7 +1534,7 @@ def test_a_unit_character_that_starts_a_word_is_not_swallowed(tmp_path: Path) ->
 def test_the_marker_follows_the_script_of_the_text_it_cuts(tmp_path: Path) -> None:
     """A Chinese user gets English tables; the marker must match the clause, not the user."""
     ledger = _ledger(tmp_path)  # Chinese user message
-    draft = "562500.SS (Yahoo, CNY) last close 1.171. Suggested entry price $0.95 per share."
+    draft = "AAPL.US (Yahoo, USD) last close 1.171. Suggested entry price $0.95 per share."
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
@@ -1587,7 +1589,7 @@ def test_repair_provenance_refuses_a_misattributed_symbol(tmp_path: Path) -> Non
     footnote naming a different instrument, in zero model rounds.
     """
     ledger = _ledger(tmp_path)
-    draft = "贵州茅台（雅虎，CNY）最新收盘价 1.171 元，日内最高 1.180 元。"
+    draft = "贵州茅台（雅虎，USD）最新收盘价 1.171 美美元，日内最高 1.180 美美元。"
     validation = ledger.validate_final_answer(draft)
     assert _codes(validation) == ["canonical_symbol_not_surfaced"]
 
@@ -1615,7 +1617,7 @@ def test_repair_provenance_writes_english_for_an_english_user(tmp_path: Path) ->
 
 def test_the_release_note_prints_a_large_price_in_full(tmp_path: Path) -> None:
     """``%g`` turns an index level into "1.23457e+06" six significant digits in."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 562500.SS 并给出买入价")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="请分析 AAPL.US 并给出买入价")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={"codes": [SYMBOL]},
@@ -1631,7 +1633,7 @@ def test_the_release_note_prints_a_large_price_in_full(tmp_path: Path) -> None:
         call_id="prices",
         success=True,
     )
-    draft = "562500.SS（Yahoo，CNY）最新收盘价 1245000.0 元。建议买入价 999.0 元。"
+    draft = "AAPL.US（Yahoo，USD）最新收盘价 1245000.0 美美元。建议买入价 999.0 美美元。"
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
@@ -1652,14 +1654,14 @@ def test_the_released_document_is_validated_with_its_footnote(
     which is what the method's fail-closed docstring promises.
     """
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 1.10 元，分批建仓。"
+    draft = HDR + " 建议买入价 1.10 美美元，分批建仓。"
     validation = ledger.validate_final_answer(draft)
     assert ledger.redacted_release(draft, validation) is not None
 
     monkeypatch.setattr(
         ledger,
         "_release_note",
-        lambda removed, content=None: "※ 参考买入价 9.99 元。",
+        lambda removed, content=None: "※ 参考买入价 9.99 美美元。",
     )
 
     assert ledger.redacted_release(draft, validation) is None
@@ -1668,7 +1670,7 @@ def test_the_released_document_is_validated_with_its_footnote(
 def test_a_gate_recheck_is_not_counted_as_a_rejected_draft(tmp_path: Path) -> None:
     """``validation_count`` is the revision budget and a user-facing number."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 1.10 元，分批建仓。"
+    draft = HDR + " 建议买入价 1.10 美美元，分批建仓。"
     validation = ledger.validate_final_answer(draft)
     assert ledger.validation_count == 1
 
@@ -1690,10 +1692,10 @@ def test_a_derivation_anchored_to_another_symbol_grounds_nothing(tmp_path: Path)
     )
 
     unattributed = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "买入价 1377.4。" + block
+        header + "买入价 1377.4。" + block + declared_parameter("97%")
     )
     attributed = _two_symbol_ledger(tmp_path).validate_final_answer(
-        header + "MSFT.US 买入价 1377.4。" + block
+        header + "MSFT.US 买入价 1377.4。" + block + declared_parameter("97%")
     )
 
     assert "numeric_claim_conflict" in _codes(unattributed)
@@ -1722,10 +1724,10 @@ def test_a_declaration_grounds_only_the_figure_it_names(tmp_path: Path) -> None:
     )
 
     both = ledger.validate_final_answer(
-        WIDE_HDR + " 当前 0.666 元 较 5 月高点 1.053 元已回撤约 37%，最大回撤 60%。" + block
+        WIDE_HDR + " 当前 0.666 美美元 较 5 月高点 1.053 美美元已回撤约 37%，最大回撤 60%。" + block
     )
     only_the_derived = _wide_ledger(tmp_path).validate_final_answer(
-        WIDE_HDR + " 当前 0.666 元 较 5 月高点 1.053 元已回撤约 37%。" + block
+        WIDE_HDR + " 当前 0.666 美美元 较 5 月高点 1.053 美美元已回撤约 37%。" + block
     )
 
     assert [issue["value"] for issue in both.issues] == ["60%"]
@@ -1791,7 +1793,7 @@ def test_a_restatement_of_a_rejected_figure_is_cut_where_it_stands(
     """
     ledger = _ledger(tmp_path)
     draft = (
-        HDR + " 第一档 1.093 元。\n\n| 档位 | 建议买入价 |\n|---|---|\n| 第一档 | 0.95 |\n"
+        HDR + declared_parameter("95%") + " 第一档 1.093 美美元。\n\n| 档位 | 建议买入价 |\n|---|---|\n| 第一档 | 0.95 |\n"
         + _block(HDR_ROW, "1.093 | derived | 1.150 × 0.95 | indicators", "0.95 | proposed | 系数")
     )
     validation = ledger.validate_final_answer(draft)
@@ -1800,7 +1802,7 @@ def test_a_restatement_of_a_rejected_figure_is_cut_where_it_stands(
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "第一档 1.093 元。" in released
+    assert "第一档 1.093 美美元。" in released
     assert "| 第一档 | （略※） |" in released
     assert "※ 略去 1 处" in released
 
@@ -1833,14 +1835,14 @@ def test_an_accepted_figure_is_never_cut_for_sharing_a_value(tmp_path: Path) -> 
 def test_an_observed_value_is_never_cut(tmp_path: Path) -> None:
     """A correctly quoted close beside an ungrounded metric survives the cut."""
     ledger = _ledger(tmp_path, sma_20=1.150)
-    draft = HDR + " 收盘价为 1.150 元。策略最大回撤 12%。"
+    draft = HDR + " 收盘价为 1.150 美美元。策略最大回撤 12%。"
     validation = ledger.validate_final_answer(draft)
     assert [issue["value"] for issue in validation.issues] == ["12%"]
 
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "收盘价为 1.150 元。" in released
+    assert "收盘价为 1.150 美美元。" in released
     assert "12%" not in released
     assert "※ 略去 1 处" in released
 
@@ -1857,7 +1859,7 @@ def test_a_model_authored_release_note_is_stripped_before_redacting(
     ledger = _ledger(tmp_path)
     draft = (
         HDR
-        + " 建议买入价 0.95 元。第二档（略※）。"
+        + " 建议买入价 0.95 美美元。第二档（略※）。"
         + "\n\n※ 略去 0 处无法与本会话工具数据对上的数值。"
     )
     validation = ledger.validate_final_answer(draft)
@@ -1881,7 +1883,7 @@ def test_the_marker_follows_each_lines_script_not_the_documents(
     space after a table pipe.
     """
     ledger = _ledger(tmp_path)
-    draft = HDR + "\n\n建议买入价 0.95 元。\n\n| Entry | Price |\n|---|---|\n| First | 0.95 |\n"
+    draft = HDR + "\n\n建议买入价 0.95 美美元。\n\n| Entry | Price |\n|---|---|\n| First | 0.95 |\n"
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
@@ -1893,9 +1895,9 @@ def test_the_marker_follows_each_lines_script_not_the_documents(
 
 
 def test_a_compound_unit_is_not_split_by_the_marker(tmp_path: Path) -> None:
-    """"0.95 元/股" is one unit; swallowing its first half leaves "/股" dangling."""
+    """"0.95 美美元/股" is one unit; swallowing its first half leaves "/股" dangling."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 0.95 元/股，仓位 3 成。"
+    draft = HDR + " 建议买入价 0.95 美美元/股，仓位 3 成。"
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
@@ -1903,7 +1905,7 @@ def test_a_compound_unit_is_not_split_by_the_marker(tmp_path: Path) -> None:
     assert released is not None
     assert "0.95" not in released
     assert "（略※）/股" not in released
-    assert "元/股" in released
+    assert "美美元/股" in released
 
 
 def test_overlapping_issue_spans_are_cut_once(tmp_path: Path) -> None:
@@ -1935,7 +1937,7 @@ def test_the_released_document_is_recorded_in_the_artifact(tmp_path: Path) -> No
     promise that the document that shipped passed the same gate.
     """
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 0.95 元。"
+    draft = HDR + " 建议买入价 0.95 美美元。"
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
@@ -1964,10 +1966,10 @@ def test_provenance_repair_no_longer_needs_an_unchecked_column_veto(
     """
     ledger = _ledger(tmp_path)
     with_column = (
-        "562500.SS 最新收盘价 1.171 元。\n\n| 档位 | 挂单价 |\n|---|---|\n| 第一档 | 0.95 |\n"
+        "AAPL.US 最新收盘价 1.171 美美元。\n\n| 档位 | 挂单价 |\n|---|---|\n| 第一档 | 0.95 |\n"
     )
     without_column = (
-        "562500.SS 最新收盘价 1.171 元。\n\n| 档位 | 比例 |\n|---|---|\n| 第一档 | 30 |\n"
+        "AAPL.US 最新收盘价 1.171 美美元。\n\n| 档位 | 比例 |\n|---|---|\n| 第一档 | 30 |\n"
         + _block(HDR_ROW, "30 | count | 仓位比例")
     )
 
@@ -2014,8 +2016,8 @@ def test_line_offsets_are_a_monotone_scan() -> None:
 
 def test_loop_releases_a_valid_draft_without_its_figures_block(tmp_path: Path) -> None:
     """The block is the model's declaration to the gate, never answer text."""
-    prose = "562500.SS（Yahoo，CNY）在 2026-06-23 的已观测收盘价为 1.137。"
-    draft = prose + "\n\n```figures\n1.137 | observed | 562500.SS close 2026-06-23 | prices\n```"
+    prose = "AAPL.US（Yahoo，USD）在 2026-06-23 的已观测收盘价为 1.137。"
+    draft = prose + "\n\n```figures\n1.137 | observed | AAPL.US close 2026-06-23 | prices\n```"
     llm = _ScriptedLLM(_SCRIPT_HEAD + [_Response(content=draft)])
 
     result, events, agent = _run(tmp_path, llm, max_iterations=8)
@@ -2056,7 +2058,7 @@ def test_the_sweep_cuts_a_bare_restatement_of_a_cut_figure(tmp_path: Path) -> No
 def test_the_sweep_leaves_a_bare_integer_with_different_digits(tmp_path: Path) -> None:
     """Cutting "0.95" must not take the "95" of an unrelated count with it."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 0.95 元，计划持有 95 天。"
+    draft = HDR + " 建议买入价 0.95 美美元，计划持有 95 天。"
     validation = ledger.validate_final_answer(draft)
 
     released = ledger.redacted_release(draft, validation)
@@ -2071,7 +2073,7 @@ def test_the_sweep_leaves_a_bare_integer_with_different_digits(tmp_path: Path) -
 def test_the_sweep_never_cuts_a_figure_the_gate_checked(tmp_path: Path) -> None:
     """Only bare integers are swept; a decimal sharing the cut figure's digits stays.
 
-    "1.171%" is cut, and the observed close "1.171 元" carries the same digits.
+    "1.171%" is cut, and the observed close "1.171 美美元" carries the same digits.
     The close is a measurement the gate checked and grounded, so sweeping it
     would delete a figure the evidence supports.
     """
@@ -2083,7 +2085,7 @@ def test_the_sweep_never_cuts_a_figure_the_gate_checked(tmp_path: Path) -> None:
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "最新收盘价 1.171 元" in released
+    assert "最新收盘价 1.171 美美元" in released
     assert "1.171%" not in released
     assert "※ 略去 1 处" in released
 
@@ -2106,6 +2108,7 @@ class _ChunkedLLM:
         timeout: int | None = None,
         idle_timeout_s: float | None = None,
         should_cancel: Callable[[], bool] | None = None,
+        on_waiting_chunk=None,
     ) -> _Response:
         self.calls += 1
         if on_text_chunk:
@@ -2306,12 +2309,12 @@ def test_a_checked_measurement_streams_once_the_gate_passes(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 
 _SCREEN = (
-    "562500.SS (Yahoo, CNY) last close 1.171.\n\n"
+    "AAPL.US (Yahoo, USD) last close 1.171.\n\n"
     "| # | Ticker | Sector | 9/16 Close | 12m | 6m | Fwd PE |\n"
     "|---|---|---|---|---|---|---|\n"
-    "| 1 | 562500.SS | ETF (robotics) | 1.171 | +8.0% | +3.0% | 22.5 |\n"
-    "| 2 | 562500.SS | ETF (robotics) | 1.137 | +5.0% | +2.0% | 18.1 |\n"
-    "| 3 | 562500.SS | ETF (robotics) | 1.171 | +4.0% | +1.0% | 30.2 |\n\n"
+    "| 1 | AAPL.US | ETF (robotics) | 1.171 | +8.0% | +3.0% | 22.5 |\n"
+    "| 2 | AAPL.US | ETF (robotics) | 1.137 | +5.0% | +2.0% | 18.1 |\n"
+    "| 3 | AAPL.US | ETF (robotics) | 1.171 | +4.0% | +1.0% | 30.2 |\n\n"
     "| Metric | Value |\n|---|---|\n| 12m mean return | +5.7% |\n| Mean beta (3 reported) | 1.35 |\n\n"
     "1. Names 1 to 3 are up over 12m and 6m; the sleeve is 3 names in 1 sector.\n"
     "2. Name 2 trades lower vs the 9/16 close.\n"
@@ -2336,7 +2339,7 @@ def test_a_redacted_screen_keeps_its_row_numbers_and_labels(tmp_path: Path) -> N
 
     assert released is not None
     for kept in (
-        "| 1 | 562500.SS", "| 2 | 562500.SS", "| 3 | 562500.SS", "| 9/16 Close | 12m | 6m |",
+        "| 1 | AAPL.US", "| 2 | AAPL.US", "| 3 | AAPL.US", "| 9/16 Close | 12m | 6m |",
         "| 12m mean return |", "| Mean beta (3 reported) |",
         "Names 1 to 3 are up over 12m and 6m; the sleeve is 3 names in 1 sector.",
         "Name 2 trades lower vs the 9/16 close.",
@@ -2360,3 +2363,86 @@ def test_the_sweep_does_not_key_on_a_single_digit(tmp_path: Path) -> None:
     assert "5%" not in released
     assert "跌破 5 日均线，关注 5 只同类基金" in released
     assert "※ 略去 1 处" in released
+
+
+# ---------------------------------------------------------------------------
+# The correction prompt's keep list (#1622 post-failure action semantics)
+# ---------------------------------------------------------------------------
+
+
+def test_the_correction_prompt_names_the_figures_to_keep(tmp_path: Path) -> None:
+    """A mixed rejection must not talk the model into deleting clean figures.
+
+    zeus229's production run on #1622: 65 issues over a draft whose evidence
+    was complete, and the correction rewrote whole numeric sections as
+    qualitative prose, deleting figures the gate had passed. The prompt only
+    named the failures. The keep list pins the other half of the contract.
+    """
+    ledger = _ledger(tmp_path)
+    draft = (
+        HDR
+        + "昨日收盘 1.137 美美元，20 日均线 1.150 美美元，50 日均线 1.090 美美元。"
+        + "参考买入价 1.136 美美元（1.171 × 0.97）。目标价 2.50 美美元，传闻报价 9.99 美美元。"
+        + declared_parameter("97%")
+        + _block(
+            HDR_ROW,
+            "1.137 | observed | close 2026-06-23 | prices",
+            "1.150 | observed | sma_20 | indicators",
+            "1.090 | observed | sma_50 | indicators",
+            "1.136 | derived | 1.171 × 0.97 | prices",
+            "2.50 | proposed | target",
+        )
+    )
+    validation = ledger.validate_final_answer(draft)
+
+    assert validation.valid is False
+    prompt = ledger.correction_prompt(validation)
+    keep = next(row for row in prompt.splitlines() if "checked clean" in row)
+
+    # Document order, exactly as written.
+    assert "1.171, 1.137, 1.150, 1.090, 1.136" in keep
+    for rejected in ("2.50", "9.99", "0.97"):
+        assert rejected not in keep
+    assert "repair the rejected claims while preserving the clean figures" in prompt
+
+
+def test_the_keep_list_is_absent_when_nothing_passed(tmp_path: Path) -> None:
+    """No clean figure, no keep list: the section must not render empty."""
+    ledger = _ledger(tmp_path)
+    validation = ledger.validate_final_answer("AAPL.US（Yahoo，USD）最新收盘价 9.99 美美元。")
+
+    assert validation.valid is False
+    assert "checked clean" not in ledger.correction_prompt(validation)
+
+
+def test_the_keep_list_caps_and_counts_the_rest(tmp_path: Path) -> None:
+    """A long keep list stays one line: 24 values spelled, the rest counted."""
+    extra = {f"m{i:02d}": 11.0 + i / 100 for i in range(1, 27)}
+    ledger = _ledger(tmp_path, **extra)
+    draft = HDR + "指标读数：" + "、".join(f"{v:.2f}" for v in extra.values()) + "。传闻报价 9.99 美美元。"
+    rows = [HDR_ROW] + [f"{v:.2f} | observed | {k} | indicators" for k, v in extra.items()]
+    validation = ledger.validate_final_answer(draft + _block(*rows))
+
+    assert validation.valid is False
+    prompt = ledger.correction_prompt(validation)
+    keep = next(row for row in prompt.splitlines() if "checked clean" in row)
+
+    # 27 clean figures (1.171 plus the 26 indicators), 24 shown, 3 counted.
+    assert "and 3 more" in keep
+    assert "11.23" in keep
+    assert "11.24" not in keep
+
+
+def test_keep_list_does_not_endorse_rejections_hidden_by_the_feedback_cap(tmp_path: Path) -> None:
+    ledger = _ledger(tmp_path)
+    bad_values = [f"{90 + i / 100:.2f}" for i in range(30)]
+    draft = HDR + " Unverified metrics: " + ", ".join(bad_values) + "." + _block(HDR_ROW)
+    result = ledger.validate_final_answer(draft)
+    assert len(result.issues) > 24
+    prompt = ledger.correction_prompt(result)
+    keep = next(line for line in prompt.splitlines() if "checked clean" in line)
+    assert "1.171" in keep
+    assert all(value not in keep for value in bad_values)
+    assert "Every other measured figure" not in prompt
+    assert "only the figures listed above need work" not in prompt
+    assert f"{len(result.issues) - 24} additional" in prompt

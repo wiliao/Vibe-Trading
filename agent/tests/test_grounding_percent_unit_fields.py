@@ -24,11 +24,11 @@ from src.agent.grounding import GroundingLedger
 
 
 def _ledger_with_rows(tmp_path: Path, rows: list[dict]) -> GroundingLedger:
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="Analyze 600519.SH")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="Analyze AAPL.US")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["600519.SH"]},
-        result=json.dumps({"600519.SH": rows}),
+        arguments={"codes": ["AAPL.US"]},
+        result=json.dumps({"AAPL.US": rows}),
         call_id="quote",
         success=True,
     )
@@ -37,7 +37,7 @@ def _ledger_with_rows(tmp_path: Path, rows: list[dict]) -> GroundingLedger:
 
 def _verdict(ledger: GroundingLedger, value: str, expression: str) -> tuple[bool, set[str]]:
     result = ledger.validate_final_answer(
-        f"600519.SH (CNY) move check: {value}.\n\n"
+        f"AAPL.US (USD) move check: {value}.\n\n"
         f"```figures\n{value} | derived | scenario result: {expression} | quote\n```"
     )
     return result.valid, {issue.get("reason") for issue in result.issues}

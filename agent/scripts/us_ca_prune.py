@@ -135,6 +135,14 @@ DELETIONS: list[tuple[str, str, str, str]] = [
     ("agent/src/skills/global-macro", "dir", "7", "macro/FX skill"),
     # Orphan (no SKILL.md, no references)
     ("agent/skills/ashare-mootdx", "dir", "7", "orphan A-share skill"),
+
+    # --- Phase 14: upstream-sync tests for removed markets ---------------------
+    ("agent/tests/test_equity_crypto_suffix_regressions.py", "file", "14", "crypto/forex suffix tests"),
+    ("agent/tests/test_crypto_usdc_busd_separated_pairs.py", "file", "14", "crypto pair tests"),
+    ("agent/tests/test_global_equity_hk_lot_sizes.py", "file", "14", "HK board-lot tests"),
+    ("agent/tests/test_extraetf_integration.py", "file", "14", "EU broker import tests"),
+    ("agent/tests/test_benchmark_exchange_suffix_regressions.py", "file", "14", "A-share benchmark suffix tests"),
+    ("agent/tests/scheduling/test_br_sync_outcomes.py", "file", "14", "Brazil dataset sync tests"),
 ]
 
 

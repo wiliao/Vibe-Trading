@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 
 from src.shadow_account.backtester import _LIQUID_BASKETS, SUPPORTED_MARKETS
+from src.shadow_account.indicators import RSI_PERIOD as _RSI_PERIOD, compute_rsi as _compute_rsi
 from src.shadow_account.models import ShadowProfile, ShadowRule
 
 PriceFetcher = Callable[..., pd.DataFrame | None]
 
-_RSI_PERIOD = 14
 
 
 def scan_today_signals(
@@ -216,13 +216,14 @@ def _wilder_average(values: pd.Series, period: int) -> pd.Series:
         return result
 
     seed = valid.iloc[:period].mean()
-    result.loc[valid.index[period - 1]] = seed
+    valid_positions = np.flatnonzero(values.notna().to_numpy())
+    result.iloc[valid_positions[period - 1]] = seed
 
     remaining = valid.iloc[period:]
     if len(remaining) > 0:
         tail = pd.concat([pd.Series([seed]), remaining])
         smoothed_tail = tail.ewm(alpha=1 / period, adjust=False).mean().iloc[1:]
-        result.loc[remaining.index] = smoothed_tail.to_numpy()
+        result.iloc[valid_positions[period:]] = smoothed_tail.to_numpy()
     return result
 
 

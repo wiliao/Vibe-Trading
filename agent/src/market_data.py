@@ -21,7 +21,7 @@ DEFAULT_MAX_ROWS = 250
 # market-validated by ``backtest.engines._market_hooks._detect_market``.
 _SOURCE_PATTERNS = [
     (re.compile(r"^local:", re.I), "local"),
-    (re.compile(r"^[A-Z]+\.US$", re.I), "yahoo"),
+    (re.compile(r"^[A-Z0-9&.\-]+\.US$", re.I), "yahoo"),
     # Canada: Toronto Stock Exchange (TD.TO) / TSX Venture (PNG.V).
     (re.compile(r"^[A-Z0-9&.\-]+\.(TO|V)$", re.I), "yahoo"),
     # Yahoo index symbols (^SPX, ^GSPC, ^VIX, ...) — served verbatim.
@@ -43,13 +43,28 @@ def detect_source(code: str) -> str:
     return "yahoo"
 
 
-
 def get_loader(source: str):
     """Get loader class via registry with fallback support."""
     from backtest.loaders.registry import get_loader_cls_with_fallback
 
     return get_loader_cls_with_fallback(source)
 
+
+#: ISO-4217-style fiat codes. A pair whose BOTH legs are fiat is an FX pair,
+#: never a crypto instrument — ``GBP/USD`` used to be classified as the crypto
+#: pair "GBP-USD" (its quote leg USD is a crypto-connector quote asset) by the
+#: trade-journal parser and the grounding ledger's symbol scanner, which then
+#: disagreed with the search result ("GBPUSD=X") and made the identity gate
+#: flag a conflict. One canonicalization is shared here so search, fetch and
+#: grounding all agree.
+FIAT_CODES = frozenset(
+    {
+        "USD", "EUR", "GBP", "JPY", "CHF", "CNY", "CNH", "HKD", "AUD", "NZD",
+        "CAD", "KRW", "INR", "SGD", "SEK", "NOK", "DKK", "MXN", "BRL", "ZAR",
+        "TRY", "RUB", "PLN", "THB", "MYR", "IDR", "PHP", "VND", "ILS", "AED",
+        "SAR", "EGP", "CZK", "HUF", "RON", "CLP", "COP", "PEN", "TWD", "CUP",
+    }
+)
 
 # Canadian venue-alias helper: TSX (.TO) <-> TSX Venture (.V).
 #
@@ -120,8 +135,12 @@ def fetch_market_data(
     fallback_chain_provider: Callable[[str], list[str]] | None = None,
     max_fallback_attempts: int = 5,
     include_provenance: bool = False,
+    as_frames: bool = False,
 ) -> dict[str, Any]:
     """Fetch normalized OHLCV data through the repository loader layer.
+
+    ``as_frames`` retains the observed DataFrames for in-process analysis;
+    row limits apply only to the JSON form.
 
     When ``source="auto"`` (or any resolved source), if the chosen loader
     raises during :meth:`fetch` the call falls through to the next source in
@@ -142,6 +161,7 @@ def fetch_market_data(
         FALLBACK_CHAINS,
         _NO_NETWORK_FALLBACK_SOURCES,
         get_source_order_override,
+        frame_caliber,
         price_caliber,
         refresh_source_order_overrides,
     )
@@ -153,6 +173,7 @@ def fetch_market_data(
 
     results: dict[str, Any] = {}
     provenance: dict[str, dict[str, Any]] = {}
+    diagnostics: dict[str, list[dict[str, str]]] = {}
     result_aliases = {
         code: code.split(":", 1)[1]
         if code.lower().startswith("local:")
@@ -193,8 +214,7 @@ def fetch_market_data(
         """Run the ordered source chain for one group, per symbol.
 
         Returns ``(data_map, used_source, provider_cls, symbol_sources)`` —
-        ``data_map`` keyed by requested symbol -> OHLCV frame (possibly
-        empty), ``used_source``/``provider_cls`` the first source that served
+        ``data_map`` keyed by requested symbol -> OHLCV non-empty frame, ``used_source``/``provider_cls`` the first source that served
         anything (``None`` when every attempt failed), and ``symbol_sources``
         mapping each served symbol to the source that actually served it. A
         partially successful attempt no longer stops the walk: symbols the
@@ -236,35 +256,52 @@ def fetch_market_data(
         used_source: str | None = None
         provider_cls: type | None = None
         remaining = list(dict.fromkeys(src_codes))
+        attempted_providers: set[str] = set()
+        def record(symbols: list[str], candidate: str, reason: str) -> None:
+            for symbol in symbols:
+                diagnostics.setdefault(symbol, []).append({"source": candidate, "reason": reason})
+
         for attempt_src in attempts:
             if not remaining:
                 break
             try:
                 loader_cls = loader_resolver(attempt_src)
             except NoAvailableSourceError as exc:
+                record(remaining, attempt_src, "source_unavailable")
                 logger.debug("loader %r unavailable: %s", attempt_src, exc)
                 continue
             except Exception as exc:  # noqa: BLE001 — resolver may raise for non-network reasons
+                record(remaining, attempt_src, "source_unavailable")
                 logger.debug("loader %r resolver failed: %s", attempt_src, exc)
                 continue
+            serving_source = getattr(loader_cls, "name", None) or attempt_src
+            if serving_source in attempted_providers:
+                continue
+            attempted_providers.add(serving_source)
             try:
                 loader = loader_cls()
                 # Weekly and monthly bars are built from daily ones (#1479).
-                partial = loader.fetch(
+                fetched = loader.fetch(
                     remaining, start_date, end_date, interval=source_interval(interval)
                 )
                 partial = {
                     code: resample_bars(frame, interval) if hasattr(frame, "groupby") else frame
-                    for code, frame in (partial or {}).items()
+                    for code, frame in (fetched or {}).items()
+                    if frame is not None and not getattr(frame, "empty", False)
                 }
+                partial = {code: frame for code, frame in partial.items()
+                           if frame is not None and not getattr(frame, "empty", False)}
             except Exception as exc:  # noqa: BLE001 — contained per-symbol fallback
+                record(remaining, serving_source, "fetch_failed")
                 logger.error(
                     "market-data loader %r failed for %s; trying next source in chain: %s",
                     attempt_src, remaining, exc,
                 )
                 continue
             if not partial:
+                record(remaining, serving_source, "no_data")
                 continue
+            record([symbol for symbol in remaining if symbol not in partial], serving_source, "no_data")
             # The resolver can substitute an unavailable optional loader before
             # fetch runs. Attribute every returned symbol to its actual provider.
             serving_source = getattr(loader_cls, "name", None) or attempt_src
@@ -302,11 +339,11 @@ def fetch_market_data(
         extra_provenance: dict[str, Any] | None = None,
     ) -> None:
         """Normalize one symbol's frame into ``results`` (+ provenance)."""
-        records = df.reset_index().to_dict(orient="records")
+        records = [] if as_frames else df.reset_index().to_dict(orient="records")
         for row in records:
             for key, value in row.items():
                 row[key] = _json_safe(value)
-        results[symbol] = cap_rows(records, max_rows)
+        results[symbol] = df if as_frames else cap_rows(records, max_rows)
         if include_provenance:
             volume_units = getattr(provider_cls, "volume_units", None) or {}
             frame_attrs = getattr(df, "attrs", None)
@@ -321,7 +358,10 @@ def fetch_market_data(
                 "fallback_used": bool(used_source and used_source != src),
                 "currency_conversion": currency_conversion,
                 "volume_unit": volume_units.get(market),
-                "adjustment": price_caliber(used_source or src, market, symbol),
+                # A loader that converted its series reports the caliber it
+                # actually served on the frame; the static (source, market)
+                # table is the fallback for unconverted data (#1541).
+                "adjustment": frame_caliber(df, used_source or src, market, symbol),
             }
             quote_currency = frame_attrs.get("quote_currency")
             if isinstance(quote_currency, str) and quote_currency:
@@ -418,10 +458,41 @@ def fetch_market_data(
         results["_unresolved"] = unresolved
     if include_provenance and provenance:
         results["_provenance"] = provenance
+    if unresolved:
+        results["_diagnostics"] = {
+            code: {"attempts": diagnostics.get(code, []), "recovery": (
+                "Use search_symbol to confirm the symbol and venue; check supported history/interval. source_unavailable means "
+                "the source needs configuration or an optional dependency; fetch_failed means "
+                "the request failed; no_data means that source returned no bars for this range. "
+                "For recent intraday bars, narrow the date range or request daily bars."
+            )} for code in unresolved
+        }
 
     return results
 
 
 def fetch_market_data_json(**kwargs: Any) -> str:
-    """Fetch market data and return strict JSON."""
-    return json.dumps(fetch_market_data(**kwargs), ensure_ascii=False, indent=2, allow_nan=False)
+    """Fetch market data and return strict JSON.
+
+    When no requested symbol returned data the envelope says so with
+    ``status: error``: a bare ``{"_unresolved": [...]}`` classified as a
+    successful call, so the agent loop neither refused an identical retry nor
+    told the model to change the request. ``_unresolved`` and ``_provenance``
+    stay, so grounding still records each symbol as unavailable. The dict API
+    (``fetch_market_data``) is unchanged for in-process callers.
+    """
+    payload = fetch_market_data(**kwargs)
+    unresolved = payload.get("_unresolved") or []
+    if unresolved and not any(not str(key).startswith("_") for key in payload):
+        payload = {
+            "status": "error",
+            "error_code": "no_market_data",
+            "error": (
+                f"No data returned for any requested symbol: {', '.join(map(str, unresolved))} "
+                f"({kwargs.get('start_date')}..{kwargs.get('end_date')}, "
+                f"source={kwargs.get('source', 'auto')}). Check the symbol suffix and the date "
+                "range or try another source. Read _diagnostics for attempted sources and recovery steps."
+            ),
+            **payload,
+        }
+    return json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False)

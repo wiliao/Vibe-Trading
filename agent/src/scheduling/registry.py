@@ -27,7 +27,7 @@ no dynamic import":
   wrapper whose body imports the domain callable at first firing. This
   module is imported by the generic :mod:`src.scheduling` package (and,
   through it, by ``scheduled_research.models``), so a top-level domain
-  import here would drag the whole ``br_data``/``memory`` stack into every
+  import here would drag the whole ``memory`` stack into every
   process that merely touches the scheduling vocabulary — and invert the
   dependency direction of the generic kernel. The wrappers keep the dict
   literal-keyed and exact-match-only; the deferred import is a fixed module
@@ -156,27 +156,6 @@ def _memory_consolidate() -> None:
     consolidate()
 
 
-def _br_data_run_sync() -> None:
-    """Run one Brazilian official-dataset sync (deferred domain import).
-
-    Backs the ``br_data.run_sync`` key: daily sync, opt-in via
-    ``VIBE_BR_SYNC_ENABLED``; replaces the retired ``src.br_data`` daemon —
-    Per-source errors become a failed scheduled attempt, so the executor
-    records the failure and applies its existing retry budget.
-    """
-    from src.br_data.sync import run_sync
-
-    report = run_sync()
-    failed = sorted(
-        name for name, outcome in report.items()
-        if isinstance(outcome, dict) and "error" in outcome
-    )
-    if failed:
-        # Report source names only; upstream diagnostics can carry local
-        # paths or credentials and must not be copied into the job store.
-        raise RuntimeError(f"Brazilian dataset sync failed for: {', '.join(failed)}")
-
-
 # ---------------------------------------------------------------------------
 # Production allowlist — the ONLY name→callable surface (module docstring).
 #
@@ -188,5 +167,4 @@ def _br_data_run_sync() -> None:
 # ---------------------------------------------------------------------------
 _INTERNAL_CALLABLES: dict[str, InternalRunnable] = {
     "memory.consolidate": _memory_consolidate,
-    "br_data.run_sync": _br_data_run_sync,
 }

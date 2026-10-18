@@ -1,1 +1,0 @@
-"""mStock connector package."""

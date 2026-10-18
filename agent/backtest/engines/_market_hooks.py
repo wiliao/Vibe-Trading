@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from typing import List
 
-
 # ── Symbol -> market classification (shared by runner.py + composite.py) ──
 
 _MARKET_PATTERNS = [
@@ -41,6 +40,7 @@ _MARKET_CURRENCY = {
     "ca_equity": "CAD",
     "index": "USD",
 }
+
 
 
 def strip_local_prefix(code: str) -> str:

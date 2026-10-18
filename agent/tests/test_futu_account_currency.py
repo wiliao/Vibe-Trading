@@ -23,8 +23,8 @@ from src.trading.connectors.futu import sdk as futu_sdk
 
 pytestmark = pytest.mark.unit
 
-#: Synthetic rates: 8 HKD and 7 CNY per USD.
-RATES = build_rates(usd_cny=Decimal("7"), usd_hkd=Decimal("8"))
+#: Synthetic rates: 8 CAD and 7 CAD per USD.
+RATES = build_rates(usd_cad=Decimal("1.35"))
 
 
 class _FakeFutu:
@@ -55,18 +55,18 @@ class _RecordingTradeCtx:
 def test_unreported_currency_takes_the_requested_currency() -> None:
     row = {"currency": "N/A", "total_assets": 1600.0, "cash": 800.0}
 
-    assert futu_sdk._account_to_dict(row, "HKD")["currency"] == "HKD"
+    assert futu_sdk._account_to_dict(row, "CAD")["currency"] == "CAD"
     assert futu_sdk._account_to_dict(row, "USD")["currency"] == "USD"
 
 
 def test_broker_reported_currency_is_never_overwritten() -> None:
     row = {"currency": "USD", "total_assets": 1600.0}
 
-    assert futu_sdk._account_to_dict(row, "HKD")["currency"] == "USD"
+    assert futu_sdk._account_to_dict(row, "CAD")["currency"] == "USD"
 
 
 @pytest.mark.parametrize("reported", [None, "", "N/A"])
-@pytest.mark.parametrize("requested", [None, "", "HKD"])
+@pytest.mark.parametrize("requested", [None, "", "CAD"])
 def test_no_row_maps_to_an_empty_currency(
     reported: str | None, requested: str | None
 ) -> None:
@@ -101,4 +101,4 @@ def test_multi_currency_account_values_at_the_requested_currency(
 
     assert ctx.accinfo_kwargs["currency"] == futu_sdk.ACCOUNT_CURRENCY
     assert snapshot["assets"][0]["currency"] == futu_sdk.ACCOUNT_CURRENCY
-    assert account_total_usd("futu", snapshot, RATES) == Decimal("200")
+    assert account_total_usd("futu", snapshot, RATES) == Decimal("1600")

@@ -560,7 +560,7 @@ class _ReleaseMixin:
         """
         # A market answer with no observed price has nothing to stand on once its
         # figures are cut; a general answer (no instrument asked about) does, and
-        # so does a completed analysis: naming 600519.SH in a backtest request
+        # so does a completed analysis: naming AAPL.US in a backtest request
         # makes it a market answer, but the backtest's own output is what the
         # surviving figures were checked against.
         if self._identity_required and not self._price_records() and not self._analysis_completed:

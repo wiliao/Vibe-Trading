@@ -12,7 +12,7 @@ __alpha_meta__ = {
     "theme": ["quality"],
     "formula_latex": r"\mathrm{zscore}_{x}\left(\frac{\mathrm{net\_income}}{\mathrm{total\_assets}}\right)",
     "columns_required": ["fund:roa"],
-    "universe": ["equity_us", "equity_cn", "equity_hk"],
+    "universe": ["equity_us"],
     "frequency": ["1d"],
     "decay_horizon": 252,
     "min_warmup_bars": 1,

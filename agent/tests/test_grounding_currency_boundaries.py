@@ -9,12 +9,12 @@ from src.agent.grounding.figures import parse_figures_block, scan_figures
 
 @pytest.mark.parametrize(('text', 'code'), [
     ('Value 2.5B JPY.', 'JPY'),
-    ('Value 2.5亿 CNY.', 'CNY'),
+    ('Value 2.5亿 USD.', 'USD'),
     ('Value CHF 2.5.', 'CHF'),
     ('Value NZD 2.5.', 'NZD'),
     ('Value ₩2.5.', 'KRW'),
     ('Value ₹2.5.', 'INR'),
-    ('Value 2.5 美元素描', None),
+    ('Value 2.5 美美元素描', None),
 ])
 def test_currency_shape_boundaries(text, code):
     [figure] = scan_figures(text, parse_figures_block(text))

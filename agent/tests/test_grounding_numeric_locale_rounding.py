@@ -73,7 +73,7 @@ def _ledger(tmp_path: Path, payload: dict, tool: str = "risk_tool") -> Grounding
         ("Vol 3,17% y 1.234,56 ARS", ["3.17", "1234.56"]),
         # Not decimals: unmarked long comma pairs, a year pair and dotted lists
         # keep their separate readings.
-        ("1400,1777 元", ["1400", "1777"]),
+        ("1400,1777 美元", ["1400", "1777"]),
         ("成交量 1000,2500 手", ["1000", "2500"]),
         ("2023,2024", ["2023", "2024"]),
         ("0.500,0.600", ["0.500", "0.600"]),

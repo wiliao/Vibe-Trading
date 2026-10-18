@@ -52,8 +52,50 @@
 
 > ⚠️ **Security warning:** The X account `VibeTrading_HKU`, Virtuals project `101845`, and token contract `0x640BDBF77b6447E8b7DB7894cED84BD1c40571f4` are not official Vibe-Trading assets. We have never launched or endorsed any token or memecoin. Do not buy, connect a wallet, or sign anything. [Details](SECURITY.md#official-channels--impersonation).
 
+- **2026-09-29** 🍁 **Scope narrowed to US + Canada equities**: this fork removes A-share, Hong Kong, UK, India, Korea and Vietnam equities plus crypto, forex and futures from every layer — data loaders, backtest engines, agent and MCP tools, broker connectors, prompts and the web UI. What ships now is 10 market-data loaders (Yahoo / yfinance first, with TSX `.TO` / TSXV `.V` support), 2 market backtest engines alongside the composite and options portfolios, 281 alphas, 58 skills, 25 swarm presets and 6 broker connectors (Alpaca, Futu, IBKR, Longbridge, Robinhood, Tiger). Canada is market data + backtesting only: no Canadian broker execution path is wired. Historical entries below are kept as written.
+- **2026-10-17** 🛠️ **Token usage and research reliability**: View LLM usage in Run Detail, chat and swarm ([#1890](https://github.com/HKUDS/Vibe-Trading/pull/1890)). Shared scheduling now powers research and optional background jobs ([#1893](https://github.com/HKUDS/Vibe-Trading/pull/1893)); live scheduling is unchanged. Fix journal date/time pairing, evidence paths, factor ties, memory roots, numeric error handling and channel progress. See [CHANGELOG](CHANGELOG.md).
 
-- **2026-09-29** 🍁 **Scope narrowed to US + Canada equities**: this fork removes A-share, Hong Kong, UK, India, Korea and Vietnam equities plus crypto, forex and futures from every layer — data loaders, backtest engines, agent and MCP tools, broker connectors, prompts and the web UI. What ships now is 10 market-data loaders (Yahoo / yfinance first, with TSX `.TO` / TSXV `.V` support), 2 market backtest engines alongside the composite and options portfolios, 271 alphas, 58 skills, 25 swarm presets and 6 broker connectors (Alpaca, Futu, IBKR, Longbridge, Robinhood, Tiger). Canada is market data + backtesting only: no Canadian broker execution path is wired. Historical entries below are kept as written.
+- **2026-10-16** 🛠️ **Credential safety and financial correctness**: Scrub more channel/provider secrets ([#1880](https://github.com/HKUDS/Vibe-Trading/pull/1880)), refresh cached local bars after source edits ([#1879](https://github.com/HKUDS/Vibe-Trading/pull/1879)), and allocate reversal fees once ([#1891](https://github.com/HKUDS/Vibe-Trading/pull/1891)). Correct European journal amounts, strict JSON, zero/negative comparisons, holding periods, weight floors, plateau detection and report paths. See [CHANGELOG](CHANGELOG.md).
+
+- **2026-10-15** 🛠️ **Model spending controls and research reliability**: Live runners use independent decision sessions with configurable cadence and persistent daily usage budgets ([#1854](https://github.com/HKUDS/Vibe-Trading/issues/1854)). Lightweight backtest previews preserve complete trade history ([#1853](https://github.com/HKUDS/Vibe-Trading/pull/1853), [#1865](https://github.com/HKUDS/Vibe-Trading/pull/1865)). Fix percentage evidence arithmetic, copied-run history deduplication, swing-signal timing, crypto routing and credential redaction. See [CHANGELOG](CHANGELOG.md) for scope and limits.
+
+- **2026-10-14** 🛠️ **Backtest, search and document fixes**: Risk ratios and equity exports now include first-bar PnL ([#1844](https://github.com/HKUDS/Vibe-Trading/pull/1844)). Session search returns distinct sessions with preserved titles and contextual snippets ([#1827](https://github.com/HKUDS/Vibe-Trading/pull/1827), [#1834](https://github.com/HKUDS/Vibe-Trading/pull/1834)). Improve PDF/Office extraction, reject unresolved evidence references, and strengthen financial-input validation and credential redaction.
+
+<details>
+<summary>Earlier news</summary>
+
+- **2026-10-13** 🧩 **Portfolio imports, strategy adaptation and research tools**: Read-only extraETF holdings imports support dated EUR valuation and allocation proposals; adapted strategies get their own backtest evidence ([#1170](https://github.com/HKUDS/Vibe-Trading/issues/1170), [#1149](https://github.com/HKUDS/Vibe-Trading/issues/1149)). Add tested custom model endpoints, a shared manual Pixel Office task board, Persian/Turkish UI, mStock read-only queries and Gildata research data.
+  Fix settlement-currency accounting, Futu market selection and cost basis, per-symbol HK board lots, saved validation settings and run progress. Complete declared grounding checks and the agent-loop split. mStock remains excluded from portfolio aggregation; Robinhood options execution remains unavailable. See [CHANGELOG](CHANGELOG.md) for scope and limits.
+
+- **2026-10-12** 🧮 **Research and backtest updates**: Correct opening fills, liquidation-time attribution, drawdown duration, valuation tolerances and SEC filing timing in factor IC ([#1780](https://github.com/HKUDS/Vibe-Trading/pull/1780)–[#1794](https://github.com/HKUDS/Vibe-Trading/pull/1794)). Add 13 fundamental/valuation factors, Brazil data and backtests, opt-in ZimaOS templates, and Feishu run progress. See [CHANGELOG](CHANGELOG.md) for scope and data limitations.
+
+- **2026-10-11** 🛠️ **Five priority fixes**: Derived figures require evidence for every data operand; unsupported live options stay blocked. Offline benchmarks retain their selected source, trade artifacts distinguish break-even exits, and Codex tools preserve optional arguments ([#1622](https://github.com/HKUDS/Vibe-Trading/issues/1622), [#1779](https://github.com/HKUDS/Vibe-Trading/pull/1779), [#1781](https://github.com/HKUDS/Vibe-Trading/pull/1781), [#1785](https://github.com/HKUDS/Vibe-Trading/pull/1785)).
+
+- **2026-10-10** 🛠️ **Slack/Discord setup and reproducible research**: Localized channel forms verify bot credentials without saving changes ([#1764](https://github.com/HKUDS/Vibe-Trading/pull/1764), [#1777](https://github.com/HKUDS/Vibe-Trading/pull/1777)). Portfolio research can reuse an immutable snapshot, and Web exports its sanitized JSON ([#1769](https://github.com/HKUDS/Vibe-Trading/pull/1769)). Indicators report their date boundary and exact input fingerprint; corrupted session records recover without rewriting files. Memory recall, credential redaction and trade-journal detection are corrected. See [CHANGELOG](CHANGELOG.md).
+
+- **2026-10-09** 🛠️ **Channel updates and backtest correctness**: Channel settings preserve embedded URL credentials and authenticated WeChat endpoints during in-place updates, with save/reset feedback in all nine languages ([#1737](https://github.com/HKUDS/Vibe-Trading/pull/1737), [#1742](https://github.com/HKUDS/Vibe-Trading/pull/1742), [#1744](https://github.com/HKUDS/Vibe-Trading/pull/1744)). Cross-market option volatility uses only timestamps known at each bar; drawdown includes starting capital. Crypto/precious-metal routing, HK duplicate detection, cache recovery, scientific-notation amounts and missing-equity validation are corrected. mootdx leaves the default A-share chain. See [CHANGELOG](CHANGELOG.md) for all thirteen PRs.
+
+- **2026-10-08** 🔐 **Protected PDF reports and clearer broker reads**: Scheduled Email PDFs support optional AES-256 password protection across Web, CLI playbooks and agent confirmations; the password stays in private channel configuration ([#1709](https://github.com/HKUDS/Vibe-Trading/pull/1709)). KIS queries all three venue buckets, refreshes an explicitly expired token once, and reports incomplete reads as errors ([#1726](https://github.com/HKUDS/Vibe-Trading/pull/1726)). Derived formulas keep their arithmetic after descriptive labels while evidence checks remain enforced ([#1728](https://github.com/HKUDS/Vibe-Trading/pull/1728)).
+
+- **2026-10-07** 🛠️ **Research continuity and reliable risk metrics**: Volatile workspace state now travels outside the system prompt, preserving its stable prefix ([#1708](https://github.com/HKUDS/Vibe-Trading/pull/1708)). Cross-market dates align correctly, missing prices no longer bridge return observations, and options Sortino uses full-sample downside deviation ([#1710](https://github.com/HKUDS/Vibe-Trading/pull/1710), [#1717](https://github.com/HKUDS/Vibe-Trading/pull/1717), [#1727](https://github.com/HKUDS/Vibe-Trading/pull/1727)). Loader fixtures share one OHLCV contract; credit valuation, style exposures, walk-forward folds and audit diagnostics are corrected.
+
+- **2026-10-06** 🛠️ **Live controls and report corrections**: Stopping a live runner cancels its current analysis and waits for scheduler cleanup, including startup cancellation and API shutdown; status timestamps use the correct units ([#1704](https://github.com/HKUDS/Vibe-Trading/pull/1704)). Emergency cancel/flatten scans skip malformed records without abandoning the remaining book ([#1703](https://github.com/HKUDS/Vibe-Trading/pull/1703)); broker schedules are stored separately and writes handle concurrency and partial writes. US equity half-days respect the early closing bell ([#1706](https://github.com/HKUDS/Vibe-Trading/pull/1706)). Report corrections preserve figures that passed validation, and bounded feedback no longer implies that unlisted figures passed ([#1702](https://github.com/HKUDS/Vibe-Trading/pull/1702)).
+
+- **2026-10-05** 🛠️ **Research prompts and calculation fixes**: Chat accepts longer research prompts and gives a localized recovery message when input is too large ([#1701](https://github.com/HKUDS/Vibe-Trading/pull/1701)). Backtests use full-sample Sortino downside deviation; grouped validation purges overlapping labels, covariance weights remain finite, shadow RSI uses Wilder seeds, and memory removal accepts filename stems. Invalid call aliases now receive exact source references for correction ([#1638](https://github.com/HKUDS/Vibe-Trading/pull/1638)); numeric validation stays unchanged.
+
+- **2026-10-04** 🛠️ **Scheduled reports and research workflows**: Edit scheduled runs and choose a configured destination; Email reports support HTML or PDF attachments ([#1649](https://github.com/HKUDS/Vibe-Trading/pull/1649), [#1680](https://github.com/HKUDS/Vibe-Trading/pull/1680)).
+  Backtests expose structured summaries and paged artifact reads ([#1646](https://github.com/HKUDS/Vibe-Trading/pull/1646), [#1647](https://github.com/HKUDS/Vibe-Trading/pull/1647)). Fixes cover memory-search snippets, export-path guidance, macro truncation, monthly risk, turnover on reversals and cash reentry, IV accuracy, VaR gaps, VCS updates and Robinhood option-order blocking.
+
+- **2026-10-03** 🛠️ **Research, reports and data reliability**: CJK session search, channel setup, broker exposure pricing and file writes now handle cases that blocked everyday use. PDF delivery embeds CJK fonts, Swarm validates preset inputs and separates task artifacts, and replayed tool results survive context compaction ([#1683](https://github.com/HKUDS/Vibe-Trading/pull/1683), [#1455](https://github.com/HKUDS/Vibe-Trading/pull/1455), [#1635](https://github.com/HKUDS/Vibe-Trading/pull/1635)). Backtests keep one adjustment basis, local caches distinguish sources, single-asset caps and weekly/monthly risk use the declared settings, audits retain loss signs, grounding checks the current engine output and exact list references, and Stooq retries after a denial cooldown ([#1684](https://github.com/HKUDS/Vibe-Trading/pull/1684), [#1650](https://github.com/HKUDS/Vibe-Trading/pull/1650), [#1685](https://github.com/HKUDS/Vibe-Trading/pull/1685), [#1640](https://github.com/HKUDS/Vibe-Trading/pull/1640)).
+
+- **2026-10-02** 🛠️ **Backtests and report checks**: strategy-file writes retain model provenance without crashing ([#1673](https://github.com/HKUDS/Vibe-Trading/pull/1673)), and Monte Carlo drawdown and Sharpe include starting capital ([#1664](https://github.com/HKUDS/Vibe-Trading/pull/1664)). Report audits preserve accounting negatives and units ([#1663](https://github.com/HKUDS/Vibe-Trading/pull/1663)); grounding artifacts record fired declared checks ([#1661](https://github.com/HKUDS/Vibe-Trading/pull/1661)); public loader-health reports include sanitized failure reasons ([#1643](https://github.com/HKUDS/Vibe-Trading/pull/1643)). Indonesian tool documentation matches the registry ([#1671](https://github.com/HKUDS/Vibe-Trading/pull/1671)).
+
+- **2026-10-01** ✅ **Data correctness and reproducible backtests**: A-share adjustment conversion now refuses ambiguous one-bar edge cases ([#1551](https://github.com/HKUDS/Vibe-Trading/pull/1551)); Southbound Eastmoney amounts are scaled from million HKD and rejected responses no longer look empty ([#1486](https://github.com/HKUDS/Vibe-Trading/pull/1486)); Northbound fallback data distinguishes post-2024-08-19 turnover from net flow ([#1484](https://github.com/HKUDS/Vibe-Trading/pull/1484)); Binance-only unpriced positions are marked incomplete without penalising other brokers ([#1505](https://github.com/HKUDS/Vibe-Trading/pull/1505)); and backtest run cards record model provenance and warn when the training cutoff is unknown or outside the test window ([#1618](https://github.com/HKUDS/Vibe-Trading/pull/1618), closes [#1613](https://github.com/HKUDS/Vibe-Trading/issues/1613)).
+
+- **2026-09-30** 🛠️ **Feishu in the Web UI, a momentum factor that read today's price, and a profit factor for runs that never lost**: Feishu joins the guided channel setup, with a standalone connection test and a hot reload that closes the old WebSocket ([#1572](https://github.com/HKUDS/Vibe-Trading/pull/1572)). `academic_carhart_mom` subtracted the 1-month return from the 12-month one, so it moved with today's close; it is now the return from 12 months ago to 1 month ago ([#1578](https://github.com/HKUDS/Vibe-Trading/pull/1578)). A run with no losing trade reports its profit factor as undefined instead of 0.0, which ranked it last ([#1602](https://github.com/HKUDS/Vibe-Trading/pull/1602)). Stooq's anti-bot page now stops every later request in the process, not just the log line ([#1637](https://github.com/HKUDS/Vibe-Trading/pull/1637)); MCP tool results reach the agent once instead of up to four times ([#1634](https://github.com/HKUDS/Vibe-Trading/pull/1634)); and the first piece of `loop.py` moves into its own module ([#1636](https://github.com/HKUDS/Vibe-Trading/pull/1636)).
+
+- **2026-09-29** 🚀 **v0.1.16 released** ([Release notes](https://github.com/HKUDS/Vibe-Trading/releases/tag/v0.1.16), `pip install -U vibe-trading-ai`): 492 commits and 116 merged pull requests since 0.1.15, from 16 contributors. **The theme of this cycle is a number that can show where it came from.** The grounding gate no longer guesses what a number is from the words around it: the model declares each figure's role (observed, derived, proposed, cited or count), the gate checks it against the session's tool evidence, and a figure that fails is cut instead of the whole answer being refused. A backtest's own output — Sortino, turnover, weights and Monte Carlo p-values, not only Sharpe — now grounds the report written about it, and run cards cite a metric only where the saved CSV agrees. Long research runs keep what they fetched: compaction follows each model's real context window instead of a fixed 40K estimate. The missing-data sweep reached 59 more alphas. **Fixed in this release, from a user's report:** failed runs keep their steps and the stop message names the call that produced nothing; `read_file` says where it may read instead of letting the model guess paths until the no-progress stop; on Codex, mid-run instructions no longer replace the system prompt, reasoning carries between turns and the default model is `gpt-6-sol`; and `get_market_data` asks for `AAPL.US` rather than returning empty data for a bare US ticker. **New:** Argentina (BYMA), weekly and monthly bars, Bahasa Indonesia, Gildata, OpenCode, Email and WebSocket channels, IM channel setup in the Web UI, and KIS, Upbit, Toss Securities and Scalable Capital connectors, 18 brokers in all. Thanks [@Shizoqua](https://github.com/Shizoqua), [@zeus229](https://github.com/zeus229), [@cgycorey](https://github.com/cgycorey), [@shadowinlife](https://github.com/shadowinlife), [@lorenzozanee](https://github.com/lorenzozanee), [@he-yufeng](https://github.com/he-yufeng), [@chiww](https://github.com/chiww), [@as950118](https://github.com/as950118), [@woshi77777stars](https://github.com/woshi77777stars), [@Yoruxyv](https://github.com/Yoruxyv), [@sambazhu](https://github.com/sambazhu), [@0xouzm](https://github.com/0xouzm), [@tingkk](https://github.com/tingkk), [@tonydo](https://github.com/tonydo), [@alanwilhelm](https://github.com/alanwilhelm) and [@modelpath-dev](https://github.com/modelpath-dev)!
+
 - **2026-09-28** 🛠️ **Source health and connector transparency**: scheduled public-source canaries report outages and data drift with bounded, credential-free probes ([#1627](https://github.com/HKUDS/Vibe-Trading/pull/1627)); BaoStock socket requests now have deadlines and serialize concurrent sessions ([#1615](https://github.com/HKUDS/Vibe-Trading/pull/1615)). Copilot credential lookups refresh after a short cache TTL ([#1619](https://github.com/HKUDS/Vibe-Trading/pull/1619)). A generated broker matrix preserves each profile’s paper/live permissions and labels declared capabilities separately from runtime verification ([#1629](https://github.com/HKUDS/Vibe-Trading/pull/1629)). **Grounding and MT5 follow-up:** explicit evidence symbols and exact field references are preserved; localized grouped figures retain the existing numeric tolerance ([#1584](https://github.com/HKUDS/Vibe-Trading/pull/1584), [#1586](https://github.com/HKUDS/Vibe-Trading/pull/1586), [#1588](https://github.com/HKUDS/Vibe-Trading/pull/1588)). Text-only correction attempts are bounded ([#1600](https://github.com/HKUDS/Vibe-Trading/pull/1600)). MT5 search uses the selected terminal and refuses ambiguous broker aliases; backtest sandboxes receive only validated attachment settings ([#1597](https://github.com/HKUDS/Vibe-Trading/pull/1597), [#1598](https://github.com/HKUDS/Vibe-Trading/pull/1598)).
 
 - **2026-09-27** 🛠️ **Verifiable run cards and safer research**: Run cards now show hashed backtest execution records and verified metric-to-CSV references in JSON, Markdown and Run Detail ([#1612](https://github.com/HKUDS/Vibe-Trading/pull/1612)). GTJA high/low recency factors use the correct day count and consistent tie handling ([#1604](https://github.com/HKUDS/Vibe-Trading/pull/1604)); India short covers check the buy-side circuit band ([#1608](https://github.com/HKUDS/Vibe-Trading/pull/1608)). Token usage remains readable without exempting arbitrary credential strings ([#1606](https://github.com/HKUDS/Vibe-Trading/pull/1606)), malformed MCP schemas retain their object properties ([#1607](https://github.com/HKUDS/Vibe-Trading/pull/1607)), and immediate-order goal checks preserve research questions ([#1605](https://github.com/HKUDS/Vibe-Trading/pull/1605)). Setup documentation now correctly identifies OpenRouter as the shipped default ([#1609](https://github.com/HKUDS/Vibe-Trading/issues/1609)).
@@ -62,12 +104,11 @@
 
 - **2026-09-25** 🛠️ **More reliable research sessions and channel diagnostics**: A text column in a backtest CSV no longer discards the numeric metrics ([#1579](https://github.com/HKUDS/Vibe-Trading/pull/1579)), and conversation compaction now counts reasoning content in its retained-message budget ([#1582](https://github.com/HKUDS/Vibe-Trading/pull/1582)). Failed channel loads now log the actual exception ([#1580](https://github.com/HKUDS/Vibe-Trading/pull/1580)); the Telegram guide clarifies that CLI and Web controls share the same API runtime ([#1583](https://github.com/HKUDS/Vibe-Trading/pull/1583)). Robinhood portfolio reads reject malformed buying-power objects while keeping omitted or null values unknown ([#1526](https://github.com/HKUDS/Vibe-Trading/pull/1526)). Leaving a chat also cancels pending history-scroll timers. Thanks [@Shizoqua](https://github.com/Shizoqua) and [@lorenzozanee](https://github.com/lorenzozanee)!
 
+
+
 - **2026-09-24** 💱 **A dollar line priced as pesos, Email and WebSocket in the Web UI, and a CI break from an SDK update**: BYMA and the TSX list US-dollar lines beside their home-currency ones (GGALD.BA, DLR-U.TO), and an Argentine or Canadian backtest priced them in its single peso or Canadian-dollar pool. The loaders now admit a line only in its market's currency, as LSE lines already were, and every other declared quote currency travels with the data, so an answer names the right one ([#1576](https://github.com/HKUDS/Vibe-Trading/pull/1576)). Hong Kong's RMB and USD counters (80700.HK, 9834.HK), which HKEX numbers in their own code ranges, are refused in a Hong Kong backtest for the same reason and quoted in their own currency. Stock profiles carry the listing's own venue and currency beside the issuer's fundamentals ([#1577](https://github.com/HKUDS/Vibe-Trading/pull/1577)), grounding and symbol search know every market the data layer routes ([#1575](https://github.com/HKUDS/Vibe-Trading/pull/1575)), and `technical_indicators` reports volume with the unit its source declares — board lots or shares, 100× apart ([#1571](https://github.com/HKUDS/Vibe-Trading/pull/1571)). Email and WebSocket join the guided channel setup, with mail-server certificates now verified and settings writes closed to cross-site pages, and a plain IMAP login is upgraded with STARTTLS before the password goes out ([#1544](https://github.com/HKUDS/Vibe-Trading/pull/1544)). **Fixed:** an explicit provider header lost to an ambient twin under openai 3.19.2, which had turned every PR's CI red ([#1568](https://github.com/HKUDS/Vibe-Trading/pull/1568)); a backtest from a microsecond-resolution source was dated 1970 ([#1560](https://github.com/HKUDS/Vibe-Trading/pull/1560)); a research goal that is plainly an order is refused again ([#1562](https://github.com/HKUDS/Vibe-Trading/pull/1562)); a strict-bench OOS split could leave one side empty ([#1559](https://github.com/HKUDS/Vibe-Trading/pull/1559)); HRP label alignment, cross-validation label order and non-finite quant inputs ([#1555](https://github.com/HKUDS/Vibe-Trading/pull/1555), [#1556](https://github.com/HKUDS/Vibe-Trading/pull/1556), [#1557](https://github.com/HKUDS/Vibe-Trading/pull/1557), [#1558](https://github.com/HKUDS/Vibe-Trading/pull/1558)); the shadow-account overtrading window ([#1563](https://github.com/HKUDS/Vibe-Trading/pull/1563)); and asset growth was read day over day ([#1564](https://github.com/HKUDS/Vibe-Trading/pull/1564)). Thanks [@Shizoqua](https://github.com/Shizoqua), [@zeus229](https://github.com/zeus229) and [@shadowinlife](https://github.com/shadowinlife)!
 
 - **2026-09-23** 🇦🇷 **Argentine listings, a short book sized upside down, and the last half of the tail-risk gate**: `.BA` symbols — BYMA equities and CEDEARs — route to Yahoo as their own ARS market, and the Web UI groups and labels them like any other; an Argentine backtest still fails closed until BYMA execution rules are modelled ([#1543](https://github.com/HKUDS/Vibe-Trading/pull/1543)). The mean-variance and turnover-aware optimizers scored every position as if it were held long, so the strongest shorts got the least capital. Both now size on position returns, where a long and a short of two correlated names hedge each other instead of reading as correlated — on a +0.92 correlated pair the old objective put the whole book on the long, the new one splits it 0.51 / -0.49 ([#1548](https://github.com/HKUDS/Vibe-Trading/pull/1548)). And a tail-risk figure now has to name its own field once a session holds more than one measure or confidence level, so an ES 95% can no longer quote the VaR 95% value under a call id ([#1425](https://github.com/HKUDS/Vibe-Trading/issues/1425)). **Fixed:** Monte-Carlo validation annualises at the venue's bars per year instead of a hardcoded 252, so its Sharpe agrees with the rest of the same report ([#1546](https://github.com/HKUDS/Vibe-Trading/pull/1546)); a futures order on a negative-price bar is no longer rejected outright ([#1547](https://github.com/HKUDS/Vibe-Trading/pull/1547)); a factor's IC ratio is left unset for a negative baseline instead of reading real decay as healthy improvement ([#1549](https://github.com/HKUDS/Vibe-Trading/pull/1549)); and two memories sharing a title under different types keep their own index rows and link targets ([#1545](https://github.com/HKUDS/Vibe-Trading/pull/1545)). Thanks [@zeus229](https://github.com/zeus229), [@Shizoqua](https://github.com/Shizoqua) and [@he-yufeng](https://github.com/he-yufeng)!
-
-<details>
-<summary>Earlier news</summary>
 
 - **2026-09-22** 📅 **Weekly and monthly bars, and a compaction replay that could lose evidence**: `get_market_data` and backtests take `1W` and `1M` (rejected since 09-20 so `1M` would not fetch minute bars). Every source still serves daily bars and the period bar is built from them, dated on the last trading day of its week or month, so a 21-month review is one call of 21 bars ([#1479](https://github.com/HKUDS/Vibe-Trading/issues/1479)). A price index is stamped unadjusted instead of by what its source does to a stock ([#1541](https://github.com/HKUDS/Vibe-Trading/issues/1541)). A read-only tool result that context compaction removed is restored from the run's own memory instead of fetched again, capped per run, and a write empties that memory so a regenerated file is read afresh ([#1488](https://github.com/HKUDS/Vibe-Trading/pull/1488)). A tail-risk figure declared with a field ref is checked against that field, so a VaR 99% quoting the 95% value is caught ([#1444](https://github.com/HKUDS/Vibe-Trading/pull/1444)). QVeris refuses stock and ETF bars, whose adjustment its search-ranked pick cannot state, and quotes priced per result ([#1494](https://github.com/HKUDS/Vibe-Trading/issues/1494)). Thanks [@sambazhu](https://github.com/sambazhu), [@zeus229](https://github.com/zeus229), [@he-yufeng](https://github.com/he-yufeng), [@jw232](https://github.com/jw232) and [@cgycorey](https://github.com/cgycorey)!
 
@@ -350,7 +391,7 @@ It is designed for research, simulation, and backtesting — and, when you choos
 | **Run analyst teams** | Multi-agent research reviews for investment, quant, macro, and risk workflows. |
 | **Put research into IM channels** | Run the same session runtime through WebSocket, Telegram, Slack, Discord, Matrix, WhatsApp, Signal, QQ/NapCat, WeChat/WeCom, Feishu/Lark, DingTalk, Teams, email, and Mochat with CLI, REST, and Web UI controls. |
 | **Ship usable artifacts** | Reports, TradingView Pine Script, MCP tools, and later research sessions. |
-| **Bench a pre-built alpha zoo** | One-line IC + alive/reversed/dead categorisation across 271 alphas (Qlib 158 + Kakushadze 101 + academic + PIT-safe fundamental) on your universe. |
+| **Bench a pre-built alpha zoo** | One-line IC + alive/reversed/dead categorisation across 281 alphas (Qlib 158 + Kakushadze 101 + academic + PIT-safe fundamental) on your universe. |
 | **Spot correlation regimes** | An edge-density + hysteresis timeline on the `/correlation` surface showing when markets fuse into one bloc — descriptive risk context, not a signal. |
 
 Daily correlation and regime requests align each source by its local calendar date, including mixed timezone-aware and timezone-naive histories.
@@ -374,32 +415,29 @@ vibe-trading --upload trades_export.csv
 vibe-trading run -p "Analyze my trading behavior, extract my shadow strategy, and compare it with my actual trades"
 ```
 
----
+### Pixel Office management
 
-## 👥 Shadow Account
+Open **Pixel Office** from the feature menu to plan and assign research tasks.
+The Web page, `vibe-trading office` CLI and `pixel_office` agent tool share one
+SQLite task board under your runtime directory. Assignment does not start
+execution; organizational ranks grant no trading permissions. Record the actual
+result when completing a task. See [Pixel Office](pixel-office/README.md) for CLI
+and API examples.
 
-Shadow Account starts from your own trading records instead of a generic strategy template.
+### Import an extraETF holdings export
 
-Upload a broker export, let the agent summarize your behavior, then compare the actual trading path with a rule-based shadow strategy.
-
-| Step | Agent output |
-|------|--------------|
-| **1. Read your journal** | Parses broker exports from 同花顺, 东方财富, 富途, and generic CSV formats. |
-| **2. Profile your behavior** | Holding days, win rate, PnL ratio, drawdown, disposition effect, overtrading, momentum chasing, and anchoring checks. |
-| **3. Extract your rules** | Turns recurring entries/exits into an explicit strategy profile instead of a hand-wavy summary. |
-| **4. Run the shadow** | Backtests the extracted rules and highlights rule breaks, early exits, missed signals, and alternative trade paths. |
-| **5. Deliver the report** | Produces an HTML/PDF report that can be inspected, archived, or refined in a later session. |
+Open **Portfolio → Manage accounts → Import extraETF Investments**, choose the official Investments CSV, confirm the number of holdings in extraETF, and choose the maximum file age you accept. Add the imported source, save, and refresh. Transactions, dividends and X-Ray exports are not holdings and are refused. Imports are local file evidence, separate from broker connections; no extraETF login or browser scraping is used.
 
 ```bash
-vibe-trading --upload trades_export.csv
-vibe-trading run -p "Analyze my trading behavior, extract my shadow strategy, and compare it with my actual trades"
+vibe-trading portfolio import-extraetf ~/Downloads/Investments.csv \
+  --label "extraETF export" --expected-positions 27 --max-age-days 7 --select
+vibe-trading portfolio refresh
+vibe-trading portfolio show
 ```
 
----
+The row count and age above are examples to replace with your own. The entire import fails on an unreadable row, count mismatch, missing price, future file time or expired freshness policy. File mtime is labelled as file mtime, never as a price observation; copying a file can change it. `Portfolio ID` keeps accounts separate even when they hold the same ISIN. Imported totals are quantity × exported price and **exclude cash and other assets absent from the export**. Select disjoint sources: an extraETF view can include accounts already selected through broker connections.
 
-## 💼 Local Multi-Broker Portfolio
-
-The Web UI adds a read-only **Portfolio** page that aggregates holdings across the broker connections you pick. Sources are connection instances of read-only profiles declaring `account.read` and `positions.read` — set them up under **Broker Connectors** in [Detailed Capabilities](#-detailed-capabilities). Eligibility is only the safety gate; the connection center also shows how far each connector has been verified for portfolio valuation.
+USD, CNY, HKD and EUR display values use [Frankfurter reference rates](https://frankfurter.dev/) with the rate date separate from fetch time; they are not intraday quotes. An unavailable currency fails valuation. Cached rates are labelled stale and cannot produce a rebalancing proposal. An ISIN identifies a security but not its trading venue: imported holdings remain excluded from historical risk-series tools until that identity is resolved.
 
 | Behavior | What you get |
 |----------|--------------|
@@ -601,6 +639,14 @@ Detailed inventories are folded below to keep the main README scannable. Open th
 | Tool | 6 | `backtest-diagnose`, `report-generate`, `doc-reader`, `web-reader`, `geopolitical-risk`, `social-media-intelligence` |
 | Research | 3 | `alpha-zoo`, `strategy-dev-manager`, `strategy-discovery` |
 
+The read-only `report_audit` tool preserves signed financial values in Markdown
+tables and `label: value` lines, so losses are checked as losses rather than profits.
+Backtest reports ground their figures in the engine's own output for that call.
+For list results, equivalent references such as `data.positions[0].contribution_pct`
+and `data.positions.0.contribution_pct` select the same element; an explicit index
+cannot borrow another element's value. Correction hints suggest exact references
+without treating the suggestion itself as evidence.
+
 </details>
 
 <details>
@@ -693,9 +739,9 @@ alongside the bundled roster (same-name files override it, like user skills) and
 </details>
 
 <details>
-<summary><b>Alpha Zoo</b> <sub>271 pre-built quant alphas across 4 families</sub></summary>
+<summary><b>Alpha Zoo</b> <sub>281 pre-built quant alphas across 4 families</sub></summary>
 
-- 🧬 271 cross-sectional alphas, lookahead-banned at the operator layer
+- 🧬 281 cross-sectional alphas, lookahead-banned at the operator layer
 - 📈 IC + IR + alive/reversed/dead categorisation in one CLI command
 - 🔬 AST purity gate + 300-row lookahead sentinel test + `pytest-socket` network kill-switch
 - 📦 Apache-2 attribution for Qlib; per-zoo `LICENSE.md` declaring formulas as mathematical content
@@ -705,9 +751,8 @@ alongside the bundled roster (same-name files override it, like user skills) and
 |-----|-------|--------|---------|
 | **qlib158** | 154 | Microsoft Qlib `Alpha158` (Apache-2.0, commit-pinned) | Apache-2.0 |
 | **alpha101** | 101 | Kakushadze (2015), "101 Formulaic Alphas", arXiv:1601.00991 | Formulas are mathematical content |
-| **qlib158** | 191 | Guotai Junan (2014), "191 Short-period Trading Alpha Factors" | Formulas are mathematical content |
 | **academic** | 12 | Fama-French 5 + Carhart momentum + Jegadeesh reversal + George-Hwang 52-week-high + Amihud illiquidity + Harvey-Siddique skew + Frazzini-Pedersen betting-against-beta + correlation-rewiring stability (price-based proxies) | Public academic literature |
-| **fundamental** | 4 | PIT-safe SEC company facts — earnings yield, ROE, gross profitability, asset growth (filed-date anchored) | Public financial data |
+| **fundamental** | 14 | PIT-safe SEC company facts — value, quality, growth and cash-flow ratios anchored to the filing date | Public financial data |
 
 Run `vibe-trading alpha list` to browse, `vibe-trading alpha show <id>` for formulas + source, `vibe-trading alpha bench --zoo X --universe Y --period Z` to score a whole zoo, and `vibe-trading alpha compare --all` to rank zoos side by side.
 
@@ -722,7 +767,30 @@ Run `vibe-trading alpha list` to browse, `vibe-trading alpha show <id>` for form
 | **Composite** | US / Canada / index | one shared capital pool across markets (`source="auto"`) |
 | **options_portfolio** | options | multi-leg, Greeks, payoff/scenario |
 
+Benchmark selection honors `.SH`, `.SZ`, and `.BJ` A-share suffixes, plus Yahoo's `.SS` spelling for Shanghai, independently of the chosen loader, including offline local sources.
+
 Bars: 1m / 5m / 15m / 30m / 1H / 4H / 1D, plus weekly / monthly (1W / 1M, built from daily bars). 15 metrics + benchmark comparison, **5 portfolio optimizers** (equal-volatility / risk-parity / mean-variance / max-diversification / turnover-aware), and 3 validation tools (Monte Carlo / Bootstrap / Walk-Forward).
+
+The turnover-aware optimizer validates per-name and group caps for single-asset
+allocations too. It preserves feasible supplied allocations (including cash),
+and raises an error when the singleton allocation exceeds a cap.
+
+When the opt-in market-data cache is enabled, local-source cache entries are
+scoped to the configured file, query, and column mapping. Changing a symbol's
+source declaration does not reuse bars from its previous source. The settled-data
+cache policy for an unchanged declaration remains the same.
+Unusable cached metadata is treated as a cache miss: the declared local source
+is read again, and the replacement entry can serve subsequent cache hits.
+The turnover-aware optimizer measures allocation changes in signed position
+space: reversing a 50% long to a 50% short contributes 0.5 turnover, including
+both the close and the reopen. Its penalty and recorded allocation turnover
+include these reversals; execution-derived turnover remains a separate metric.
+Local data date ranges include the entire UTC end day, including subsecond
+timestamps; bars at the following midnight are excluded before aggregation.
+
+The shared backtest market classifier recognizes `BTC/USD`, `ETH/USD`,
+`BNB/USD`, `SOL/USD`, `ADA/USD`, and `DOGE/USD` as crypto. Fiat pairs such as
+`GBP/USD`, `EUR/USD`, and `USD/JPY` retain their forex classification.
 
 </details>
 
@@ -847,6 +915,10 @@ https://github.com/user-attachments/assets/3754a414-c3ee-464f-b1e8-78e1a74fbd30
 pip install vibe-trading-ai
 ```
 
+`vibe-trading update` upgrades PyPI installs in place. Editable checkouts and
+version-control installs receive manual update guidance so their source revision
+is not silently replaced by a PyPI release.
+
 Then run a first research task:
 
 ```bash
@@ -887,8 +959,9 @@ vibe-trading-mcp               # start MCP server (stdio)
 - **Docker** for Path A
 - OpenAI Codex can also be used with ChatGPT OAuth: set `LANGCHAIN_PROVIDER=openai-codex`, then run `vibe-trading provider login openai-codex`. This does not use `OPENAI_API_KEY`.
 - GitHub Copilot can be used with an active Copilot subscription instead of a separately billed LLM API key. See [GitHub Copilot SDK provider](#github-copilot-sdk-provider).
+- A local Claude Code login can drive the agent without an API key. See [Claude Code CLI provider](#claude-code-cli-provider).
 
-> **Supported LLM providers:** OpenRouter, OpenAI, Anthropic (native Messages API), DeepSeek, OpenCode (Go / Zen), Gemini, Groq, DashScope/Qwen, Zhipu, Moonshot/Kimi, MiniMax, SiliconFlow (CN + Global), Xiaomi MIMO, Novita AI, iFlytek Spark, Z.ai, NVIDIA NIM, ModelScope, GitHub Copilot, Ollama (local). When no `*_BASE_URL` is set, each provider falls back to its canonical endpoint, so just a key is enough. See `.env.example` for config.
+> **Supported LLM providers:** OpenRouter, OpenAI, Anthropic (native Messages API), DeepSeek, OpenCode (Go / Zen), Gemini, Groq, DashScope/Qwen, Zhipu, Moonshot/Kimi, MiniMax, SiliconFlow (CN + Global), Xiaomi MIMO, Novita AI, iFlytek Spark, Z.ai, NVIDIA NIM, ModelScope, GitHub Copilot, Claude Code CLI, Ollama (local). When no `*_BASE_URL` is set, each provider falls back to its canonical endpoint, so just a key is enough. See `.env.example` for config.
 
 > **Tip:** US and Canadian markets work without any API keys thanks to automatic fallback. Yahoo and yfinance (US / Canada), Stooq, Sina and Eastmoney (US) are free; Finnhub, Alpha Vantage, Tiingo and FMP are optional key-gated providers.
 
@@ -917,6 +990,35 @@ vibe-trading
 ```
 
 Authentication priority is `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`, stored Copilot CLI credentials, then `gh` credentials. Vibe-Trading does not copy or persist SDK credentials. Host keychain credentials are not automatically available inside Docker, so containers should receive `COPILOT_GITHUB_TOKEN`.
+
+### Claude Code CLI provider
+
+The `claude-cli` provider uses the [Claude Code](https://claude.com/claude-code) CLI you already have installed and logged in. Each agent step runs one headless `claude -p` process that only chooses the next step — call these tools, or give the final answer. Vibe-Trading runs the tools itself, so the evidence ledger, grounding checks and swarm deliverable checks behave exactly as with an API provider. It does not read `ANTHROPIC_API_KEY`.
+
+Log in once with Claude Code, then check that Vibe-Trading can see the login:
+
+```bash
+claude auth login
+vibe-trading provider login claude-cli   # reports the login; it does not start a new one
+```
+
+Then configure `agent/.env`:
+
+```dotenv
+LANGCHAIN_PROVIDER=claude-cli
+LANGCHAIN_MODEL_NAME=claude-opus-5-5
+# LANGCHAIN_REASONING_EFFORT=high                   # low|medium|high|xhigh|max; passed as --effort
+# CLAUDE_CLI_PATH=/opt/homebrew/bin/claude          # when `claude` is not on PATH or in ~/.local/bin
+# CLAUDE_CLI_DENY_TOOL_PREFIXES=trading_,etoro_     # default; set empty to offer every tool
+# CLAUDE_CLI_BASH_POLICY=python-only                # or `off`
+```
+
+- `CLAUDE_CLI_DENY_TOOL_PREFIXES` hides tools whose names start with these prefixes from the model. The default hides every `trading_*` and `etoro_*` tool, read-only ones included, so the agent cannot quote or list positions through a broker connector under this provider until you change it.
+- `CLAUDE_CLI_BASH_POLICY=python-only` lets the `bash` tool run only `python <relative script>.py`, `python -c ...`, and read-only `ls`/`cat`/`head`/`tail`/`wc`/`pwd` on non-hidden relative paths (so not `.env`); refused calls are returned to the model so it can choose again. Any other value stops the provider from starting.
+
+> **Warning:** Both settings are convenience filters, not a security boundary. `python -c` can still run arbitrary code, and external MCP tools (`mcp_<server>_<tool>`) are not covered by the default prefixes. Live orders stay bound by the mandate gate and kill switch whatever these settings allow.
+
+> **Note:** When Settings shows this provider, it loads the models your Claude Code login can run (cached for 5 minutes; **Load models** refreshes), and the reasoning effort menu offers only the levels the selected model accepts. The chosen level is passed to each `claude -p` call as `--effort`; it does not read or change `~/.claude/settings.json`, and "Provider default" means the model's own default. Base URL, temperature and `MAX_RETRIES` have no effect with this provider, and `TIMEOUT_SECONDS` is raised to at least 600 seconds per decision. Image input is not supported. The CLI returns each decision in one piece; while it runs, provider waiting events keep the Web UI active. Transport keepalives alone do not suppress `VIBE_TRADING_SSE_TIMEOUT` (default 90 seconds), and cancellation and the per-decision deadline remain enforced.
 
 ### Path A: Docker (zero setup)
 
@@ -1015,22 +1117,35 @@ Copy `agent/.env.example` to `agent/.env` and uncomment the provider block you w
 |----------|:--------:|-------------|
 | `LANGCHAIN_PROVIDER` | Yes | Provider name (`openrouter`, `deepseek`, `groq`, `ollama`, etc.) |
 | `<PROVIDER>_API_KEY` | Yes* | API key (`OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, etc.) |
-| `<PROVIDER>_BASE_URL` | Yes | API endpoint URL |
+| `<PROVIDER>_BASE_URL` | Yes* | API endpoint URL |
 | `LANGCHAIN_MODEL_NAME` | Yes | Model name (e.g. `deepseek-v4-pro`) |
-| `LANGCHAIN_REASONING_EFFORT` | No | Reasoning effort (`none`, `low`, `medium`, `high`, or `max`) |
+| `LANGCHAIN_REASONING_EFFORT` | No | Reasoning effort (`none`, `low`, `medium`, `high`, or `max`; `claude-cli` takes `low` through `max` plus `xhigh`, and no `none`) |
 | `LANGCHAIN_USE_RESPONSES_API` | No | Responses transport override: literal `true` uses `/v1/responses` when the endpoint supports it; native adapters retain their own transport; all other values use Chat Completions |
 | `TIMEOUT_SECONDS` | No | LLM call timeout, default 120s |
+| `CLAUDE_CLI_PATH` | No | `claude` executable for the `claude-cli` provider when it is not on PATH or in `~/.local/bin` |
+| `CLAUDE_CLI_DENY_TOOL_PREFIXES` | No | Tool-name prefixes hidden from the `claude-cli` model (default `trading_,etoro_`; empty offers every tool) |
+| `CLAUDE_CLI_BASH_POLICY` | No | `python-only` (default) or `off` for the `claude-cli` provider's `bash` tool |
 | `API_AUTH_KEY` | Recommended for network deployments | Bearer token required when the API is reachable from non-local clients |
 | `VIBE_TRADING_ENABLE_SHELL_TOOLS` | No | Explicit opt-in for shell-capable tools in remote API/MCP-SSE style deployments |
 | `VIBE_TRADING_ALLOWED_FILE_ROOTS` | No | Extra comma-separated roots for document and broker-journal imports |
 | `VIBE_TRADING_ALLOWED_RUN_ROOTS` | No | Extra comma-separated roots for generated-code run directories |
+| `VIBE_TRADING_ALLOWED_WRITE_ROOTS` | No | Extra comma-separated roots the agent may write or edit (e.g. `~/Documents` for report exports) |
 | `VIBE_TW_STOCK_DB` | No | Path to a Taiwan-market SQLite snapshot; the read-only `taiwan_stock_data` tool registers only when it is schema-valid |
 | `VIBE_TRADING_EXTRA_CORS_ORIGINS` | No | Comma-separated origins **added** to the loopback CORS defaults (`CORS_ORIGINS` replaces them instead) |
 | `CONTENT_FILTER_WARNING_THRESHOLD` | No | Content-filter warning ratio threshold (default 0.05 = 5%). When the ratio of LLM responses blocked by content moderation exceeds this, the run card warns you to switch providers. |
 
-<sub>* Ollama does not require an API key. OpenAI Codex uses ChatGPT OAuth and stores tokens via `oauth-cli-kit`, not in `agent/.env`. GitHub Copilot authentication is handled by the official SDK.</sub>
+<sub>* Ollama does not require an API key. OpenAI Codex uses ChatGPT OAuth and stores tokens via `oauth-cli-kit`, not in `agent/.env`. GitHub Copilot authentication is handled by the official SDK. Claude Code CLI uses the local `claude` login and needs no API key or base URL.</sub>
 
 **Free data (no key needed):** US and Canadian equities via Yahoo/yfinance, US bars via Stooq, Sina and Eastmoney. The system automatically selects the best available source for each market.
+
+**PDF reports:** Ask the agent to save a report as PDF. `write_file` renders a
+`.pdf` target from Markdown/text with an embedded font; it does not need system
+Pango/Cairo or a font download. The Web chat provides an authenticated download
+link, and IM channels that support files receive the PDF as an attachment.
+External folders must be listed in `VIBE_TRADING_ALLOWED_WRITE_ROOTS`. Successful
+writes return the resolved path and byte count; a rejected path does not forbid
+other allowed folders. Generated downloads are staged under
+`~/.vibe-trading/generated_reports/` (or `VIBE_TRADING_HOME/generated_reports/`).
 
 ### 🎯 Recommended Models
 
@@ -1054,7 +1169,7 @@ The interactive TUI (`vibe-trading`) now uses a terminal-native transcript: a st
 vibe-trading               # interactive TUI
 vibe-trading run -p "..."  # single run
 vibe-trading serve         # API server
-vibe-trading alpha list    # browse 271 pre-built alphas; show / bench / compare / export-manifest sub-commands available
+vibe-trading alpha list    # browse 281 pre-built alphas; show / bench / compare / export-manifest sub-commands available
 vibe-trading playbook list # five scheduled-research templates; show / create sub-commands available
 vibe-trading channels status --local  # inspect IM channel config and install hints
 vibe-trading provider doctor  # print redacted provider/proxy/package diagnostics
@@ -1186,7 +1301,7 @@ Commands are case-insensitive and must be sent as the entire message (e.g. `hell
 
 > **`/pairing` is operator-gated.** In-chat pairing-control commands are rejected unless the sender is listed as an operator — set `channels.operators` (cross-channel authority) or a channel section's own `operators` list in your channels config. With no operators configured, in-chat `/pairing` is refused (fail-closed) and pairing is managed only through the authenticated CLI (`vibe-trading channels pairing …`) and the auth-gated REST endpoint. This prevents any allow-listed group member from taking over pairing across channels.
 
-**Configure from the Web UI**: the **IM Channels** panel on the Settings page configures channels without hand-editing files. Expand a channel to open its config panel: fields render from backend metadata, and secret values are never returned to the browser, only masked (`****` plus the last 4 characters). DingTalk is the first fully-guided channel: create an app at [open-dev.dingtalk.com](https://open-dev.dingtalk.com/), add the bot capability, enable Stream Mode (no public callback URL needed), copy the AppKey into Client ID and the AppSecret into Client Secret, then publish the app. QQ has joined it as a fully-guided channel: register a bot on the QQ Open Platform ([q.qq.com](https://q.qq.com/)), copy the AppID and AppSecret into the form, verify with **Test connection** before saving, then enable; no public callback URL is needed (WebSocket via the official botpy SDK). Email and WebSocket have joined as fully-guided channels: Email's **Test connection** probes the IMAP login, the mailbox folder and the SMTP login against your provider without sending anything, while WebSocket — a local server rather than a remote service — validates the TLS certificate/key material and the address availability on this machine; an address held by the already-running server reads as the expected state, not a failure. Saving a WebSocket config hot-swaps the server, so connected clients (including the Web UI chat) briefly disconnect and reconnect. **Test connection** probes the values in the form before anything is saved and answers with an honest result code (`ok`, `invalid_credentials`, `network`, or `unsupported`). **Enable** applies immediately: a running channel runtime hot-swaps that one adapter with no process restart, and enabling auto-verifies credentials unless you explicitly choose **Enable anyway** after a failed check. Disabling a channel keeps its stored credentials, so re-enabling needs no re-entry. Only the built-in adapters are listed here; entry-points plugin channels remain file-configured.
+**Configure from the Web UI**: the **IM Channels** panel on the Settings page configures channels without hand-editing files. Expand a channel to open its config panel: fields render from backend metadata, and secret values are never returned to the browser, only masked (`****` plus the last 4 characters). DingTalk is the first fully-guided channel: create an app at [open-dev.dingtalk.com](https://open-dev.dingtalk.com/), add the bot capability, enable Stream Mode (no public callback URL needed), copy the AppKey into Client ID and the AppSecret into Client Secret, then publish the app. QQ has joined it as a fully-guided channel: register a bot on the QQ Open Platform ([q.qq.com](https://q.qq.com/)), copy the AppID and AppSecret into the form, verify with **Test connection** before saving, then enable; no public callback URL is needed (WebSocket via the official botpy SDK). Email and WebSocket have joined as fully-guided channels: Email's **Test connection** probes the IMAP login, the mailbox folder and the SMTP login against your provider without sending anything, while WebSocket — a local server rather than a remote service — validates the TLS certificate/key material and the address availability on this machine; an address held by the already-running server reads as the expected state, not a failure. Saving a WebSocket config hot-swaps the server, so connected clients (including the Web UI chat) briefly disconnect and reconnect. Feishu has joined them as a fully-guided channel: create a custom app on the Feishu Open Platform ([open.feishu.cn](https://open.feishu.cn/), or [open.larksuite.com](https://open.larksuite.com/) for international Lark), add the bot capability, select the matching domain in the form, copy the App ID and App Secret, verify with **Test connection** before saving, then enable; no public callback URL is needed (WebSocket long connection via the official lark-oapi SDK). **Test connection** probes the values in the form before anything is saved and answers with an honest result code (`ok`, `invalid_credentials`, `network`, or `unsupported`). **Enable** applies immediately: a running channel runtime hot-swaps that one adapter with no process restart, and enabling auto-verifies credentials unless you explicitly choose **Enable anyway** after a failed check. Disabling a channel keeps its stored credentials, so re-enabling needs no re-entry. Only the built-in adapters are listed here; entry-points plugin channels remain file-configured.
 
 Saves write the `channels.<name>` section of `~/.vibe-trading/agent.json` atomically. YAML config files are read-only for the web UI (JSON is required to edit from the browser), and the panel says so instead of failing. Channels without a dedicated guide render a generic form derived from their defaults.
 
@@ -1197,6 +1312,24 @@ Saves write the `channels.<name>` section of `~/.vibe-trading/agent.json` atomic
 ## 💡 Examples
 
 ### Strategy & Backtesting
+
+Average holding period includes completed same-bar trades (zero bars). The
+existing `avg_holding_days` compatibility key reports the engine's holding-bar
+measure; it is not a conversion to calendar days.
+
+Standalone revalidation (`python -m backtest.validation <run_dir>`) runs all
+three validation tools using saved `config.json` validation parameters; missing
+parameters use the existing defaults. This includes simulation counts, seeds,
+bootstrap confidence, and walk-forward window count.
+
+New BaseEngine `artifacts/trades.csv` files include an `event` column:
+`entry` marks an opening row and `exit` marks a completed trade, including
+zero-PnL exits. Validation and strategy-discovery readers use this marker.
+Files without it retain legacy loading; their zero-PnL exits remain ambiguous.
+The separate options-engine trade format is unchanged. Validation also recovers entry dates from
+matching adjacent `entry`/`exit` rows, so walk-forward trade counts and win rates
+retain entry-window attribution after reload. Unmarked or unmatched rows keep
+the legacy timestamp fallback.
 
 ```bash
 # Moving average crossover on US equities
@@ -1221,6 +1354,14 @@ select execution bars in `config.json`:
   "rebalance_mask": "MS"
 }
 ```
+
+Backtest run cards record the provider and model that wrote `config.json` and
+`code/signal_engine.py`. Set `model_training_cutoff` in `config.json` to an
+ISO date to record the model's cutoff; a window ending earlier is marked as
+potentially exposed, and an unset cutoff is treated as unknown and exposed.
+For strict factor benchmarks, pass `--training-cutoff YYYY-MM-DD` to
+`vibe-trading alpha bench --strict` to place the out-of-sample segment strictly
+after the cutoff.
 
 `MS` executes the aligned target on the first observed trading bar of each
 month. Weekly/quarterly pandas offset aliases (for example `W-FRI` and `QS`) and
@@ -1249,6 +1390,20 @@ engine = ZooSignalEngine.from_zoo(["qlib158_beta10", "qlib158_beta20", "qlib158_
 panel = ...  # your wide OHLCV panel
 signal = engine.compute_signal(panel)
 ```
+
+Correlation market inference recognizes explicit crypto pairs; bare equity tickers such as `ABNB` and `SOL` use the US equity data chain.
+
+### Trade journal fees
+
+Journal PnL includes recorded fees. When one fill closes a position and opens
+an opposite position, its fee is split by quantity between the two legs.
+Profile win rate and the average-win/average-loss ratio use the resulting net
+PnL of FIFO matched portions; those portions are not necessarily whole orders.
+
+Generic journals accept a complete `datetime` column or separate `date` and
+`time` columns (case-insensitive). Split columns are combined before sorting
+and FIFO matching; Excel date serials and time fractions are supported.
+A complete `datetime` column takes precedence when all three are present.
 
 ### Market Research
 
@@ -1281,6 +1436,12 @@ vibe-trading --swarm-run macro_rates_fx_desk '{"focus": "Fed pivot impact on EM 
 # Resume a failed or cancelled run while keeping its completed tasks
 vibe-trading --swarm-retry <run_id> --swarm-resume
 ```
+
+Each Swarm task keeps its reports, summary and message log under
+`artifacts/<agent_id>/<task_id>/`, so tasks assigned to the same agent retain
+their own output during sequential or parallel execution. Retrying a task clears
+only that task's output; completed task artifacts remain available to downstream
+workers. Resume also preserves artifacts recorded by older runs.
 
 ### Cross-Session Memory
 
@@ -1411,6 +1572,20 @@ that surface action calls the commit endpoint. Create drafts carry `title`, `sou
 Scheduled delivery is channel-agnostic. Configure reusable opaque target refs
 under `channels.deliveryTargets`; the agent tool and its confirmation surfaces
 expose the ref, label, and channel but never the provider's raw chat/user id.
+For Email PDF reports, an operator can set the private `pdf_password` field in
+Settings → IM Channels → Email. The Scheduled page then offers optional PDF
+protection only for PDF delivery. The password stays in Email channel config;
+jobs persist only the protection boolean, and requesting protection without a
+configured password is rejected.
+
+For CLI playbooks, add `--protect-pdf` alongside `--delivery-format pdf` and
+an Email destination, for example:
+
+```bash
+vibe-trading playbook create premarket-brief --delivery-target-ref research-email \
+  --delivery-format pdf --protect-pdf
+```
+
 The existing direct REST/admin fields remain available for backward
 compatibility:
 
@@ -1455,7 +1630,7 @@ Posting `{}` schedules a template on its own suggested cadence with its declared
 
 ## 🔌 MCP Plugin
 
-Vibe-Trading exposes 64 MCP tools for any MCP-compatible client. Runs as a stdio subprocess — no server setup needed. Core research tools work with zero API keys for US and Canadian equities; trading connector tools use the selected connector profile, and `run_swarm` needs an LLM key.
+Vibe-Trading exposes 66 MCP tools for any MCP-compatible client. Runs as a stdio subprocess — no server setup needed. Core research tools work with zero API keys for US and Canadian equities; trading connector tools use the selected connector profile, and `run_swarm` needs an LLM key.
 
 **Environment variables:** the client spawns the server itself, so a shell `export` never reaches it — set them in the client's `env` block. Generated backtest code is sandboxed to the allowed run roots, so writing results into a workspace of your own needs `VIBE_TRADING_ALLOWED_RUN_ROOTS`:
 
@@ -1524,7 +1699,7 @@ with `--host` / `--port`.
 
 </details>
 
-**MCP tools exposed (64):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `quantlib_call`, `cashflow_performance`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`.
+**MCP tools exposed (66):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `adapt_strategy`, `refresh_strategy_evidence`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `quantlib_call`, `cashflow_performance`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`.
 
 ### SWARM external MCP tools
 
@@ -1682,6 +1857,38 @@ The agent exposes connector-scoped tools named `trading_connections`,
 Live-broker raw MCP tools are not registered directly as `mcp_<broker>_*`.
 No IBKR order-placement tool is registered.
 
+### Live runner model spending
+
+Model calls are billed even when a mandate permits only one trade or the agent
+places no orders. The runner checks safety every minute, but defaults to a model
+decision every **15 minutes**, at most **26 decisions / 1,000,000 reported tokens
+per UTC day**. Each decision starts a fresh conversation and reconstructs broker
+state under the existing mandate gate.
+
+Configure cadence, a once-daily wall-clock time/timezone, and daily budgets in
+**Runtime → Model schedule and spending limits**, or the chat runner panel.
+Stop the runner before editing. The CLI uses the same authenticated API:
+
+```bash
+vibe-trading connector runner-settings --profile robinhood-live-mcp
+vibe-trading connector runner-settings --profile robinhood-live-mcp --file runner-settings.json
+```
+
+The JSON accepts `interval_seconds`, optional `daily_at` (`HH:MM`) and `timezone`
+(IANA, default `America/New_York`), `max_daily_turns`, `max_daily_tokens`, and
+optional `max_daily_cost_usd`, `input_usd_per_million`, `output_usd_per_million`.
+Both prices are required for a dollar limit. Use the highest applicable input or
+cache-write price; estimates ignore cache discounts and auxiliary model calls.
+Daily projections need measured usage and configured prices; unknown costs stay
+unknown. The same settings are exposed by `GET` / `PUT /live/runner/settings?broker=robinhood`.
+
+Spending history survives restarts. Limits are checked **after each provider
+response**, so a response can overshoot a token or estimated-dollar budget.
+Exhaustion or missing usage trips the existing kill switch and cancels the active
+decision before its tool calls. Existing halt/cancel/flatten behavior applies;
+inspect the broker and usage before resuming. An unfinished decision after a
+crash is blocked for inspection, never silently counted as free.
+
 ### 🔐 TAP Mode — full credential isolation & human-approved writes
 
 **Opt-in, off by default.** If the `TAP_*` variables below are unset, the
@@ -1815,7 +2022,7 @@ Vibe-Trading/
 ├── agent/                          # Backend (Python)
 │   ├── cli/                        # CLI package — interactive TUI + subcommands
 │   ├── api_server.py               # FastAPI server — runs, sessions, upload, swarm, SSE
-│   ├── mcp_server.py               # MCP server — 64 tools for OpenClaw / Claude Desktop
+│   ├── mcp_server.py               # MCP server — 66 tools for OpenClaw / Claude Desktop
 │   │
 │   ├── src/
 │   │   ├── agent/                  # ReAct agent core
@@ -1830,7 +2037,7 @@ Vibe-Trading/
 │   │   ├── memory/                 # Cross-session persistent memory
 │   │   │   └── persistent.py       #   file-based memory (~/.vibe-trading/memory/)
 │   │   │
-│   │   ├── tools/                  # 90 auto-discovered agent tools
+│   │   ├── tools/                  # 93 auto-discovered agent tools
 │   │   │   ├── backtest_tool.py    #   run backtests
 │   │   │   ├── remember_tool.py    #   cross-session memory (save/recall/forget)
 │   │   │   ├── skill_writer_tool.py #  skill CRUD (save/patch/delete/file)
@@ -1839,7 +2046,7 @@ Vibe-Trading/
 │   │   │   ├── web_search_tool.py  #   DuckDuckGo web search
 │   │   │   └── ...                 #   bash, file I/O, factor analysis, options, alpha browser + bench, etc.
 │   │   │
-│   │   ├── factors/                # Alpha Zoo — 271 alphas across 4 families
+│   │   ├── factors/                # Alpha Zoo — 281 alphas across 4 families
 │   │   │   ├── base.py             #   19 operators (rank/scale/ts_*/delta/decay_linear/safe_div/vwap)
 │   │   │   ├── registry.py         #   AST-only metadata load + lazy compute + sanity gates
 │   │   │   ├── bench_runner.py     #   IC + alive/reversed/dead categorisation
@@ -1922,7 +2129,7 @@ Vibe-Trading is part of the **[HKUDS](https://github.com/HKUDS)** agent ecosyste
 | **Data Bridge** | Bring-your-own data: local CSV/Parquet/SQL connectors with schema mapping | Local loader Shipped |
 | **Options Lab** | Vol surface, Greeks dashboard, payoff/scenario explorer | Analytic payoff/scenario tool **Shipped**; surface/dashboard Planned |
 | **Portfolio Studio** | Risk x-ray, constraints, turnover-aware optimizer, rebalance notes | Turnover-aware optimizer **Shipped 0.1.11**; rest Planned |
-| **Alpha Zoo** | 271 pre-built alphas (Qlib 158 + Kakushadze 101 + academic + fundamental) with one-line bench, agent integration, and Web UI | **Shipped 0.1.8**, extended through 0.1.12 |
+| **Alpha Zoo** | 281 pre-built alphas (Qlib 158 + Kakushadze 101 + academic + fundamental) with one-line bench, agent integration, and Web UI | **Shipped 0.1.8**, extended through 0.1.12 |
 | **Strategy Development Manager** | Register papers / broker research as factors & strategies with a persistent store + automated IC/Sharpe decay lifecycle | **Shipped 0.1.11** |
 | **Correlation Regime** | Edge-density + hysteresis regime timeline layered on `/correlation` — spot when markets fuse into one bloc | **Shipped 0.1.12** |
 | **Research Delivery** | Scheduled briefs and live research sessions through Slack / Telegram / email-style IM channels | Scheduler + IM Runtime Shipped |
@@ -2099,3 +2306,21 @@ MIT License — see [LICENSE](LICENSE)
 <p align="center">
   <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.Vibe-Trading&style=flat" alt="visitors"/>
 </p>
+
+### Custom model endpoints
+
+Settings → Custom OpenAI-compatible providers tests a chat-completions endpoint,
+saves its API key in the OS credential vault (`pip install "vibe-trading-ai[keyring]"`),
+and activates it for new runs. Testing sends a short model request and may incur
+the provider's normal API charge. Active profiles are immutable; save a changed
+endpoint under a new ID and activate it after testing. Switch back through the
+normal model provider selector. Keys are never stored in the profile JSON.
+
+The same flow is available from `vibe-trading provider custom list`,
+`vibe-trading provider custom add --id example --label Example --base-url https://api.example.com/v1 --model example-model`
+(the key is prompted privately), and `vibe-trading provider custom activate example`.
+The configured provider is used by CLI, API, Web, and agent runs alike.
+
+RSSHub daily event enrichment uses calendar-date keys: timezone-aware `as_of` values and daily bar labels retain their displayed date, matching the provider’s knowable-date policy. This does not convert intraday publication instants between markets.
+
+RSSHub feed `code_style` transformations separate the final venue suffix from the ticker, preserving share-class dots: `BRK.B.US` becomes `BRK.B` for `bare` routes and `USBRK.B` for `exchange_prefix`; `raw` remains unchanged.

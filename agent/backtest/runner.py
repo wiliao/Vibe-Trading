@@ -30,7 +30,7 @@ from backtest.loaders.registry import (
     get_loader_cls_with_fallback,
     is_no_network_fallback_source,
     mixed_caliber_warning,
-    price_caliber,
+    frame_caliber,
     resolve_loader,
 )
 from backtest.loaders.base import (
@@ -57,6 +57,7 @@ _VALID_INTERVALS = {"1m", "5m", "15m", "30m", "1H", "4H", "1D", "1W", "1M"}
 _VALID_ENGINES = {"daily", "options"}
 _PRICE_PANEL_COLUMNS = ("open", "high", "low", "close", "volume", "vwap", "amount")
 _FUND_PREFIX = "fund:"
+_VAL_PREFIX = "val:"
 
 
 @dataclass(frozen=True)
@@ -1029,6 +1030,26 @@ def _fund_columns_required(selected_factors: Iterable[Any]) -> list[str]:
     return out
 
 
+def _val_columns_required(selected_factors: Iterable[Any]) -> list[str]:
+    """Collect requested ``val:*`` panel columns from selected factors.
+
+    Args:
+        selected_factors: Factor metadata/spec objects.
+
+    Returns:
+        Stable, de-duplicated ``val:*`` column names.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for spec in selected_factors:
+        for column in _columns_required_from_factor_spec(spec):
+            if not column.startswith(_VAL_PREFIX) or column in seen:
+                continue
+            seen.add(column)
+            out.append(column)
+    return out
+
+
 def _build_price_panel(data_map: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Convert ``code -> OHLCV frame`` rows into the factor panel shape.
 
@@ -1130,6 +1151,58 @@ def _inject_fundamental_panel(
     return panel
 
 
+def _inject_valuation_panel(
+    panel: dict[str, pd.DataFrame],
+    *,
+    symbols: list[str],
+    val_columns: Iterable[str],
+    start: str,
+    end: str,
+    index: pd.DatetimeIndex | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Inject required ``val:*`` daily valuation fields into a factor panel.
+
+    Daily valuation fields carry no supplier in this build, so a declared
+    ``val:`` column resolves to a NaN frame: nothing is fabricated, and the
+    factors declaring it SkipAlpha or NaN-out naturally.
+
+    Args:
+        panel: Existing factor panel keyed by column name.
+        symbols: Symbols to load.
+        val_columns: Requested ``val:*`` columns.
+        start: Start date string.
+        end: End date string.
+        index: Optional price index to align to. Defaults to ``panel["close"]``.
+
+    Returns:
+        The same panel dictionary with ``val:<field>`` frames added.
+
+    Raises:
+        ValueError: If a declared ``val:`` field is outside the valuation
+            whitelist (pe, pe_ttm, pb, ps_ttm, dv_ttm).
+    """
+    fields = [column[len(_VAL_PREFIX):] for column in val_columns if column.startswith(_VAL_PREFIX)]
+    fields = list(dict.fromkeys(fields))
+    if not fields:
+        return panel
+
+    price_index = index
+    if price_index is None:
+        close = panel.get("close")
+        price_index = close.index if close is not None else pd.DatetimeIndex([])
+
+    loaded: dict[str, pd.DataFrame] = {}
+
+    for field in fields:
+        frame = loaded.get(field)
+        if not isinstance(frame, pd.DataFrame):
+            frame = _nan_fundamental_frame(price_index, symbols)
+        else:
+            frame = frame.reindex(index=price_index, columns=symbols)
+        panel[f"{_VAL_PREFIX}{field}"] = frame
+    return panel
+
+
 def _project_panel_fields_to_data_map(
     data_map: dict[str, pd.DataFrame],
     panel: dict[str, pd.DataFrame],
@@ -1153,28 +1226,41 @@ def _maybe_inject_fundamentals_for_factor_panel(
     data_map: dict[str, pd.DataFrame],
     config: dict,
 ) -> dict[str, pd.DataFrame]:
-    """Inject ``fund:*`` factor dependencies when selected factors request them."""
+    """Inject ``fund:*``/``val:*`` factor dependencies when selected factors request them."""
     selected_factors = _selected_factor_specs(config)
     fund_columns = _fund_columns_required(selected_factors)
-    if not fund_columns:
+    val_columns = _val_columns_required(selected_factors)
+    if not fund_columns and not val_columns:
         return data_map
 
     panel = _build_price_panel(data_map)
     close = panel.get("close")
     price_index = close.index if close is not None else pd.DatetimeIndex([])
     symbols = list(data_map)
-    _inject_fundamental_panel(
-        panel,
-        symbols=symbols,
-        fund_columns=fund_columns,
-        start=config.get("start_date", ""),
-        end=config.get("end_date", ""),
-        freq="ttm",
-        pit=True,
-        source="auto",
-        index=price_index,
+    if fund_columns:
+        _inject_fundamental_panel(
+            panel,
+            symbols=symbols,
+            fund_columns=fund_columns,
+            start=config.get("start_date", ""),
+            end=config.get("end_date", ""),
+            freq="ttm",
+            pit=True,
+            source="auto",
+            index=price_index,
+        )
+    if val_columns:
+        _inject_valuation_panel(
+            panel,
+            symbols=symbols,
+            val_columns=val_columns,
+            start=config.get("start_date", ""),
+            end=config.get("end_date", ""),
+            index=price_index,
+        )
+    return _project_panel_fields_to_data_map(
+        data_map, panel, [*fund_columns, *val_columns]
     )
-    return _project_panel_fields_to_data_map(data_map, panel, fund_columns)
 
 
 # --- Main entry ---
@@ -1297,8 +1383,17 @@ def main(run_dir: Path) -> None:
 
     # Every source has already been fetched, sanitized, and enriched above.
     # Reuse that exact snapshot so provider costs and run-card provenance stay
-    # aligned with the data consumed by the engine.
-    loader = _AutoLoader(data_map)
+    # aligned with the data consumed by the engine. A source that prohibits
+    # fallback keeps its own loader behind the snapshot: a declared benchmark
+    # is usually outside ``codes``, but must still come from that same source.
+    if is_no_network_fallback_source(source):
+        loader = _AutoLoader(
+            data_map,
+            inner=loader,
+            name=str(getattr(loader, "name", None) or source),
+        )
+    else:
+        loader = _AutoLoader(data_map)
 
     if engine_type == "options":
         from backtest.engines.options_portfolio import run_options_backtest
@@ -1572,7 +1667,10 @@ def _fetch_auto(codes: List[str], config: dict, interval: str = "1D") -> dict:
         local_name = str(getattr(local_loader, "name", "local") or "local")
         served_by.add(local_name)
         for code in local_result:
-            caliber_stamps[code] = (local_name, price_caliber(local_name, _detect_market(code), code))
+            caliber_stamps[code] = (
+                local_name,
+                frame_caliber(local_result[code], local_name, _detect_market(code), code),
+            )
         merged.update(local_result)
 
     market_groups = _group_codes_by_market([code for code in codes if code not in set(local_codes)])
@@ -1602,7 +1700,7 @@ def _fetch_auto(codes: List[str], config: dict, interval: str = "1D") -> dict:
         if market_result:
             served_by.add(src_name)
             for code in market_result:
-                caliber_stamps[code] = (src_name, price_caliber(src_name, market, code))
+                caliber_stamps[code] = (src_name, frame_caliber(market_result[code], src_name, market, code))
         missing = [code for code in market_codes if code not in market_result]
 
         # Retry only missing symbols so a partial primary response does not
@@ -1626,14 +1724,16 @@ def _fetch_auto(codes: List[str], config: dict, interval: str = "1D") -> dict:
                 fb_served_by = str(getattr(fb_loader, "name", fb_name) or fb_name)
                 served_by.add(fb_served_by)
                 for code in mapped:
-                    caliber_stamps[code] = (fb_served_by, price_caliber(fb_served_by, market, code))
+                    caliber_stamps[code] = (fb_served_by, frame_caliber(mapped[code], fb_served_by, market, code))
                 logger.info(
                     "Runtime fallback: %s -> %s for %s", src_name, fb_name, market
                 )
 
         if missing:
+            served = sorted(set(merged) - set(missing))
             raise NoAvailableSourceError(
-                f"incomplete data for {market}; missing symbols: {missing}"
+                f"incomplete data for {market}; missing symbols: {missing}; "
+                f"served symbols: {served}"
             )
         merged.update(market_result)
 
@@ -1725,7 +1825,7 @@ def fetch_data_map(config: dict) -> DataFetchResult:
         for code in data_map:
             caliber_stamps[code] = (
                 served_by,
-                price_caliber(served_by, _detect_market(code), code),
+                frame_caliber(data_map[code], served_by, _detect_market(code), code),
             )
         used_sources = [served_by] if data_map else []
         missing = [code for code in codes if code not in data_map]
@@ -1752,51 +1852,56 @@ def fetch_data_map(config: dict) -> DataFetchResult:
         # lines as a trace. Callers want snapshot provenance, not a padded row
         # count.
         if missing and not is_no_network_fallback_source(primary_source):
-            market = _detect_market(codes[0])
-            for fallback_source in FALLBACK_CHAINS.get(market, []):
-                if not missing:
-                    break
-                if (
-                    fallback_source == primary_source
-                    or fallback_source not in LOADER_REGISTRY
-                ):
-                    continue
-                fallback_loader = LOADER_REGISTRY[fallback_source]()
-                if not fallback_loader.is_available():
-                    continue
-                fallback_codes = _normalize_codes(missing, fallback_source)
-                fallback_result = fallback_loader.fetch(
-                    fallback_codes,
-                    config.get("start_date", ""),
-                    config.get("end_date", ""),
-                    interval=interval,
-                )
-                mapped = _restore_original_codes(
-                    fallback_result, missing, fallback_codes
-                )
-                if mapped:
-                    data_map.update(mapped)
-                    missing = [code for code in missing if code not in mapped]
-                    fb_served_by = str(
-                        getattr(fallback_loader, "name", fallback_source)
-                        or fallback_source
+            missing_by_market: dict[str, list[str]] = {}
+            for code in missing:
+                missing_by_market.setdefault(_detect_market(code), []).append(code)
+            for market, market_missing in missing_by_market.items():
+                for fallback_source in FALLBACK_CHAINS.get(market, []):
+                    if not market_missing:
+                        break
+                    if (
+                        fallback_source == primary_source
+                        or fallback_source not in LOADER_REGISTRY
+                    ):
+                        continue
+                    fallback_loader = LOADER_REGISTRY[fallback_source]()
+                    if not fallback_loader.is_available():
+                        continue
+                    fallback_codes = _normalize_codes(market_missing, fallback_source)
+                    fallback_result = fallback_loader.fetch(
+                        fallback_codes,
+                        config.get("start_date", ""),
+                        config.get("end_date", ""),
+                        interval=interval,
                     )
-                    for code in mapped:
-                        caliber_stamps[code] = (
-                            fb_served_by,
-                            price_caliber(fb_served_by, _detect_market(code), code),
+                    mapped = _restore_original_codes(
+                        fallback_result, market_missing, fallback_codes
+                    )
+                    if mapped:
+                        data_map.update(mapped)
+                        market_missing = [code for code in market_missing if code not in mapped]
+                        fb_served_by = str(
+                            getattr(fallback_loader, "name", fallback_source)
+                            or fallback_source
                         )
-                    if not used_sources:
-                        source = fb_served_by
-                        loader = fallback_loader
-                    used_sources.append(fb_served_by)
-                    logger.info(
-                        "Runtime fallback: %s -> %s", primary_source, fb_served_by
-                    )
+                        for code in mapped:
+                            caliber_stamps[code] = (
+                                fb_served_by,
+                                frame_caliber(mapped[code], fb_served_by, market, code),
+                            )
+                        if not used_sources:
+                            source = fb_served_by
+                            loader = fallback_loader
+                        used_sources.append(fb_served_by)
+                        logger.info(
+                            "Runtime fallback: %s -> %s", primary_source, fb_served_by
+                        )
+                missing = [code for code in missing if code not in data_map]
 
         if missing:
             raise NoAvailableSourceError(
-                f"incomplete data for source={primary_source}; missing symbols: {missing}"
+                f"incomplete data for source={primary_source}; missing symbols: {missing}; "
+                f"served symbols: {sorted(data_map)}"
             )
 
     data_map = {
@@ -1853,14 +1958,68 @@ def _sanitize_data_map(data_map: dict) -> dict:
 
 
 class _AutoLoader:
-    """Loader adapter that returns a pre-fetched data map."""
+    """Loader adapter that returns a pre-fetched data map.
 
-    def __init__(self, data_map: dict):
+    With an ``inner`` loader, symbols outside the snapshot are fetched through
+    it, and ``name`` reports that loader's source so benchmark resolution can
+    tell the adapter apart from a network loader swapped in by a fallback.
+    """
+
+    def __init__(
+        self,
+        data_map: dict,
+        inner: Any = None,
+        name: str | None = None,
+    ) -> None:
+        """Wrap a fetched snapshot.
+
+        Args:
+            data_map: ``code -> DataFrame`` snapshot already consumed by the run.
+            inner: Loader that served the snapshot; consulted only for symbols
+                the snapshot does not hold. ``None`` serves the snapshot alone.
+            name: Source name of ``inner``. When ``None`` the adapter exposes no
+                ``name``: a bare snapshot does not stand for any one source.
+        """
         self._data = data_map
+        self._inner = inner
+        if name is not None:
+            self.name = name
 
-    def fetch(self, codes, start_date, end_date, fields=None, interval="1D"):
-        """Return preloaded rows for requested codes."""
-        return {c: df for c, df in self._data.items() if c in codes}
+    def fetch(
+        self,
+        codes: List[str],
+        start_date: str,
+        end_date: str,
+        fields: Optional[List[str]] = None,
+        interval: str = "1D",
+    ) -> dict:
+        """Return snapshot rows, fetching symbols it lacks through ``inner``.
+
+        Frames from ``inner`` go through the same OHLC sanitisation as the
+        snapshot, so a benchmark is held to the bar quality the strategy was.
+
+        Args:
+            codes: Requested symbols.
+            start_date: Window start, passed through to ``inner``.
+            end_date: Window end, passed through to ``inner``.
+            fields: Extra fields, passed through to ``inner``.
+            interval: Bar interval, passed through to ``inner``.
+
+        Returns:
+            ``code -> DataFrame`` for every requested symbol that could be served.
+        """
+        served = {c: df for c, df in self._data.items() if c in codes}
+        missing = [c for c in codes if c not in served]
+        if missing and self._inner is not None:
+            source = str(getattr(self, "name", "") or "")
+            requested = _normalize_codes(missing, source)
+            fetched = self._inner.fetch(
+                requested, start_date, end_date, fields=fields, interval=interval
+            )
+            if isinstance(fetched, dict):
+                restored = _restore_original_codes(fetched, missing, requested)
+                served.update(_sanitize_data_map(restored))
+        return served
 
 
 if __name__ == "__main__":

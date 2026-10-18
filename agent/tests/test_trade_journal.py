@@ -130,8 +130,6 @@ def test_generic_corporate_action_rows_are_skipped(raw: str) -> None:
         ("AAPL.US", "us"),
         ("TD.TO", "ca"),
         ("PNG.V", "ca"),
-        ("00700.HK", "other"),
-        ("600519.SH", "other"),
         ("123456", "other"),
     ],
 )
@@ -176,8 +174,8 @@ def test_records_to_dataframe_sorts_and_handles_empty() -> None:
 
     out = _df(
         [
-            _rec("2026-01-03 10:00:00", "600519.SH", "buy", 100, 10),
-            _rec("2026-01-01 10:00:00", "600519.SH", "buy", 100, 9),
+            _rec("2026-01-03 10:00:00", "AAPL.US", "buy", 100, 10),
+            _rec("2026-01-01 10:00:00", "AAPL.US", "buy", 100, 9),
         ]
     )
     # Sorted ascending by datetime.
@@ -305,8 +303,8 @@ def test_fifo_single_roundtrip_pnl() -> None:
     rts = pair_trades_fifo(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "600519.SH", "buy", 100, 10),
-                _rec("2026-01-11 10:00:00", "600519.SH", "sell", 100, 12),
+                _rec("2026-01-01 10:00:00", "AAPL.US", "buy", 100, 10),
+                _rec("2026-01-11 10:00:00", "AAPL.US", "sell", 100, 12),
             ]
         )
     )
@@ -322,8 +320,8 @@ def test_fifo_fee_allocation() -> None:
     rts = pair_trades_fifo(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "X.SH", "buy", 100, 10, fee=10),
-                _rec("2026-01-02 10:00:00", "X.SH", "sell", 100, 12, fee=6),
+                _rec("2026-01-01 10:00:00", "X.US", "buy", 100, 10, fee=10),
+                _rec("2026-01-02 10:00:00", "X.US", "sell", 100, 12, fee=6),
             ]
         )
     )
@@ -335,9 +333,9 @@ def test_fifo_partial_fill_splits_into_two_roundtrips() -> None:
     rts = pair_trades_fifo(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "X.SH", "buy", 100, 10),
-                _rec("2026-01-02 10:00:00", "X.SH", "buy", 100, 20),
-                _rec("2026-01-03 10:00:00", "X.SH", "sell", 150, 30),
+                _rec("2026-01-01 10:00:00", "X.US", "buy", 100, 10),
+                _rec("2026-01-02 10:00:00", "X.US", "buy", 100, 20),
+                _rec("2026-01-03 10:00:00", "X.US", "sell", 150, 30),
             ]
         )
     )
@@ -355,7 +353,7 @@ def test_fifo_partial_exits_conserve_entry_fee(exit_quantities: list[int]) -> No
     records = [
         _rec(
             "2026-01-01 10:00:00",
-            "X.SH",
+            "X.US",
             "buy",
             entry_qty,
             10,
@@ -365,7 +363,7 @@ def test_fifo_partial_exits_conserve_entry_fee(exit_quantities: list[int]) -> No
     records.extend(
         _rec(
             f"2026-01-0{day} 10:00:00",
-            "X.SH",
+            "X.US",
             "sell",
             qty,
             11,
@@ -383,7 +381,7 @@ def test_fifo_partial_exits_conserve_entry_fee(exit_quantities: list[int]) -> No
 
 def test_fifo_unmatched_sell_ignored() -> None:
     rts = pair_trades_fifo(
-        _df([_rec("2026-01-01 10:00:00", "X.SH", "sell", 100, 12)])
+        _df([_rec("2026-01-01 10:00:00", "X.US", "sell", 100, 12)])
     )
     assert rts == []
 
@@ -397,10 +395,10 @@ def test_compute_profile_win_rate_and_pnl() -> None:
     profile = _compute_profile(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "A.SH", "buy", 100, 10),
-                _rec("2026-01-05 10:00:00", "A.SH", "sell", 100, 12),  # +200 win
-                _rec("2026-01-02 10:00:00", "B.SH", "buy", 100, 50),
-                _rec("2026-01-06 10:00:00", "B.SH", "sell", 100, 45),  # -500 loss
+                _rec("2026-01-01 10:00:00", "A.US", "buy", 100, 10),
+                _rec("2026-01-05 10:00:00", "A.US", "sell", 100, 12),  # +200 win
+                _rec("2026-01-02 10:00:00", "B.US", "buy", 100, 50),
+                _rec("2026-01-06 10:00:00", "B.US", "sell", 100, 45),  # -500 loss
             ]
         )
     )
@@ -427,9 +425,9 @@ def test_compute_profile_dividend_rows() -> None:
     profile = _compute_profile(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "A.SH", "buy", 100, 10),
-                _rec("2026-01-05 10:00:00", "A.SH", "sell", 100, 12),  # +200 win
-                _dividend_rec("2026-01-10 09:00:00", "A.SH", 500.0),
+                _rec("2026-01-01 10:00:00", "A.US", "buy", 100, 10),
+                _rec("2026-01-05 10:00:00", "A.US", "sell", 100, 12),  # +200 win
+                _dividend_rec("2026-01-10 09:00:00", "A.US", 500.0),
             ]
         )
     )
@@ -441,15 +439,15 @@ def test_compute_profile_dividend_rows() -> None:
     assert profile["market_distribution"] == {"china_a": 2}
     assert profile["hourly_distribution"] == {10: 2}
     # Nor into the per-symbol trade count and turnover.
-    assert profile["top_symbols"] == [{"symbol": "A.SH", "trades": 2, "total_amount": 2200.0}]
+    assert profile["top_symbols"] == [{"symbol": "A.US", "trades": 2, "total_amount": 2200.0}]
 
 
 def test_compute_profile_without_dividends_is_unchanged() -> None:
     profile = _compute_profile(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "A.SH", "buy", 100, 10),
-                _rec("2026-01-05 10:00:00", "A.SH", "sell", 100, 12),
+                _rec("2026-01-01 10:00:00", "A.US", "buy", 100, 10),
+                _rec("2026-01-05 10:00:00", "A.US", "sell", 100, 12),
             ]
         )
     )
@@ -482,8 +480,8 @@ def test_compute_behavior_returns_all_four_diagnostics() -> None:
     behavior = _compute_behavior(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "A.SH", "buy", 100, 10),
-                _rec("2026-01-05 10:00:00", "A.SH", "sell", 100, 12),
+                _rec("2026-01-01 10:00:00", "A.US", "buy", 100, 10),
+                _rec("2026-01-05 10:00:00", "A.US", "sell", 100, 12),
             ]
         )
     )
@@ -503,9 +501,9 @@ def test_compute_behavior_returns_all_four_diagnostics() -> None:
 def _filter_df() -> pd.DataFrame:
     return _df(
         [
-            _rec("2026-01-02 10:00:00", "600519.SH", "buy", 100, 10),
+            _rec("2026-01-02 10:00:00", "AAPL.US", "buy", 100, 10),
             _rec("2026-02-15 10:00:00", "AAPL", "buy", 10, 180),
-            _rec("2026-03-20 10:00:00", "600519.SH", "sell", 100, 12),
+            _rec("2026-03-20 10:00:00", "AAPL.US", "sell", 100, 12),
         ]
     )
 
@@ -552,9 +550,9 @@ def test_apply_filter_preserves_full_date_and_mixed_precision() -> None:
 
 
 def test_apply_filter_symbol_equals() -> None:
-    out = _apply_filter(_filter_df(), "symbol=600519.SH")
+    out = _apply_filter(_filter_df(), "symbol=AAPL.US")
     assert len(out) == 2
-    assert set(out["symbol"]) == {"600519.SH"}
+    assert set(out["symbol"]) == {"AAPL.US"}
 
 
 def test_apply_filter_empty_expr_is_noop() -> None:
@@ -585,8 +583,8 @@ def _write_full_journal(tmp_path: Path) -> Path:
     csv = tmp_path / "full.csv"
     csv.write_text(
         "datetime,symbol,side,quantity,price\n"
-        "2026-01-02 09:35:00,600519.SH,buy,100,10\n"
-        "2026-01-09 14:00:00,600519.SH,sell,100,12\n",
+        "2026-01-02 09:35:00,AAPL.US,buy,100,10\n"
+        "2026-01-09 14:00:00,AAPL.US,sell,100,12\n",
         encoding="utf-8",
     )
     return csv
@@ -611,8 +609,8 @@ def test_analyze_reports_pnl_for_a_capitalized_aliased_journal(allow_tmp: Path) 
     csv = allow_tmp / "aliased_capitalized.csv"
     csv.write_text(
         "Date,Symbol,Side,Qty,Price\n"
-        "2026-01-02 09:35:00,600519.SH,Buy,100,10\n"
-        "2026-01-09 14:00:00,600519.SH,Sell,100,12\n",
+        "2026-01-02 09:35:00,AAPL.US,Buy,100,10\n"
+        "2026-01-09 14:00:00,AAPL.US,Sell,100,12\n",
         encoding="utf-8",
     )
 
@@ -650,7 +648,7 @@ def test_analyze_with_filter(allow_tmp: Path) -> None:
     csv = allow_tmp / "multi.csv"
     csv.write_text(
         "datetime,symbol,side,quantity,price\n"
-        "2026-01-02 09:35:00,600519.SH,buy,100,10\n"
+        "2026-01-02 09:35:00,AAPL.US,buy,100,10\n"
         "2026-02-09 14:00:00,AAPL,buy,10,180\n",
         encoding="utf-8",
     )
@@ -712,7 +710,7 @@ def test_parse_generic_skips_nan_symbol_rows() -> None:
         ("€99.00", 99.0),
         ("¥1,000", 1000.0),
         ("\u221212.5", -12.5),
-        ("CNY12.5", 12.5),
+        ("CAD12.5", 12.5),
     ],
 )
 def test_to_float_strips_currency_and_unicode_minus(raw: str, expected: float) -> None:
@@ -750,10 +748,10 @@ def test_unreadable_dividend_cash_is_surfaced_not_silently_zero() -> None:
     profile = _compute_profile(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "A.SH", "buy", 100, 10),
-                _rec("2026-01-05 10:00:00", "A.SH", "sell", 100, 12),
-                _dividend_rec("2026-01-10 09:00:00", "A.SH", 0.0),
-                _dividend_rec("2026-01-11 09:00:00", "A.SH", 500.0),
+                _rec("2026-01-01 10:00:00", "A.US", "buy", 100, 10),
+                _rec("2026-01-05 10:00:00", "A.US", "sell", 100, 12),
+                _dividend_rec("2026-01-10 09:00:00", "A.US", 0.0),
+                _dividend_rec("2026-01-11 09:00:00", "A.US", 500.0),
             ]
         )
     )
@@ -767,9 +765,9 @@ def test_clean_journal_reports_no_missing_dividend_cash() -> None:
     profile = _compute_profile(
         _df(
             [
-                _rec("2026-01-01 10:00:00", "A.SH", "buy", 100, 10),
-                _rec("2026-01-05 10:00:00", "A.SH", "sell", 100, 12),
-                _dividend_rec("2026-01-10 09:00:00", "A.SH", 500.0),
+                _rec("2026-01-01 10:00:00", "A.US", "buy", 100, 10),
+                _rec("2026-01-05 10:00:00", "A.US", "sell", 100, 12),
+                _dividend_rec("2026-01-10 09:00:00", "A.US", 500.0),
             ]
         )
     )

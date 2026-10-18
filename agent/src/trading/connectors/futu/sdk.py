@@ -50,9 +50,9 @@ PROFILE_ENVIRONMENTS = {
 }
 
 #: Currency the funds query requests balances in; it labels a multi-currency
-#: account's row (see ``_account_to_dict``). HKD matches the SDK's own default
-#: for this argument.
-ACCOUNT_CURRENCY = "HKD"
+#: account's row (see ``_account_to_dict``). Every shipped Futu profile filters
+#: the US market, so balances are requested and labelled in USD.
+ACCOUNT_CURRENCY = "USD"
 
 #: Futu's placeholder for a field it does not report, currency included
 #: (``NoneDataValue`` / ``Currency.NONE``).

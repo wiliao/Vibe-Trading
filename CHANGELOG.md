@@ -5,7 +5,7 @@
 All notable changes to Vibe-Trading are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.16] — 2026-10-10
+## [0.1.16] — 2026-10-10 (US/CA scope release)
 
 ### Changed
 
@@ -17,9 +17,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   are `yahoo`, `yfinance`, `stooq`, `sina`, `eastmoney`, `finnhub`,
   `alphavantage`, `tiingo`, `fmp`, and `local` (`auto` for routing). Six broker
   connectors remain: `alpaca`, `futu`, `ibkr`, `longbridge`, `robinhood`, and
-  `tiger`. The Alpha Zoo is 271 alphas across `alpha101`, `qlib158`, `academic`,
+  `tiger`. The Alpha Zoo is 281 alphas across `alpha101`, `qlib158`, `academic`,
   and `fundamental`; the `gtja191` zoo is gone and factor benchmarking is
   `sp500`-only. Canada is market-data and backtest only — it has no live path.
+- **Upstream sync through `c546e877` (2026-10-18).** Every upstream change since
+  the 2026-09-28 base is adopted for files this fork still ships: scheduling,
+  grounding, journal, metrics, portfolio, provider, settings, tool and frontend
+  work listed under the maintenance headings below. Region-only upstream
+  additions — Brazil/B3 data, mStock, Gildata, mootdx, the CN industry-neutral
+  value alphas and their loaders — stay out of this fork.
 
 ### Maintenance — 2026-10-18
 
@@ -43,11 +49,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   history hydration restores missing task rows. A reported zero remains zero
   beside a nonzero count; an unreported direction stays unknown. These are token
   counts, not monetary cost or cross-run billing totals.
-- Share the scheduler kernel across scheduled research and opt-in memory/Brazil
-  background jobs (#1893). The live-trading scheduler is unchanged. ZimaOS keeps
-  both scheduler and daily-sync flags off by default. Brazilian source failures
-  now reach the scheduler's existing retry budget instead of recording success.
-  The first daily sync waits for its configured slot; manual sync remains available.
+- Share the scheduler kernel across scheduled research and opt-in memory
+  background jobs (#1893). The live-trading scheduler is unchanged. The first
+  daily sync waits for its configured slot; manual sync remains available.
   Before downgrading to code without system-job support, remove `system:` rows
   from the stored job file: older readers reject them and quarantine that file.
 - Combine generic trade-journal date/time columns before FIFO matching, including

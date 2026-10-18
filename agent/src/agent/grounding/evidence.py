@@ -1043,7 +1043,7 @@ class _EvidenceMixin:
                 value = _coerce_csv_number(cell)
                 if value is None:
                     continue
-                # A weight column is named by its instrument ("000001.SZ"), and
+                # A weight column is named by its instrument ("AAPL.US"), and
                 # that name is the field a ref narrows on. The record carries no
                 # symbol: a portfolio table is not evidence about the listing,
                 # and a symbol here would start attributing the answer's

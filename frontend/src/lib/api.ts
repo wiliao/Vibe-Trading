@@ -7,6 +7,56 @@ import type {
 } from "@/lib/options";
 
 const BASE = "";
+const configuredTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
+const REQUEST_TIMEOUT_MS = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+  ? configuredTimeout : 120_000;
+const METADATA_TIMEOUT_MS = Math.min(REQUEST_TIMEOUT_MS, 15_000);
+
+/** Bound both the connection and body read; never automatically replay writes. */
+async function performRequest<T>(
+  path: string,
+  options: RequestInit,
+  read: (response: Response) => Promise<T>,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const abort = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) abort();
+  else options.signal?.addEventListener("abort", abort, { once: true });
+  try {
+    const response = await fetch(`${BASE}${path}`, { ...options, signal: controller.signal });
+    if (!response.ok) throw await errorFromResponse(response);
+    return await read(response);
+  } catch (error) {
+    if (timedOut) {
+      const mutation = options.method && !["GET", "HEAD"].includes(options.method.toUpperCase());
+      throw new ApiError(i18n.t(mutation ? "connection.requestTimeoutMutation" : "connection.requestTimeout"), 0, "request_timeout");
+    }
+    if (options.signal?.aborted || error instanceof ApiError) throw error;
+    if (error instanceof TypeError) {
+      throw new ApiError(i18n.t("connection.requestFailed"), 0, "network_error");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abort);
+  }
+}
+
+export async function downloadGeneratedReport(reportId: string, filename: string): Promise<void> {
+  const blob = await performRequest(`/api/reports/${encodeURIComponent(reportId)}`, { headers: authHeaders() }, (response) => response.blob());
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export class ApiError extends Error {
   status: number;
@@ -42,6 +92,14 @@ export interface CorrelationResponse {
   matrix: number[][];
 }
 
+export interface CorrelationAnalysisResponse {
+  correlation: CorrelationResponse | null;
+  regime: CorrelationRegimeResponse | null;
+  errors: { correlation?: string; regime?: string };
+  coverage: { requested: string[]; missing: string[]; observations: number; first_date: string | null; last_date: string | null;
+    diagnostics: Record<string, { symbol: string; market: string; source: string | null; attempts: Array<{ source: string; reason: "source_unavailable" | "fetch_failed" | "no_data" }> }> };
+}
+
 export interface RegimeEpisode {
   start: string;
   end: string | null;
@@ -65,6 +123,10 @@ export interface CorrelationRegimeResponse {
 }
 
 export interface PortfolioPosition {
+  portfolio_id?: string;
+  portfolio_name?: string;
+  source_mtime?: string;
+  instrument_id_kind?: string;
   source_id?: string;
   profile_id?: string;
   source_label?: string;
@@ -102,6 +164,8 @@ export interface PortfolioConnectorCompatibility {
  * as history — never as a current valuation.
  */
 export interface PortfolioAccount {
+  source_kind?: "connection" | "extraetf";
+  import_metadata?: { source_mtime: string; expires_at: string; as_of_source: string } | null;
   source_id?: string;
   profile_id?: string;
   label?: string;
@@ -147,6 +211,7 @@ export interface PortfolioSnapshot {
   accounts: PortfolioAccount[];
   positions: PortfolioPosition[];
   combined_holdings?: Array<{
+    canonical_id?: string;
     symbol: string;
     market_value_usd: number;
     asset_type?: string;
@@ -158,11 +223,21 @@ export interface PortfolioSnapshot {
 }
 
 export interface PortfolioHistoryPoint {
+  total_eur?: string | null;
   id: string;
   created_at: string;
   complete: number;
   total_usd: string;
   total_cad: string;
+  /** Historical HKD value at this snapshot’s FX rate; absent means unavailable. */
+  total_hkd?: string | null;
+}
+
+export interface RebalanceProposal {
+  mode: "proposal_only";
+  snapshot_id: string;
+  currency: string;
+  rows: Array<{ canonical_id: string; current_value: number; target_value: number; change_value: number }>;
 }
 
 export interface PortfolioRefreshState {
@@ -182,6 +257,7 @@ export interface PortfolioReconnectState {
 }
 
 export interface PortfolioSourceSettings {
+  source_kind?: "connection" | "extraetf";
   connection_id: string;
   label: string;
   enabled: boolean;
@@ -195,13 +271,14 @@ export interface PortfolioSettings {
 }
 
 export interface PortfolioSourceCatalogItem {
+  source_kind?: "connection" | "extraetf";
   id: string;
   connection_id: string;
   profile_id: string;
   connector: string;
   label: string;
-  environment: "paper" | "live";
-  transport: "local_tws" | "remote_mcp" | "broker_sdk" | "local_plugin";
+  environment: "paper" | "live" | "import";
+  transport: "local_tws" | "remote_mcp" | "broker_sdk" | "local_plugin" | "file_import";
   capabilities: string[];
   readonly: boolean;
   notes: string;
@@ -211,7 +288,7 @@ export interface PortfolioSourceCatalogItem {
   credential_fields: CredentialField[];
   credential_status: Record<string, boolean>;
   credentials_configured: boolean;
-  portfolio_compatibility: PortfolioConnectorCompatibility;
+  portfolio_compatibility: PortfolioConnectorCompatibility | null;
 }
 
 export interface CredentialField {
@@ -233,6 +310,7 @@ export interface ConnectorOnboarding {
 }
 
 export interface LocalConnection {
+  portfolio_eligible?: boolean;
   id: string;
   profile_id: string;
   label: string;
@@ -254,6 +332,7 @@ export interface LocalConnection {
 }
 
 export interface ReadonlyConnectionProfile {
+  portfolio_eligible?: boolean;
   id: string;
   connector: string;
   label: string;
@@ -306,19 +385,24 @@ async function errorFromResponse(res: Response): Promise<ApiError> {
     if (typeof raw === "string" && raw) {
       detail = raw;
     } else if (raw && typeof raw === "object") {
-      const structured = raw as { code?: unknown; message?: unknown };
+      const structured = raw as { code?: unknown; message?: unknown; max_length?: unknown };
       if (typeof structured.code === "string" && structured.code) code = structured.code;
       if (typeof structured.message === "string" && structured.message) detail = structured.message;
       else if (code) detail = code;
+      if (code === "message_too_long" && typeof structured.max_length === "number") {
+        detail = i18n.t("agent.messageTooLong", { limit: structured.max_length.toLocaleString() });
+      }
     }
-  } catch { /* ignore */ }
+  } catch {
+    if (res.status >= 500) detail = i18n.t("connection.requestFailed");
+  }
   if (res.status === 401 || res.status === 403) {
     detail = getAuthRequiredMessage();
   }
   return new ApiError(detail, res.status, code);
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
   const { headers, ...rest } = options ?? {};
   const mergedHeaders: Record<string, string> = { "Content-Type": "application/json", ...authHeaders() };
   if (headers) {
@@ -326,26 +410,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       mergedHeaders[key] = value;
     });
   }
-  const res = await fetch(`${BASE}${path}`, {
+  return performRequest(path, {
     ...rest,
     headers: mergedHeaders,
-  });
-  if (!res.ok) {
-    throw await errorFromResponse(res);
-  }
-  const text = await res.text();
-  if (!text) return {} as T;
+  }, async (res) => {
+    const text = await res.text();
+    if (!text) return {} as T;
 
-  const contentType = res.headers.get("content-type") || "";
-  if (!contentType.includes("application/json")) {
-    const preview = text.slice(0, 80).replace(/\s+/g, " ");
-    throw new ApiError(
-      `Expected JSON from ${path}, got ${contentType || "unknown content type"}: ${preview}`,
-      res.status,
-    );
-  }
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const preview = text.slice(0, 80).replace(/\s+/g, " ");
+      throw new ApiError(
+        `Expected JSON from ${path}, got ${contentType || "unknown content type"}: ${preview}`,
+        res.status,
+      );
+    }
 
-  return JSON.parse(text) as T;
+    return JSON.parse(text) as T;
+  }, timeoutMs);
 }
 
 export interface UploadResult {
@@ -357,11 +439,7 @@ export interface UploadResult {
 async function uploadFile(file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/upload`, { method: "POST", headers: authHeaders(), body: form });
-  if (!res.ok) {
-    throw await errorFromResponse(res);
-  }
-  return res.json();
+  return performRequest("/upload", { method: "POST", headers: authHeaders(), body: form }, (res) => res.json());
 }
 
 function appendQueryParam(url: string, key: string, value: string): string {
@@ -370,7 +448,12 @@ function appendQueryParam(url: string, key: string, value: string): string {
 }
 
 export const api = {
+  getPixelOffice: () => request<OfficeSnapshot>("/api/pixel-office"),
+  updatePixelOffice: (action: "create" | "assign" | "complete" | "rank", arguments_: Record<string, unknown>) =>
+    request<OfficeSnapshot>("/api/pixel-office/actions", { method: "POST", body: JSON.stringify({ action, arguments: arguments_ }) }),
   uploadFile,
+  getCorrelationAnalysis: (codes: string, days: number, method: "pearson" | "spearman", includeRegime: boolean, signal?: AbortSignal) =>
+    request<CorrelationAnalysisResponse>(`/correlation/analysis?${new URLSearchParams({ codes, days: String(days), method, include_regime: String(includeRegime) })}`, { signal }),
   getCorrelation: (codes: string, days: number, method: "pearson" | "spearman") =>
     request<CorrelationResponse>(
       `/correlation?codes=${encodeURIComponent(codes)}&days=${encodeURIComponent(String(days))}&method=${encodeURIComponent(method)}`,
@@ -380,6 +463,8 @@ export const api = {
       `/correlation/regime?codes=${encodeURIComponent(codes)}&days=${encodeURIComponent(String(days))}`,
     ),
   getPortfolio: () => request<{ status: string; snapshot: PortfolioSnapshot | null }>("/api/portfolio"),
+  getPortfolioAnalysisContext: (snapshotId: string) =>
+    request<{ status: string; context: Record<string, unknown> }>(`/api/portfolio/analysis-context?snapshot_id=${encodeURIComponent(snapshotId)}`),
   refreshPortfolio: () => request<{ status: string; snapshot: PortfolioSnapshot }>("/api/portfolio/refresh", { method: "POST" }),
   getPortfolioRefreshStatus: () => request<{ status: string; refresh: PortfolioRefreshState }>("/api/portfolio/refresh-status"),
   reconnectPortfolioSource: (sourceId: string) =>
@@ -422,12 +507,14 @@ export const api = {
       `/api/connections/${encodeURIComponent(connectionId)}`,
       { method: "DELETE" },
     ),
+  importExtraEtf: (payload: { csv_text: string; label: string; source_mtime: string; expected_positions: number; max_age_days: number }) =>
+    request<{ status: string; import: { id: string } }>("/api/portfolio/imports/extraetf", { method: "POST", body: JSON.stringify(payload) }),
+  proposePortfolioRebalance: (snapshotId: string, targetWeights: Record<string, number>) =>
+    request<{ status: string; proposal: RebalanceProposal }>("/api/portfolio/rebalance", { method: "POST", body: JSON.stringify({ snapshot_id: snapshotId, target_weights: targetWeights }) }),
   getPortfolioHistory: (limit = 180) =>
     request<{ status: string; history: PortfolioHistoryPoint[] }>(`/api/portfolio/history?limit=${encodeURIComponent(String(limit))}`),
   downloadPortfolioCsv: async () => {
-    const response = await fetch(`${BASE}/api/portfolio/export.csv`, { headers: authHeaders() });
-    if (!response.ok) throw await errorFromResponse(response);
-    return response.blob();
+    return performRequest("/api/portfolio/export.csv", { headers: authHeaders() }, (response) => response.blob());
   },
   listRuns: (limit?: number) => request<RunListItem[]>(`/runs${limit ? `?limit=${encodeURIComponent(String(limit))}` : ""}`),
   getRun: (id: string, params: RunDetailParams = {}) => {
@@ -437,11 +524,12 @@ export const api = {
     const qs = q.toString();
     return request<RunData>(`/runs/${id}${qs ? `?${qs}` : ""}`);
   },
+  getRunPreview: (id: string) => request<RunPreview>(`/runs/${id}/preview`),
   getRunCode: (id: string) => request<Record<string, string>>(`/runs/${id}/code`),
   getRunFactor: (id: string) => request<FactorReportPayload>(`/runs/${id}/factor`),
   getRunAttribution: (id: string) => request<AttributionResponse>(`/runs/${encodeURIComponent(id)}/attribution`),
   getRunPine: (id: string) => request<PineScriptResult>(`/runs/${id}/pine`),
-  listSessions: () => request<SessionItem[]>("/sessions"),
+  listSessions: () => request<SessionItem[]>("/sessions", undefined, METADATA_TIMEOUT_MS),
   createSession: (title?: string) => request<SessionItem>("/sessions", { method: "POST", body: JSON.stringify({ title: title || "" }) }),
   deleteSession: (sid: string) => request<{ status: string }>(`/sessions/${sid}`, { method: "DELETE" }),
   renameSession: (sid: string, title: string) => request<{ status: string }>(`/sessions/${sid}`, { method: "PATCH", body: JSON.stringify({ title }) }),
@@ -453,6 +541,11 @@ export const api = {
   listScheduledRuns: (signal?: AbortSignal) => request<ScheduledRun[]>("/scheduled-runs", { signal }),
   createScheduledRun: (body: CreateScheduledRunRequest) =>
     request<ScheduledRun>("/scheduled-runs", { method: "POST", body: JSON.stringify(body) }),
+  updateScheduledRun: (id: string, body: UpdateScheduledRunRequest) =>
+    request<ScheduledRun>(`/scheduled-runs/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   deleteScheduledRun: (id: string) =>
     request<void>(`/scheduled-runs/${encodeURIComponent(id)}`, { method: "DELETE" }),
   commitScheduledResearchProposal: (proposalId: string) =>
@@ -523,6 +616,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(settings),
     }),
+  listCustomProviders: () =>
+    request<{ status: string; providers: CustomProviderProfile[] }>("/settings/custom-providers"),
+  testCustomProvider: (settings: { base_url: string; model: string; api_key: string }) =>
+    request<CustomProviderTestResponse>("/settings/custom-providers/test", {
+      method: "POST",
+      body: JSON.stringify(settings),
+    }),
+  saveCustomProvider: (settings: CustomProviderSaveRequest) =>
+    request<{ status: string; provider: CustomProviderProfile }>("/settings/custom-providers", {
+      method: "POST",
+      body: JSON.stringify(settings),
+    }),
+  activateCustomProvider: (profileId: string) =>
+    request<{ status: string; active_id: string; model: string; base_url: string }>(
+      `/settings/custom-providers/${encodeURIComponent(profileId)}/activate`, {
+        method: "POST",
+        body: JSON.stringify({ confirm: true }),
+      },
+    ),
   getDataSourceSettings: () => request<DataSourceSettings>("/settings/data-sources"),
   updateDataSourceSettings: (settings: UpdateDataSourceSettingsRequest) =>
     request<DataSourceSettings>("/settings/data-sources", {
@@ -550,6 +662,9 @@ export const api = {
       body: JSON.stringify(body ?? {}),
     }),
   // Alpha Zoo API
+  getAlphaReadiness: () => request<AlphaReadiness>("/alpha/readiness", {}, METADATA_TIMEOUT_MS),
+  getAlphaBenchJob: (jobId: string) => request<AlphaJobSnapshot<AlphaBenchResult>>(`/alpha/bench/${encodeURIComponent(jobId)}`, {}, METADATA_TIMEOUT_MS),
+  getAlphaCompareJob: (jobId: string) => request<AlphaJobSnapshot<AlphaCompareResult>>(`/alpha/compare/${encodeURIComponent(jobId)}`, {}, METADATA_TIMEOUT_MS),
   listAlphas: (params: AlphaListParams = {}) => {
     const q = new URLSearchParams();
     if (params.zoo) q.set("zoo", params.zoo);
@@ -577,10 +692,11 @@ export const api = {
     withAuthTicket(`${BASE}/alpha/compare/${encodeURIComponent(jobId)}/stream`),
 
   // Options Lab
-  analyzeOptionsPayoff: (body: OptionsPayoffRequest) =>
+  analyzeOptionsPayoff: (body: OptionsPayoffRequest, signal?: AbortSignal) =>
     request<OptionsPayoffResponse>("/options/payoff", {
       method: "POST",
       body: JSON.stringify(body),
+      signal,
     }),
   getOptionsChain: (ticker: string, expiration?: number) => {
     const q = new URLSearchParams();
@@ -628,6 +744,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ broker }),
     }),
+  saveRunnerSettings: (broker: string, settings: LiveDecisionSettings) =>
+    request<LiveDecisionBudget>(`/live/runner/settings?broker=${encodeURIComponent(broker)}`, {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
   stopLiveRunner: (broker: string) =>
     request<LiveRunnerResponse>("/live/runner/stop", {
       method: "POST",
@@ -656,7 +777,7 @@ export interface ScheduledRun {
   id: string;
   prompt: string;
   title: string;
-  source_type: "prompt" | "playbook";
+  source_type: "prompt" | "playbook" | "system";
   playbook_slug: string | null;
   end_at: number | null;
   schedule: string;
@@ -673,6 +794,8 @@ export interface ScheduledRun {
   // app, which is what every monitor created before this did.
   delivery_channel: string | null;
   delivery_target: string | null;
+  delivery_format: "html" | "pdf" | null;
+  protect_pdf: boolean;
   delivery_target_ref: string | null;
   delivery_target_label: string | null;
   delivery_status: string;
@@ -695,7 +818,23 @@ export interface CreateScheduledRunRequest {
   config?: Record<string, unknown>;
   delivery_channel?: string | null;
   delivery_target?: string | null;
+  delivery_format?: "html" | "pdf" | null;
+  protect_pdf?: boolean;
   delivery_target_ref?: string | null;
+}
+
+export interface UpdateScheduledRunRequest {
+  title?: string | null;
+  prompt?: string;
+  schedule?: string;
+  timezone?: string | null;
+  end_at?: number | null;
+  config?: Record<string, unknown> | null;
+  delivery_channel?: string | null;
+  delivery_target?: string | null;
+  delivery_target_ref?: string | null;
+  delivery_format?: "html" | "pdf" | null;
+  protect_pdf?: boolean;
 }
 
 export interface ScheduledResearchProposalJob {
@@ -713,6 +852,8 @@ export interface ScheduledResearchProposalJob {
     channel: string | null;
     target_ref: string | null;
     target_label: string | null;
+    format?: "html" | "pdf" | null;
+    protect_pdf?: boolean;
     status: string;
   };
 }
@@ -758,6 +899,8 @@ export interface LLMProviderOption {
   api_key_required: boolean;
   auth_type?: string;
   login_command?: string | null;
+  /** Reasoning effort levels the provider accepts, besides "" (provider default). */
+  reasoning_efforts?: string[];
 }
 
 export interface LLMSettings {
@@ -793,6 +936,33 @@ export interface ListLLMModelsRequest {
   provider: string;
   base_url?: string;
   api_key?: string;
+  refresh?: boolean;
+}
+
+export interface CustomProviderProfile {
+  id: string;
+  label: string;
+  base_url: string;
+  model: string;
+  api_key_configured: boolean;
+  active: boolean;
+  last_tested_at?: string | null;
+}
+
+export interface CustomProviderTestResponse {
+  status: "ok";
+  test_id: string;
+  response_preview: string;
+  latency_ms: number;
+}
+
+export interface CustomProviderSaveRequest {
+  id: string;
+  label: string;
+  base_url: string;
+  model: string;
+  api_key: string;
+  test_id: string;
 }
 
 export interface LLMModelsResponse {
@@ -804,6 +974,8 @@ export interface LLMModelsResponse {
     | "api_key_required"
     | "model_list_unavailable"
     | null;
+  /** Model id -> reasoning effort levels it accepts; empty means none. */
+  effort_levels?: Record<string, string[]> | null;
 }
 
 /** Markets with a configurable per-market data-source fallback order. */
@@ -833,6 +1005,12 @@ export interface UpdateDataSourceSettingsRequest {
   source_orders?: SourceOrderUpdate[];
 }
 
+export interface DeliveryTargetSuggestion {
+  target: string;
+  kind?: string;
+  label?: string;
+}
+
 export interface ChannelAdapterStatus {
   name: string;
   display_name: string;
@@ -843,6 +1021,11 @@ export interface ChannelAdapterStatus {
   running: boolean;
   error?: string;
   install_hint?: string;
+  delivery_target_label?: string;
+  delivery_target_kind?: string;
+  delivery_target_placeholder?: string;
+  delivery_target_input_type?: string;
+  delivery_target_suggestions?: DeliveryTargetSuggestion[];
 }
 
 export interface ChannelRuntimeStatus {
@@ -873,6 +1056,8 @@ export interface ChannelFieldHint {
   secret: boolean;
   required: boolean;
   help_key?: string | null;
+  /** Closed set of valid values; the panel renders a <select> when present. */
+  choices?: string[];
 }
 
 export interface ChannelSecretStatus {
@@ -891,6 +1076,7 @@ export interface ChannelConfigEntry {
   fields: ChannelFieldHint[];
   values: Record<string, unknown>;
   secrets: Record<string, ChannelSecretStatus>;
+  pdf_password_configured?: boolean;
 }
 
 export interface ChannelsConfigResponse {
@@ -913,7 +1099,8 @@ export type ChannelPutBody = {
 
 export interface ChannelPutResult {
   channel: ChannelConfigEntry;
-  applied: "hot_swapped" | "reset" | "deferred";
+  applied: "refreshed" | "hot_swapped" | "reset" | "deferred";
+  reset_reason?: string;
 }
 
 export type ChannelTestBody = {
@@ -975,6 +1162,14 @@ export interface EquityPoint {
   time: string;
   equity: string | number;
   drawdown: string | number;
+}
+
+/** What a chat run card needs from `GET /runs/{id}/preview`. */
+export interface RunPreview {
+  metrics: BacktestMetrics | null;
+  equity_curve: EquityPoint[];
+  /** False for plain chat replies, which own a run directory but no report. */
+  report_worthy: boolean;
 }
 
 /** Monte Carlo fan-chart payload: percentile envelope + sampled paths over trade order. */
@@ -1175,6 +1370,41 @@ export interface AttributionResponse {
   notes: string[];
 }
 
+/**
+ * One provider-reported LLM usage event inside `llm_usage.per_iteration`.
+ * Field names mirror the on-disk artifact written by `agent/src/agent/llm_usage.py`.
+ * The two `cache_*` keys appear only once the provider reports a cache event for
+ * that call, so they are optional — never fabricated.
+ */
+export interface LlmUsageCall {
+  iter: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cache_read_tokens?: number;
+  cache_creation_tokens?: number;
+}
+
+/**
+ * Run-scoped LLM usage summary returned by `GET /runs/{id}` (`RunResponse.llm_usage`,
+ * optional on the backend and `null`/absent when the run recorded no usage events).
+ */
+export interface LlmUsage {
+  provider: string;
+  model: string;
+  totals: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    calls: number;
+    /** Present only after a provider cache event, like the per-iteration keys. */
+    cache_read_tokens?: number;
+    cache_creation_tokens?: number;
+  };
+  per_iteration: LlmUsageCall[];
+  updated_at: string;
+}
+
 export interface RunData {
   status: string;
   run_id: string;
@@ -1187,6 +1417,8 @@ export interface RunData {
   metrics?: BacktestMetrics;
   artifacts?: ArtifactInfo[];
   run_card?: RunCard;
+  /** Provider-reported AgentLoop usage summary; null/absent when the run recorded no usage events. */
+  llm_usage?: LlmUsage | null;
   risk_xray?: RiskXRayPayload;
   rebalance_notes?: RebalanceNotesPayload;
   validation?: ValidationData;
@@ -1549,11 +1781,21 @@ export interface AlphaDetailResponse {
 }
 
 export interface AlphaBenchRequest {
+  request_id?: string;
   zoo: string;
   universe: string;
   period: string;
   top?: number;
+  alpha_id?: string;
 }
+
+export interface AlphaReadiness {
+  universes: Record<string, { ready: boolean; reason: "public_data" | "single_asset" }>;
+  zoo_counts: Record<string, number>;
+}
+
+export interface AlphaProgress { n_done: number; n_total: number; current_alpha_id?: string; stage?: "loading_data" | "preparing_returns" | "computing" }
+export interface AlphaJobSnapshot<T> { job_id: string; status: "queued" | "running" | "done" | "error"; progress: AlphaProgress; result: T | null; error: string | null }
 
 export interface AlphaBenchTopRow {
   id: string;
@@ -1564,7 +1806,17 @@ export interface AlphaBenchTopRow {
   category: "alive" | "reversed" | "dead";
 }
 
+export interface AlphaDataMeta {
+  fetched_instruments?: number;
+  requested_instruments?: number;
+  missing_instruments?: string[];
+  survivorship_bias?: boolean;
+  degraded?: boolean;
+}
+
 export interface AlphaBenchResult {
+  n_alphas_tested?: number;
+  meta?: AlphaDataMeta;
   alive: number;
   reversed: number;
   dead: number;
@@ -1575,6 +1827,7 @@ export interface AlphaBenchResult {
 }
 
 export interface AlphaCompareRequest {
+  request_id?: string;
   alpha_ids: string[];
   universe: string;
   period: string;
@@ -1601,6 +1854,7 @@ export interface AlphaCompareSkip {
 }
 
 export interface AlphaCompareResult {
+  meta?: AlphaDataMeta;
   universe: string;
   period: string;
   sort: string;
@@ -1799,6 +2053,25 @@ export interface LiveBrokerStatus {
   mandate?: LiveMandateStatus | null;
   runner: LiveRunnerLiveness;
   halted: boolean;
+  decision_budget?: LiveDecisionBudget | null;
+}
+
+export interface LiveDecisionSettings {
+  interval_seconds: number;
+  daily_at: string | null;
+  timezone: string;
+  max_daily_turns: number;
+  max_daily_tokens: number;
+  max_daily_cost_usd: number | null;
+  input_usd_per_million: number | null;
+  output_usd_per_million: number | null;
+}
+
+export interface LiveDecisionBudget {
+  settings?: LiveDecisionSettings;
+  usage?: { day: string; turns: number; tokens: number; estimated_cost_usd: number | null; unaccounted_turns: number };
+  projected_daily_cost_usd?: number | null;
+  error?: string;
 }
 
 /** Response of `GET /live/status` (SPEC §7.5 runner status panel + C2). */
@@ -1835,4 +2108,10 @@ export interface ToolTrailItem {
   preview?: string;
   call_id?: string;
   timestamp?: number;
+}
+
+export interface OfficeSnapshot {
+  mode: "manual_planning";
+  agents: { id: string; name: string; role: string; color: string; rank: "Operator" | "Senior" | "Lead"; load: number }[];
+  tasks: { id: string; title: string; description: string; priority: "low" | "normal" | "high"; assigned_to: string | null; status: "queued" | "assigned" | "completed"; result: string }[];
 }

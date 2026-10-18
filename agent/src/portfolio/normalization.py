@@ -140,6 +140,12 @@ def normalize_position(broker: str, row: dict[str, Any]) -> dict[str, Any]:
             ),
         )
     )
+    if broker == "futu":
+        # Futu's cost_price is diluted by realized gains, not the remaining
+        # position's purchase cost. Never derive unrealized P&L from it.
+        # If neither average_cost nor unrealized_pl was reported, P&L stays
+        # unavailable; the connector still preserves both raw cost bases.
+        cost = _decimal(row.get("average_cost"))
     market_price = _decimal(
         row.get(
             "market_price",

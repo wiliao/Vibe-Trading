@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from backtest.engines.china_a import ChinaAEngine
+from backtest.engines.global_equity import GlobalEquityEngine
 from backtest.models import TradeRecord
 from backtest.validation import _load_trades, monte_carlo_test
 from src.strategy_discovery.run_artifacts import read_trade_activity
@@ -18,7 +18,7 @@ from src.strategy_discovery.run_artifacts import read_trade_activity
 def test_exported_trades_keep_zero_pnl_exits(
     tmp_path: Path, direction: int, same_day: bool, middle_pnl: float
 ) -> None:
-    engine = ChinaAEngine({"initial_cash": 1000.0})
+    engine = GlobalEquityEngine({"initial_cash": 1000.0})
     dates = pd.date_range("2026-01-01", periods=6)
     engine.trades = [
         TradeRecord(
@@ -125,7 +125,7 @@ def test_all_breakeven_events_preserve_activity(tmp_path: Path, overlap: bool) -
 
 
 def test_empty_export_keeps_event_header(tmp_path: Path) -> None:
-    engine = ChinaAEngine({"initial_cash": 1000.0})
+    engine = GlobalEquityEngine({"initial_cash": 1000.0})
     dates = pd.date_range("2026-01-01", periods=2)
     equity = pd.Series(1000.0, index=dates)
     engine._write_artifacts(

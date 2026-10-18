@@ -432,7 +432,7 @@ def _redact_token_usage(value: Any, *, sink: str) -> Any:
 #: price, a duration, a timestamp) is never mangled.
 #:
 #: All names are SINGULAR and must start a word: either a ``\b`` boundary, an
-#: UPPERCASE env-style prefix such as ``TUSHARE_``, or the ``aws_`` prefix (see
+#: UPPERCASE env-style prefix such as ``ACME_``, or the ``aws_`` prefix (see
 #: :data:`_TEXT_KV_PATTERN`).
 #: A plural is a count or a collection, never a credential, and matching it
 #: mangles routine output (``tokens: 1204 in / 318 out`` from the LLM usage
@@ -465,7 +465,7 @@ _TEXT_VALUE = r"\"[^\"\n]*\"|'[^'\n]*'|[^\s,;{}\[\]()\"']+"
 _TEXT_KV_PATTERN = re.compile(
     r"(?P<q>[\"']?)"
     # ``\b`` for a plain name; for an env-style name the label follows an
-    # UPPERCASE segment and ``_`` (``TUSHARE_TOKEN``). The inline ``(?-i:...)``
+    # UPPERCASE segment and ``_`` (``ACME_TOKEN``). The inline ``(?-i:...)``
     # keeps the uppercase test case-sensitive under IGNORECASE, so ``pad_token``
     # and ``max_token`` still do not match. ``aws_`` is the one lowercase prefix
     # accepted, for ``~/.aws/credentials`` names such as ``aws_secret_access_key``.

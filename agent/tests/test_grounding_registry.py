@@ -108,7 +108,7 @@ def test_fired_checks_name_the_declared_check_that_fired(tmp_path: Path) -> None
 
 def test_fired_checks_name_the_previously_inline_undeclared_rule(tmp_path: Path) -> None:
     ledger = _ledger_with_locked_listed_identity(tmp_path)
-    result = ledger.validate_final_answer("GLD 现价 999.99 美元，建议买入。")
+    result = ledger.validate_final_answer("GLD 现价 999.99 美美元，建议买入。")
     assert result.issues
     assert _recorded_validations(tmp_path)[-1]["fired_checks"] == ["undeclared-figure"]
 
@@ -171,7 +171,7 @@ def test_figures_block_malformed_fires_identically_through_the_gate(tmp_path: Pa
 
 def test_unsourced_symbol_figures_fires_identically_through_the_gate(tmp_path: Path) -> None:
     ledger = _ledger_with_locked_listed_identity(tmp_path)
-    answer = "GLD 维持观察。000858.SZ 现价 15.20 元，可以买入。"
+    answer = "GLD 维持观察。MSFT.US 现价 15.20 美元，可以买入。"
     result = ledger.validate_final_answer(answer)
     assert "unsourced_symbol_figures" in [str(issue.get("code")) for issue in result.issues]
     direct = GROUNDING_CHECKS.run("unsourced-symbol-figures", ledger, answer)
@@ -180,7 +180,7 @@ def test_unsourced_symbol_figures_fires_identically_through_the_gate(tmp_path: P
 
 def test_unsourced_symbol_figures_ignores_session_symbols(tmp_path: Path) -> None:
     ledger = _ledger_with_locked_listed_identity(tmp_path)
-    answer = "GLD 现价 999.99 美元，建议买入。"
+    answer = "GLD 现价 999.99 美美元，建议买入。"
     ledger.validate_final_answer(answer)
     assert GROUNDING_CHECKS.run("unsourced-symbol-figures", ledger, answer) == []
 
@@ -205,14 +205,14 @@ PAIRS = {
     "listed-identity-relabelled-private": ("listed", "GLD is a listed fund.", "GLD is a private company."),
     "identity-not-locked": ("identity", "GLD is a listed fund.", "机器人ETF 可以买入。"),
     "figures-block-malformed": ("market", HDR, HDR + "\n```figures\nbad row\n```"),
-    "unsourced-symbol-figures": ("market", HDR, HDR + " 000858.SZ costs 15.20 CNY."),
-    "figure-symbol": ("multi", "510300.SH akshare CNY close 3.912." + _block("3.912 | observed | 510300.SH close | c3"),
-                      "159516.SZ akshare CNY close 3.912." + _block("3.912 | observed | 510300.SH close | c3")),
+    "unsourced-symbol-figures": ("market", HDR, HDR + " MSFT.US costs 15.20 USD."),
+    "figure-symbol": ("multi", "SPY.US yahoo USD close 3.912." + _block("3.912 | observed | SPY.US close | c3"),
+                      "AAPL.US yahoo USD close 3.912." + _block("3.912 | observed | SPY.US close | c3")),
     "undeclared-figure": ("market", HDR + _block(HDR_ROW), HDR + " Value 0.777." + _block(HDR_ROW)),
     "figure-price-column": ("market", HDR + "\n| Close |\n|---|\n|0.666|" + _block(HDR_ROW),
                             HDR + "\n| Close |\n|---|\n|0.666|" + _block("0.666 | proposed | entry")),
     "figure-count": ("market", HDR + " Count 3.0." + _block(HDR_ROW, "3.0 | count | names"),
-                     HDR + " Count 3.0 CNY." + _block(HDR_ROW, "3.0 | count | names")),
+                     HDR + " Count 3.0 USD." + _block(HDR_ROW, "3.0 | count | names")),
     "figure-observed": ("market", HDR + _block(HDR_ROW), HDR + " Price 0.777." + _block(HDR_ROW, "0.777 | observed | close | c1")),
     "figure-derived": ("market", HDR + " Result 0.099." + _block(HDR_ROW, "0.099 | derived | 0.666 - 0.567 | c1"),
                        HDR + " Result 0.123." + _block(HDR_ROW, "0.123 | derived | 0.666 - 0.567 | c1")),
@@ -220,9 +220,9 @@ PAIRS = {
                         HDR + " Entry 9.950." + _block(HDR_ROW, "9.950 | proposed | entry")),
     "figure-cited": ("market", HDR + " Study score 1.8." + _block(HDR_ROW, "1.8 | cited | Study"),
                      HDR + " Score 1.8." + _block(HDR_ROW, "1.8 | cited | Study")),
-    "canonical-symbol-surfaced": ("market", HDR, "akshare CNY close 0.666."),
-    "data-source-surfaced": ("market", HDR, "159516.SZ CNY close 0.666."),
-    "quote-currency-surfaced": ("market", HDR, "159516.SZ akshare close 0.666."),
+    "canonical-symbol-surfaced": ("market", HDR, "yahoo USD close 0.666."),
+    "data-source-surfaced": ("market", HDR, "AAPL.US USD close 0.666."),
+    "quote-currency-surfaced": ("market", HDR, "AAPL.US yahoo close 0.666."),
 }
 
 

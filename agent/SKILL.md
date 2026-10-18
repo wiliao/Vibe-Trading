@@ -1,7 +1,7 @@
 ---
 name: vibe-trading
 version: 0.1.16
-description: Professional finance research toolkit — backtesting (2 engines + benchmark comparison panel), factor analysis, Alpha Zoo (271 pre-built alphas across qlib158/alpha101/academic/fundamental), options pricing, 58 finance skills, 25 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 10 market-data sources (yahoo, yfinance, stooq, sina, eastmoney, local, plus optional-key finnhub/alphavantage/tiingo/fmp).
+description: Professional finance research toolkit — backtesting (2 engines + benchmark comparison panel), factor analysis, Alpha Zoo (281 pre-built alphas across qlib158/alpha101/academic/fundamental), options pricing, 58 finance skills, 25 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 10 market-data sources (yahoo, yfinance, stooq, sina, eastmoney, local, plus optional-key finnhub/alphavantage/tiingo/fmp).
 dependencies:
   python: ">=3.11"
   pip:
@@ -20,7 +20,7 @@ mcp:
 
 # Vibe-Trading
 
-Professional finance research toolkit with AI-powered backtesting (2 engines), multi-agent teams, 58 specialized skills, the **Alpha Zoo** (271 pre-built quantitative alphas across qlib158 / alpha101 / academic / fundamental with one-line CLI benchmarking), and the Shadow Account loop — extract your implicit trading rules from a journal, backtest them across US/Canada equities, then see where they would have served you better.
+Professional finance research toolkit with AI-powered backtesting (2 engines), multi-agent teams, 58 specialized skills, the **Alpha Zoo** (281 pre-built quantitative alphas across qlib158 / alpha101 / academic / fundamental with one-line CLI benchmarking), and the Shadow Account loop — extract your implicit trading rules from a journal, backtest them across US/Canada equities, then see where they would have served you better.
 
 ## Setup
 
@@ -50,7 +50,7 @@ Add to your agent's MCP config:
 
 ### API Key Requirements
 
-Core research MCP tools work with zero API keys for US/Canada research. After `pip install`, backtesting, market data, factor analysis, options pricing, chart patterns, web search, document reading, trade journal analysis, shadow-account extraction/backtest/report, the Alpha Zoo (271 pre-built alphas), and all 58 skills are ready to use. IBKR tools require a local TWS / IB Gateway session; `run_swarm` requires an LLM key.
+Core research MCP tools work with zero API keys for US/Canada research. After `pip install`, backtesting, market data, factor analysis, options pricing, chart patterns, web search, document reading, trade journal analysis, shadow-account extraction/backtest/report, the Alpha Zoo (281 pre-built alphas), and all 58 skills are ready to use. IBKR tools require a local TWS / IB Gateway session; `run_swarm` requires an LLM key.
 
 | Feature | Key needed | When |
 |---------|-----------|------|
@@ -98,12 +98,12 @@ Example workflow:
 
 Use `list_swarm_presets()` to see all teams, then `run_swarm()` to execute.
 
-### Alpha Zoo (271 pre-built alphas)
+### Alpha Zoo (281 pre-built alphas)
 One-line cross-sectional IC / IR / alive-reversed-dead categorisation across four bundled zoos:
 - **qlib158** (154 alphas) — Microsoft Qlib's `Alpha158` feature handler, Apache-2.0 with pinned commit SHA.
 - **alpha101** (101 alphas) — Kakushadze (2015) "101 Formulaic Alphas" (arXiv:1601.00991), written from the paper appendix.
 - **academic** (12 factors) — Fama-French 5 + Carhart momentum + Jegadeesh reversal + George-Hwang 52-week-high + Amihud illiquidity + Harvey-Siddique skew + Frazzini-Pedersen betting-against-beta (price-based proxies) + a correlation-rewiring stability score (from the in-repo correlation-regime skill).
-- **fundamental** (4 factors) — PIT-safe earnings yield, ROE, gross profitability, and asset growth from daily fundamental panels.
+- **fundamental** (14 factors) — PIT-safe earnings yield, ROE, gross profitability and asset growth, plus ten SEC XBRL additions: book-to-market, FCF yield, accruals, ROA, CFO yield, operating margin, cash-to-assets, leverage, revenue growth and earnings growth, from daily fundamental panels.
 
 Each alpha ships with `__alpha_meta__` (formula LaTeX + theme + universe + warmup + columns required), guarded by an AST purity gate + 300-row lookahead sentinel test. Use the `vibe-trading alpha {list,show,bench,compare,export-manifest}` CLI, the `/alpha/*` REST routes (browser at `/alpha-zoo`), or compose multi-factor signals via `ZooSignalEngine.from_zoo(...)`.
 
@@ -119,7 +119,7 @@ Comprehensive knowledge base covering:
 
 Use `load_skill(name)` to access full methodology docs with code templates.
 
-## Available MCP Tools (64)
+## Available MCP Tools (66)
 
 | Tool | Description | API Key |
 |------|-------------|---------|
@@ -154,9 +154,11 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `read_document` | Extract text from PDF/DOCX/XLSX/PPTX/images | None |
 | `write_file` | Write files (config, strategy code) | None |
 | `read_file` | Read file contents | None |
+| `read_run_artifact` | Structured run-artifact reads (rows / downsample / meta) | None |
 | `list_strategies` | Browse discoverable strategies (Alpha Zoo + SDM store) | None |
 | `query_strategies` | Evidence-gated query: regime / Sharpe / quality / cost filters | None |
 | `get_strategy_evidence` | Per-regime evidence rows for one strategy | None |
+| `adapt_strategy` | Prepare an evidence-gated child strategy for generation and its own backtest |
 | `refresh_strategy_evidence` | Rebuild the disposable strategy-evidence cache from run artifacts | None |
 | `analyze_trade_journal` | Parse broker CSV → profile + behavior diagnostics | None |
 | `extract_shadow_strategy` | Distill 3-5 if-then rules from profitable roundtrips | None |
@@ -272,6 +274,17 @@ vibe-trading connector orders
 vibe-trading connector quote AAPL
 vibe-trading connector history AAPL --duration "30 D" --bar-size "1 day"
 ```
+
+Live-runner model spending is independent of mandate trade limits. Operators
+configure it through Runtime / the chat runner panel, or
+`vibe-trading connector runner-settings --profile robinhood-live-mcp`
+(`--file settings.json` saves settings while stopped). Defaults are one model
+decision every 15 minutes, 26 decisions and 1,000,000 reported tokens per UTC day,
+with fresh conversation context per decision. A once-daily time and IANA timezone
+are optional. Dollar limits require operator-supplied input/output prices and are
+estimates, not provider billing guarantees. Usage is checked after each response;
+budget exhaustion or missing usage activates the existing kill switch. The agent
+must not edit this operator state or raise its own spending limits.
 
 Default ports are TWS paper `7497`, IB Gateway paper `4002`, TWS live-readonly
 `7496`, and IB Gateway live-readonly `4001`.

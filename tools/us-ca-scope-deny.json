@@ -110,6 +110,11 @@
       "reason": "Tests for the surviving QVeris marketplace settings card."
     },
     {
+      "path": "frontend/src/pages/__tests__/SettingsClaudeCliModels.test.tsx",
+      "tokens": ["qveris"],
+      "reason": "Mocks the surviving QVeris marketplace card so this test can exercise the Claude CLI model selector on the settings page."
+    },
+    {
       "path": "frontend/src/i18n/locales/*.json",
       "tokens": ["qveris"],
       "reason": "User-facing copy for the surviving QVeris marketplace (one qveris string block per locale)."
@@ -163,16 +168,6 @@
       "path": "agent/src/factors/bench_runner_strict.py",
       "tokens": ["a-share"],
       "reason": "Module docstring describing the historical Bili_Stock A-share study that motivates the strict benchmark's false-positive controls. Study provenance prose, not a data route."
-    },
-    {
-      "path": "agent/src/live/mandate/model.py",
-      "tokens": ["a-share"],
-      "reason": "Docstring enumerating the removed-market AssetClass buckets (A-share, Korea, Vietnam, Argentina, UK) that this US/CA build deliberately does not define."
-    },
-    {
-      "path": "frontend/src/stores/agent.ts",
-      "tokens": ["a-share"],
-      "reason": "Comment recording which removed A-share/crypto/derivatives tool names were dropped from MARKET_DATA_TOOL. Prose about the removal, and the names themselves are gone."
     }
   ]
 }

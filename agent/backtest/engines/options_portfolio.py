@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from backtest.engines.base import evaluation_start_index
-from backtest.metrics import effective_bars_per_year
+from backtest.metrics import effective_bars_per_year, period_returns
 from src.quantlib.options import bs_greeks, bs_price, normalise_option_type
 
 
@@ -51,18 +51,23 @@ def historical_volatility(
             (the leading warm-up and NaN gaps). Backfilling the first computed
             window here would price bars before it with information from the
             window's own end (#1293).
-        bars_per_year: Bars per elapsed calendar year on this series' own
-            cadence. ``None`` is the cross-market convention the runner passes
-            (#1239) and resolves through ``effective_bars_per_year`` from the
-            observed span, exactly as the metrics do -- so a leg is priced and
-            graded on one cadence instead of two. Crypto venues serve 365 daily
-            bars and okx hourly bars 8760, neither of which is 252.
+        bars_per_year: Known annual bar count, or ``None`` for a cross-market
+            run. With ``None``, estimate each bar's cadence from return
+            intervals observed up to that bar, using elapsed seconds so
+            intraday bars retain their frequency. Future timestamps must not
+            affect historical prices; end-of-run metric annualisation is a
+            separate calculation.
 
     Returns:
         Annualised historical volatility Series.
     """
     if bars_per_year is None:
-        bars_per_year = effective_bars_per_year(close.index)
+        # An expanding mean of elapsed return intervals is causal, including
+        # weekends and market closures already observed. Count intervals, not
+        # prices: n prices contain n - 1 returns. Preserve fractional days.
+        spacing = pd.Series(close.index, index=close.index).diff().dt.total_seconds()
+        mean_spacing = spacing.expanding().mean()
+        bars_per_year = pd.Timedelta(days=365.25).total_seconds() / mean_spacing.where(mean_spacing > 0)
     log_ret = np.log(close / close.shift(1))
     hv = log_ret.rolling(window=window).std() * np.sqrt(bars_per_year)
     return hv.fillna(default_iv)
@@ -249,10 +254,9 @@ def run_options_backtest(
         print(json.dumps({"error": "No data fetched"}))
         sys.exit(1)
 
-    # Compute implied volatility (approximated by historical volatility) on the
-    # cadence this run is annualised on, so legs are priced and graded alike.
-    # Each code resolves a None from its own span: a cross-market basket has no
-    # single factor, which is why the runner passes None at all.
+    # Each cross-market underlying estimates its cadence using only timestamps
+    # known at each bar. Reporting metrics may inspect the whole finished run;
+    # the volatility used to price historical trades may not.
     iv_map: Dict[str, pd.Series] = {}
     for code, df in data_map.items():
         iv_map[code] = historical_volatility(
@@ -777,7 +781,10 @@ def _calc_options_metrics(
 
     returns: pd.Series | None = None
     if n >= 2 and path_is_finite:
-        candidate_returns = equity_vals.pct_change(fill_method=None).iloc[1:]
+        # Seeded with the pre-first-bar cash mark, same convention as
+        # calc_metrics: the drawdown path below already counts that bar's
+        # loss, so the risk ratios must see it too.
+        candidate_returns = period_returns(equity_vals, initial_cash)
         if np.isfinite(candidate_returns.to_numpy()).all():
             returns = candidate_returns
         else:
@@ -792,6 +799,12 @@ def _calc_options_metrics(
     max_dd: float | None = None
     if path_is_finite:
         peak = equity_vals.cummax()
+        # The account holds initial_cash before the first recorded bar, so
+        # that cash is the real high-water mark; without the seed a first-bar
+        # loss (commission alone causes one) never shows up in the drawdown.
+        # Same convention as backtest.metrics.calc_metrics.
+        if valid_initial_cash:
+            peak = peak.clip(lower=float(initial_cash))
         if bool((peak > 0).all()):
             dd = (equity_vals - peak) / peak
             max_dd = float(dd.min())
@@ -825,14 +838,14 @@ def _calc_options_metrics(
     sortino: float | None = None
     if returns is not None and bars_per_year > 0:
         downside = returns[returns < 0]
-        if len(downside) > 1:
-            downside_std = float(downside.std())
-            if np.isfinite(downside_std) and downside_std > 1e-12:
-                sortino = float(returns.mean() / downside_std * np.sqrt(bars_per_year))
-        if sortino is None:
-            warnings.append(
-                "Sortino ratio requires at least two varying downside returns."
+        # Zero-target downside RMS includes every return period in the divisor.
+        downside_deviation = float(np.sqrt((downside**2).sum() / len(returns)))
+        if np.isfinite(downside_deviation) and downside_deviation > 1e-12:
+            sortino = float(
+                returns.mean() / downside_deviation * np.sqrt(bars_per_year)
             )
+        if sortino is None:
+            warnings.append("Sortino ratio requires nonzero downside deviation.")
     elif bars_per_year <= 0:
         warnings.append("Sortino ratio requires a positive bars_per_year value.")
     else:
@@ -866,8 +879,14 @@ def _calc_options_metrics(
     losses = [p for p in closed_pnl if p < 0]
     win_rate = len(wins) / len(closed_pnl) if closed_pnl else 0.0
     avg_win = np.mean(wins) if wins else 0.0
-    avg_loss = abs(np.mean(losses)) if losses else 1e-10
-    pl_ratio = avg_win / avg_loss if avg_loss > 1e-10 else 0.0
+    avg_loss = abs(np.mean(losses)) if losses else 0.0
+    # Closed trades with no loss leave the ratio without a denominator: None,
+    # as in backtest.metrics.win_rate_and_stats, since 0.0 would rank the run
+    # below every other one. No closed trade at all keeps 0.0.
+    if avg_loss > 1e-10:
+        pl_ratio = avg_win / avg_loss
+    else:
+        pl_ratio = None if closed_pnl else 0.0
 
     return {
         "final_value": final_value,
@@ -881,6 +900,6 @@ def _calc_options_metrics(
         # options_rejected_opens and must not inflate the trade count.
         "trade_count": sum(1 for t in trades if t.get("side") != "reject"),
         "win_rate": round(win_rate, 4),
-        "profit_loss_ratio": round(pl_ratio, 4),
+        "profit_loss_ratio": round(pl_ratio, 4) if pl_ratio is not None else None,
         "warnings": warnings,
     }

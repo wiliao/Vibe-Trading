@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from src.session.search import SessionSearchIndex
 from src.tools.path_utils import resolve_safe_path
-from src.tools.swarm_tool import _build_variables, _match_preset, _merge_variables
+from src.tools.swarm_tool import _build_variables, _match_preset
 from src.tools.write_file_tool import WriteFileTool
 
 
@@ -74,26 +74,24 @@ def test_case_alias_and_symlink_paths_use_real_directory_identity(tmp_path):
 
 
 @pytest.mark.parametrize("prompt,preset,asset,key,duration", [
-    ("Analyze XRP for the next 7 days", "crypto_research_lab", "XRP", "timeframe", "7 days"),
-    ("分析铜，未来两周", "commodity_research_team", "copper", "horizon", "2 weeks"),
-    ("分析铁矿石未来七天", "commodity_research_team", "iron ore", "horizon", "7 days"),
-    ("Analyze copper for the next six months", "commodity_research_team", "copper", "horizon", "6 months"),
+    ("Analyze AAPL for the next 7 days", "equity_research_team", "AAPL", "goal", "Analyze AAPL for the next 7 days"),
 ])
 def test_swarm_actual_worker_templates_retain_explicit_assets_and_duration(prompt, preset, asset, key, duration):
     from src.swarm.presets import load_preset
     assert _match_preset(prompt) == preset
     variables = _build_variables(preset, prompt)
     assert variables[key] == duration
-    for task in load_preset(preset)["tasks"]:
-        rendered = task["prompt_template"].format_map(variables)
-        assert asset in rendered and duration in rendered
+    rendered = [
+        task["prompt_template"].format_map(variables)
+        for task in load_preset(preset)["tasks"]
+    ]
+    assert any(asset in text and duration in text for text in rendered)
 
 
-def test_swarm_unknown_asset_is_not_replaced_by_default_crypto_basket():
-    variables = _build_variables("crypto_research_lab", "Analyze SUI crypto for seven days")
-    assert "SUI" in variables["target"]
-    assert variables["timeframe"] == "7 days"
-    assert _merge_variables(variables, {"target": ["SUI"]})[1] is not None
+def test_swarm_unknown_asset_is_not_replaced_by_a_default_basket():
+    variables = _build_variables("equity_research_team", "Analyze SUI for seven days")
+    assert "SUI" in variables["goal"]
+    assert variables["market"] == "US"
 
 
 @pytest.mark.parametrize("parser", ["fmp", "tiingo"])

@@ -127,7 +127,7 @@ def test_registry_loads_factor_with_expected_meta(
     assert alpha.module_path == f"src.factors.zoo.fundamental.{stem}"
     assert alpha.meta["theme"] == theme
     assert alpha.meta["columns_required"] == columns
-    assert alpha.meta["universe"] == ["equity_us", "equity_cn", "equity_hk"]
+    assert alpha.meta["universe"] == ["equity_us"]
     assert alpha.meta["frequency"] == ["1d"]
     assert alpha.meta["decay_horizon"] == 252
     assert alpha.meta["min_warmup_bars"] == 1

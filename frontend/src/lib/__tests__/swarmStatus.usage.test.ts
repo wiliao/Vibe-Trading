@@ -294,7 +294,7 @@ describe("swarmStatus roster repair from the run detail", () => {
     model: "deepseek-v4.1-flash",
     tasks: [
       { id: "task-allocate", agent_id: "allocator", status: "blocked", worker_iterations: 0, input_tokens: null, output_tokens: null },
-      { id: "task-ashare", agent_id: "a_share_analyst", status: "completed", worker_iterations: 9, input_tokens: null, output_tokens: null },
+      { id: "task-us", agent_id: "us_equity_analyst", status: "completed", worker_iterations: 9, input_tokens: null, output_tokens: null },
       { id: "task-crypto", agent_id: "crypto_analyst", status: "completed", worker_iterations: 21, input_tokens: null, output_tokens: null },
       { id: "task-ushk", agent_id: "us_hk_analyst", status: "failed", worker_iterations: 8, input_tokens: null, output_tokens: null },
     ],
@@ -312,9 +312,9 @@ describe("swarmStatus roster repair from the run detail", () => {
     const merged = mergeSwarmRunUsage(partial, detail);
 
     expect(merged.agents.map((agent) => agent.agentId).sort()).toEqual([
-      "a_share_analyst",
       "allocator",
       "crypto_analyst",
+      "us_equity_analyst",
       "us_hk_analyst",
     ]);
     expect(merged.agents.find((a) => a.agentId === "crypto_analyst")?.status).toBe("done");
@@ -342,14 +342,14 @@ describe("swarmStatus roster repair from the run detail", () => {
     const live: SwarmRunStatus = {
       ...baseStatus(),
       agents: [
-        { agentId: "a_share_analyst", taskId: "task-ashare", status: "done", input_tokens: 10 },
+        { agentId: "us_equity_analyst", taskId: "task-us", status: "done", input_tokens: 10 },
       ],
     };
     const stale = { ...detail, tasks: [{ ...detail.tasks[1], status: "pending" }] };
 
     const merged = mergeSwarmRunUsage(live, stale);
 
-    expect(merged.agents.find((a) => a.agentId === "a_share_analyst")?.status).toBe("done");
-    expect(merged.agents.find((a) => a.agentId === "a_share_analyst")?.input_tokens).toBe(10);
+    expect(merged.agents.find((a) => a.agentId === "us_equity_analyst")?.status).toBe("done");
+    expect(merged.agents.find((a) => a.agentId === "us_equity_analyst")?.input_tokens).toBe(10);
   });
 });

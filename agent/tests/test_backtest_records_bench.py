@@ -438,8 +438,8 @@ def test_concurrent_copies_are_reserved_once(backend):
                 store._conn.close()
 
 
-def test_real_local_perpetual_backtest_records_one_measurement(run_root, store, artifact_id, monkeypatch, tmp_path):
-    """Exercise real tool -> subprocess -> crypto engine -> bench persistence."""
+def test_real_local_us_equity_backtest_records_one_measurement(run_root, store, artifact_id, monkeypatch, tmp_path):
+    """Exercise real tool -> subprocess -> US equity engine -> bench persistence."""
     import pandas as pd
     import shutil
     from src.core import runner as core_runner
@@ -453,13 +453,13 @@ def test_real_local_perpetual_backtest_records_one_measurement(run_root, store, 
                   "high": [102 + i for i in range(40)], "low": [99 + i for i in range(40)],
                   "close": [101 + i for i in range(40)], "volume": 100000}).to_csv(prices, index=False)
     (bridge / "config.yaml").write_text(json.dumps({"sources": [
-        {"symbol": "1000PEPE-USDT-PERP", "type": "csv", "path": str(prices)},
+        {"symbol": "AAPL.US", "type": "csv", "path": str(prices)},
     ]}))
     prepare = core_runner._prepare_sandbox_home
     monkeypatch.setattr(core_runner, "_prepare_sandbox_home", lambda _home: prepare(fixture_home))
     run = _make_run_dir(run_root, "real-engine")
     _write_config(run, artifact_id=artifact_id, bench_type="periodic", source="local",
-                  codes=["1000PEPE-USDT-PERP"], start_date="2026-01-01", end_date="2026-02-09", initial_cash=10000)
+                  codes=["AAPL.US"], start_date="2026-01-01", end_date="2026-02-09", initial_cash=10000)
     (run / "code" / "signal_engine.py").write_text(
         'import pandas as pd\nclass SignalEngine:\n'
         '    def __init__(self, **kwargs): pass\n'

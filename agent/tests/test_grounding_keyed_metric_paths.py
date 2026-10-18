@@ -138,13 +138,13 @@ def test_same_ticker_different_markets_remain_distinct(tmp_path):
     """Market-qualified identifiers cannot lend evidence to each other."""
     ledger = _ledger(
         tmp_path,
-        {"risk_contribution_pct": {"ABC.US": 0.125, "ABC.BA": 0.125}},
+        {"risk_contribution_pct": {"ABC.US": 0.125, "ABC.TO": 0.125}},
     )
     assert ledger._metric_pool("ABC.US") == [0.125]
-    assert ledger._metric_pool("ABC.BA") == [0.125]
+    assert ledger._metric_pool("ABC.TO") == [0.125]
     assert ledger._metric_pool("ABC") == []
     assert ledger._referenced(
-        "metrics-call::risk_contribution_pct.ABC.US", "ABC.BA", None
+        "metrics-call::risk_contribution_pct.ABC.US", "ABC.TO", None
     ) == ([], [])
 
 

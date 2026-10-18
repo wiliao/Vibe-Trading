@@ -163,7 +163,6 @@ of day.
 - `artifact_id`: optional. Set it only when the run benches an artifact registered with `sdm_register`; the backtest then records its metrics in that artifact's bench history. `bench_type` (`"initial"` / `"periodic"` / `"manual"`, default `"manual"`) states whether the run counts towards decay monitoring, which reads only `initial` and `periodic` runs. Omit both for exploratory runs.
 - `initial_cash`: default 1,000,000
 - `commission`: default 0.1%
-- `hk_lot_sizes`: optional, Hong Kong only — `{"00700.HK": 100, "02800.HK": 500}`. HK board lots are set per issuer, so without this table every HK order is rounded to 100 shares and a name whose real lot is smaller than its target trades zero times. Codes match with or without leading zeros. Every symbol with no configured lot size uses 100 shares and is listed under `lot_assumptions` in the metrics, including runs without a table. Reports must identify these as assumptions rather than verified exchange lots.
 - `validation`: optional statistical validation after backtest completes. Omit to skip. Example:
   ```json
   "validation": {

@@ -8,7 +8,7 @@ p-values, the optimiser's weights — because only kind-named metrics (Sharpe,
 return, drawdown …) ever became evidence, and a ref naming the run
 (``rp/artifacts/metrics.csv``, ``risk_parity target_positions.csv``) resolved to
 nothing. Declared figures: 196 ``value_mismatch`` and 167
-``not_in_referenced_call`` became 1 and 7. And naming 600519.SH in the request
+``not_in_referenced_call`` became 1 and 7. And naming AAPL.US in the request
 made it a market answer, so a report with no fetched price could never be
 released with its failing figures cut: 12 of 15 runs ended in the refusal.
 
@@ -111,14 +111,14 @@ def _write_backtest(
     )
     rows = weights or RP_WEIGHTS
     (artifacts / "target_positions.csv").write_text(
-        "timestamp,000001.SZ,000858.SZ,600519.SH\n"
+        "timestamp,SHOP.TO,MSFT.US,AAPL.US\n"
         + "".join(f"{day},{a},{b},{c}\n" for day, a, b, c in rows),
         encoding="utf-8",
     )
     (artifacts / "trades.csv").write_text(
         "timestamp,code,side,price,qty,pnl\n"
-        "2024-03-01,000001.SZ,sell,9.81,1000,11488.33\n"
-        "2024-06-03,600519.SH,sell,1602.5,100,-17998.19\n",
+        "2024-03-01,SHOP.TO,sell,9.81,1000,11488.33\n"
+        "2024-06-03,AAPL.US,sell,1602.5,100,-17998.19\n",
         encoding="utf-8",
     )
     listed = [
@@ -178,7 +178,7 @@ def two_runs(tmp_path: Path) -> GroundingLedger:
     )
     ledger = GroundingLedger(
         run_dir=tmp_path,
-        user_message="用000001.SZ、600519.SH、000858.SZ构建风险平价组合，回测2024全年，与等权基准对比",
+        user_message="用SHOP.TO、AAPL.US、MSFT.US构建风险平价组合，回测2024全年，与等权基准对比",
     )
     _backtest(ledger, tmp_path / "rp", "bt-rp")
     _backtest(ledger, tmp_path / "ew", "bt-ew")
@@ -302,11 +302,11 @@ def test_one_run_holding_two_drawdowns_is_still_one_source(tmp_path: Path) -> No
 def test_a_table_grounds_only_the_rows_the_model_was_shown(two_runs: GroundingLedger) -> None:
     table = two_runs.run_dir / "rp" / "artifacts" / "target_positions.csv"
     shown = _declared(
-        "2024-01-02 风险平价权重：000001.SZ 38.97%。",
+        "2024-01-02 风险平价权重：SHOP.TO 38.97%。",
         "38.97% | observed | 初始权重 | rp/artifacts/target_positions.csv",
     )
     unseen = _declared(
-        "2024-01-05 风险平价权重：600519.SH 34.23%。",
+        "2024-01-05 风险平价权重：AAPL.US 34.23%。",
         "34.23% | observed | 权重 | rp/artifacts/target_positions.csv",
     )
 
@@ -344,7 +344,7 @@ def test_a_file_the_model_wrote_is_never_engine_output(tmp_path: Path) -> None:
     ledger = GroundingLedger(run_dir=tmp_path, user_message="回测风险平价")
     own = tmp_path / "rp" / "artifacts" / "my_weights.csv"
     own.parent.mkdir(parents=True)
-    own.write_text("timestamp,000001.SZ\n2024-01-02,0.4567\n", encoding="utf-8")
+    own.write_text("timestamp,SHOP.TO\n2024-01-02,0.4567\n", encoding="utf-8")
     ledger.ingest_tool_result(
         tool_name="write_file",
         arguments={"path": str(own)},
@@ -354,7 +354,7 @@ def test_a_file_the_model_wrote_is_never_engine_output(tmp_path: Path) -> None:
     )
     own.unlink()
     _write_backtest(tmp_path / "rp", RP)
-    own.write_text("timestamp,000001.SZ\n2024-01-02,0.4567\n", encoding="utf-8")
+    own.write_text("timestamp,SHOP.TO\n2024-01-02,0.4567\n", encoding="utf-8")
     _backtest(ledger, tmp_path / "rp", "bt-rp")
     _read(ledger, own, "read-own")
 
@@ -362,7 +362,7 @@ def test_a_file_the_model_wrote_is_never_engine_output(tmp_path: Path) -> None:
     assert not ledger.validate_final_answer(forged).valid
 
     table = tmp_path / "rp" / "artifacts" / "target_positions.csv"
-    table.write_text("timestamp,000001.SZ\n2024-01-02,0.4567\n", encoding="utf-8")
+    table.write_text("timestamp,SHOP.TO\n2024-01-02,0.4567\n", encoding="utf-8")
     _read(ledger, table, "read-edited")
     edited = _declared("权重 45.67%。", "45.67% | observed | 权重 | rp/artifacts/target_positions.csv")
     assert not ledger.validate_final_answer(edited).valid
@@ -615,11 +615,11 @@ def test_a_named_derivation_survives_prices_of_several_symbols(two_runs: Groundi
     """Several instruments' bars bar the session pools, not the evidence a ref names."""
     two_runs.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["000001.SZ", "600519.SH"]},
+        arguments={"codes": ["SHOP.TO", "AAPL.US"]},
         result=json.dumps(
             {
-                "000001.SZ": [{"trade_date": "2024-12-31", "close": 11.2}],
-                "600519.SH": [{"trade_date": "2024-12-31", "close": 1524.0}],
+                "SHOP.TO": [{"trade_date": "2024-12-31", "close": 11.2}],
+                "AAPL.US": [{"trade_date": "2024-12-31", "close": 1524.0}],
             }
         ),
         call_id="md",
@@ -652,8 +652,8 @@ def test_a_backtest_report_is_released_cut_instead_of_refused(two_runs: Groundin
 
 
 def test_a_market_answer_with_no_price_and_no_analysis_is_still_refused(tmp_path: Path) -> None:
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="600519.SH 现价多少，给出买入价")
-    draft = "600519.SH 买入价 1500.5 元。"
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="AAPL.US 现价多少，给出买入价")
+    draft = "AAPL.US 买入价 1500.5 美元。"
 
     assert ledger.redacted_release(draft, ledger.validate_final_answer(draft)) is None
     assert "价格数字" in ledger.safe_fallback()
@@ -671,23 +671,23 @@ def test_the_fallback_after_an_analysis_names_the_figures_not_prices(
 
 
 def test_a_code_and_name_cell_attributes_its_figure_to_the_code(tmp_path: Path) -> None:
-    """"000001.SZ 平安银行" in the symbol column is 000001.SZ, not a mismatch."""
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="000001.SZ 和 600519.SH 最近收盘")
+    """"SHOP.TO 平安银行" in the symbol column is SHOP.TO, not a mismatch."""
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="SHOP.TO 和 AAPL.US 最近收盘")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["000001.SZ", "600519.SH"]},
+        arguments={"codes": ["SHOP.TO", "AAPL.US"]},
         result=json.dumps(
             {
-                "000001.SZ": [{"trade_date": "2024-12-31", "close": 11.2}],
-                "600519.SH": [{"trade_date": "2024-12-31", "close": 1524.0}],
+                "SHOP.TO": [{"trade_date": "2024-12-31", "close": 11.2}],
+                "AAPL.US": [{"trade_date": "2024-12-31", "close": 1524.0}],
             }
         ),
         call_id="md",
         success=True,
     )
     result = ledger.validate_final_answer(
-        "| 标的 | 收盘 |\n|---|---:|\n| 000001.SZ 平安银行 | 11.20 |\n\n"
-        "数据来源 auto，人民币计价。\n\n```figures\n11.20 | observed | 000001.SZ 收盘 | md\n```"
+        "| 标的 | 收盘 |\n|---|---:|\n| SHOP.TO 平安银行 | 11.20 |\n\n"
+        "数据来源 auto，人民币计价。\n\n```figures\n11.20 | observed | SHOP.TO 收盘 | md\n```"
     )
 
     assert not any(issue.get("reason") == "symbol_mismatch" for issue in result.issues), result.issues
@@ -848,7 +848,7 @@ def test_structured_artifact_reader_grounds_only_shown_rows(
     monkeypatch.setenv("VIBE_TRADING_ALLOWED_RUN_ROOTS", str(two_runs.run_dir))
     result = read_run_artifact(
         str(two_runs.run_dir / "rp"), "target_positions", format=mode,
-        max_rows=2, columns=["timestamp", "000001.SZ"],
+        max_rows=2, columns=["timestamp", "SHOP.TO"],
     )
     payload = json.loads(result)
     assert payload["returned_rows"] == 2
@@ -857,7 +857,7 @@ def test_structured_artifact_reader_grounds_only_shown_rows(
         result=result, call_id="structured-weights", success=True,
     )
     observed = [r for r in two_runs._evidence if r.call_id == "structured-weights"]
-    assert {r.field for r in observed} == {"000001.SZ"}
+    assert {r.field for r in observed} == {"SHOP.TO"}
     assert {r.value for r in observed} == {row[1] for row in payload["rows"]}
     shown = _declared("初始权重 38.97%。", "38.97% | observed | 权重 | rp/artifacts/target_positions.csv")
     assert two_runs.validate_final_answer(shown).valid
@@ -874,7 +874,7 @@ def test_structured_reader_never_grounds_model_written_table(
     monkeypatch.setenv("VIBE_TRADING_ALLOWED_RUN_ROOTS", str(two_runs.run_dir))
     table = two_runs.run_dir / "rp" / "artifacts" / "target_positions.csv"
     if changed == "different_bytes":
-        table.write_text("timestamp,000001.SZ\n2024-01-02,0.4567\n", encoding="utf-8")
+        table.write_text("timestamp,SHOP.TO\n2024-01-02,0.4567\n", encoding="utf-8")
     two_runs.ingest_tool_result(
         tool_name="write_file", arguments={"path": str(table)},
         result=json.dumps({"status": "ok", "path": str(table)}),
@@ -895,7 +895,7 @@ def test_structured_reader_checks_engine_hash_and_scope(
 
     monkeypatch.setenv("VIBE_TRADING_ALLOWED_RUN_ROOTS", str(two_runs.run_dir))
     table = two_runs.run_dir / "rp" / "artifacts" / "target_positions.csv"
-    table.write_text("timestamp,000001.SZ\n2024-01-02,0.4567\n", encoding="utf-8")
+    table.write_text("timestamp,SHOP.TO\n2024-01-02,0.4567\n", encoding="utf-8")
     result = read_run_artifact(str(table.parent.parent), "target_positions")
     two_runs.ingest_tool_result(
         tool_name="read_run_artifact", arguments={"run_dir": str(table.parent.parent)},

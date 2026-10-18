@@ -96,13 +96,7 @@ function effortOptions(): string[] {
 describe("Settings with the claude-cli provider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    apiMock.getDataSourceSettings.mockResolvedValue({
-      tushare_token_configured: false,
-      baostock_supported: true,
-      baostock_installed: true,
-      baostock_message: "BaoStock available",
-      env_path: "agent/.env",
-    });
+    apiMock.getDataSourceSettings.mockResolvedValue({ env_path: "agent/.env" });
     apiMock.listLLMModels.mockResolvedValue(modelList);
   });
 

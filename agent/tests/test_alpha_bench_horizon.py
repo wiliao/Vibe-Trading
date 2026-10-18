@@ -151,7 +151,7 @@ def test_run_bench_strict_accepts_horizon_and_carries_meta(monkeypatch: pytest.M
     _setup_strict(monkeypatch, captured)
 
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=False, registry=_StubRegistry(), horizon=21,
     )
 
@@ -166,7 +166,7 @@ def test_run_bench_strict_default_meta_says_daily(monkeypatch: pytest.MonkeyPatc
     _setup_strict(monkeypatch, captured)
 
     result = run_bench_strict(
-        zoo="alpha101", universe="csi300", period="2024-2024",
+        zoo="alpha101", universe="sp500", period="2024-2024",
         random_control=False, registry=_StubRegistry(),
     )
 
@@ -210,7 +210,7 @@ def test_validate_horizon_rejects_out_of_range_or_non_int(bad: object) -> None:
 def _ns(**overrides: Any) -> argparse.Namespace:
     base = dict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2020-2025",
         top=20,
         yes=True,
@@ -507,7 +507,7 @@ def test_multi_zoo_aggregate_discloses_horizon_and_exclusions() -> None:
 
     out = cli_handlers._run_all_zoos_with_progress(
         target_ids=["fund_cn"],
-        universe="csi300",
+        universe="sp500",
         period="2020-2021",
         top=5,
         start_ts=time.monotonic(),

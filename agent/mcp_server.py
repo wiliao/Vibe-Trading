@@ -805,6 +805,12 @@ def backtest(run_dir: str) -> str:
     - "auto": auto-detect based on symbol format (with fallback)
 
     Returns metrics (Sharpe, return, drawdown, etc.) and artifact paths.
+    On success the envelope also carries a structured ``summary``: the full
+    scalar metrics plus structured_metrics and validation, run metadata,
+    an ``equity_preview`` (at most 50 equal-stride points, first and last
+    pinned) and ``artifact_paths`` including per-symbol ohlcv files — read
+    these instead of parsing ``stdout``. Large envelopes omit logs first
+    and reduce preview points; any omitted summary is explicitly reported.
 
     Args:
         run_dir: Path to the run directory containing config.json and code/.
@@ -888,6 +894,7 @@ def alpha_bench(
     alpha_id: str | None = None,
     zoo: str | None = None,
     top: int = 20,
+    horizon: int = 1,
     output_dir: str | None = None,
 ) -> str:
     """Benchmark one Alpha Zoo alpha or a complete zoo on a universe.
@@ -898,6 +905,10 @@ def alpha_bench(
         alpha_id: Optional single alpha id; mutually exclusive with ``zoo``.
         zoo: Optional zoo id; mutually exclusive with ``alpha_id``.
         top: Number of top-ranked alphas to include in the report.
+        horizon: Forward-return horizon in bars (default 1 = next-bar).
+            ``h > 1`` computes h-bar forward returns and samples IC rows
+            non-overlapping (end-anchored); 21 ≈ monthly, the conventional
+            horizon for fundamental factors. Range 1-252.
         output_dir: Optional directory for the generated HTML report.
     """
     if not alpha_id and not zoo:
@@ -920,7 +931,7 @@ def alpha_bench(
     try:
         from datetime import date
 
-        from src.tools.alpha_bench_tool import _parse_period
+        from src.tools.alpha_bench_tool import _MAX_HORIZON, _parse_period
 
         start_raw, end_raw = _parse_period(period)
         start_date = date.fromisoformat(start_raw)
@@ -949,10 +960,20 @@ def alpha_bench(
             ensure_ascii=False,
         )
 
+    if isinstance(horizon, bool) or not isinstance(horizon, int) or not 1 <= horizon <= _MAX_HORIZON:
+        return json.dumps(
+            {
+                "status": "error",
+                "error": f"MCP alpha_bench horizon must be an integer between 1 and {_MAX_HORIZON}",
+            },
+            ensure_ascii=False,
+        )
+
     params: dict[str, Any] = {
         "universe": universe,
         "period": period,
         "top": top,
+        "horizon": horizon,
     }
     if alpha_id is not None:
         params["alpha_id"] = alpha_id
@@ -1189,6 +1210,67 @@ def read_file(path: str) -> str:
     return registry.execute("read_file", {"path": path})
 
 
+@mcp.tool
+def read_run_artifact(
+    run_dir: str,
+    artifact: str,
+    format: str = "rows",
+    offset: int = 0,
+    max_rows: int = 1000,
+    columns: _lenient_str_list_opt = None,
+) -> str:
+    """Read a backtest run artifact as structured JSON instead of raw CSV text.
+
+    Artifacts: friendly aliases ``equity``, ``trades``, ``metrics``,
+    ``positions``, ``target_positions`` (CSVs under ``<run_dir>/artifacts/``),
+    ``ohlcv:<CODE>`` (e.g. ``ohlcv:600519.SH``) and ``run_card`` — plus any
+    run_dir-relative ``.csv``/``.json`` path listed in the run's
+    ``run_card.json`` artifacts manifest (e.g. ``artifacts/validation.json``).
+    The manifest is the trust anchor: a relative path it does not list is
+    refused, and a manifest entry pointing outside the run directory is never
+    followed.
+
+    Formats:
+
+    - ``rows``: offset paging over whole records; follow ``next_offset`` until
+      ``truncated`` is false to walk a file losslessly.
+    - ``downsample``: equal-stride sample of at most ``max_rows`` points with
+      the first and last row always pinned — one call feeds a chart.
+    - ``meta``: columns / total_rows / size_bytes, plus the manifest's
+      ``sha256`` and ``manifest_size_bytes`` for a manifest-listed artifact.
+
+    Cells arrive typed (int / float / null / string). Every envelope is
+    serialized within the shared model-result character budget: an oversized
+    page shrinks to whole records with honest ``truncated`` / ``next_offset``
+    metadata rather than cutting mid-JSON. Errors return
+    ``{"ok": false, "error", "hint"}``. Small JSON artifacts return their
+    parsed object; oversized JSON returns size metadata in meta mode and an
+    actionable error otherwise.
+
+    Args:
+        run_dir: Run directory a backtest/tool call returned.
+        artifact: Alias name or manifest-listed relative path (see above);
+            anything else — including path traversal — is refused.
+        format: "rows" (default), "downsample" or "meta".
+        offset: First row index for "rows" mode (default 0).
+        max_rows: Page size [1, 5000] (default 1000); samples retain at least two endpoints.
+        columns: Optional column projection; unknown names are refused with
+            the valid list.
+    """
+    registry = _get_registry()
+    return registry.execute(
+        "read_run_artifact",
+        {
+            "run_dir": run_dir,
+            "artifact": artifact,
+            "format": format,
+            "offset": offset,
+            "max_rows": max_rows,
+            "columns": columns,
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # Strategy discovery tools
 # ---------------------------------------------------------------------------
@@ -1314,7 +1396,21 @@ def get_strategy_evidence(strategy_id: str, regime: str | None = None) -> str:
 
 
 @mcp.tool
-def refresh_strategy_evidence(manifest_path: str | None = None, runs: list | None = None) -> str:
+def adapt_strategy(strategy_id: str, name: str, universe: str, config: dict, position_sizing: str | None = None) -> str:
+    """Prepare a child from fresh adequate SDM evidence, preserving signal logic.
+
+    Returns description and a bound run_dir. Load strategy-generate, write the
+    child's code, backtest there, then refresh its evidence with scope=strategies.
+    Does not generate code or run a backtest by itself, or copy parent metrics.
+    """
+    return _strategy_discovery_execute("adapt_strategy", {
+        "strategy_id": strategy_id, "name": name, "universe": universe,
+        "config": config, "position_sizing": position_sizing,
+    })
+
+
+@mcp.tool
+def refresh_strategy_evidence(manifest_path: str | None = None, runs: list | None = None, scope: str = "all") -> str:
     """Rebuild the strategy-discovery evidence cache from backtest run artifacts.
 
     WRITE tool with disposable-cache-only scope: it replaces the facade-owned
@@ -1336,10 +1432,11 @@ def refresh_strategy_evidence(manifest_path: str | None = None, runs: list | Non
     Args:
         manifest_path: Path to the JSON manifest file (see above).
         runs: Inline run specs (see above).
+        scope: all replaces the whole cache; strategies updates successful named strategies only.
     """
     return _strategy_discovery_execute(
         "refresh_strategy_evidence",
-        {"manifest_path": manifest_path, "runs": runs},
+        {"manifest_path": manifest_path, "runs": runs, "scope": scope},
     )
 
 
@@ -2120,7 +2217,10 @@ def get_macro_series(
         series_id: FRED series identifier (e.g. "CPIAUCSL", "UNRATE").
         start_date: Inclusive window start, YYYY-MM-DD. Omit for full history.
         end_date: Inclusive window end, YYYY-MM-DD. Omit for the latest date.
-        limit: Maximum number of most-recent observations to return.
+        limit: Maximum number of most-recent observations to return (max
+            5000). A series longer than that is capped and says so in the
+            result: truncated, observations_available, and a hint. The shared
+            character budget may return fewer rows; count reports delivered rows.
     """
     params: dict[str, Any] = {"series_id": series_id, "limit": limit}
     if start_date:
@@ -2128,7 +2228,6 @@ def get_macro_series(
     if end_date:
         params["end_date"] = end_date
     return _execute_key_gated("get_macro_series", params)
-
 
 @mcp.tool
 def qveris_search(query: str, limit: int = 20, session_id: str | None = None) -> str:

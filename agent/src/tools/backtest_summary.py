@@ -45,8 +45,8 @@ def collect_ohlcv_paths(run_dir: Path) -> dict[str, str]:
     """Map each symbol code to the absolute path of its OHLCV CSV.
 
     Globs ``<run_dir>/artifacts/ohlcv_*.csv``; the code is the filename minus
-    the ``ohlcv_`` prefix and ``.csv`` suffix (``ohlcv_BTC-USDT.csv`` maps to
-    ``BTC-USDT``).  Paths are absolute when ``run_dir`` is absolute, which the
+    the ``ohlcv_`` prefix and ``.csv`` suffix (``ohlcv_AAPL.US.csv`` maps to
+    ``AAPL.US``).  Paths are absolute when ``run_dir`` is absolute, which the
     backtest tool guarantees via ``safe_run_dir``.
 
     Args:

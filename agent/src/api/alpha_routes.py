@@ -37,7 +37,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import importlib.util
 import re
 import threading
 import time
@@ -106,14 +105,12 @@ _ALPHA_ID_RE = re.compile(r"^[a-z][a-z0-9]+_[a-z0-9_]{1,64}$")
 _JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 # Filter enums — keep in sync with src.factors.registry.Theme / Universe.
-_VALID_ZOOS = {"alpha101", "gtja191", "qlib158", "academic", "fundamental"}
+_VALID_ZOOS = {"alpha101", "qlib158", "academic", "fundamental"}
 _VALID_THEMES = {
     "momentum", "reversal", "volume", "volatility", "quality", "value",
     "liquidity", "microstructure", "sentiment", "growth", "leverage",
 }
-_VALID_UNIVERSES = {
-    "equity_us",
-}
+_VALID_UNIVERSES = {"equity_us"}
 # Ranking metrics for /alpha/compare — keep in sync with
 # ``src.factors.compare_runner.SORT_KEYS`` (kept local to avoid a heavy import).
 _VALID_SORTS = {"ir", "ic_mean", "ic_positive_ratio", "ic_count"}
@@ -403,16 +400,11 @@ def register_alpha_routes(
     @app.get("/alpha/readiness", dependencies=[Depends(require_auth)])
     async def alpha_readiness():
         """Report configuration and mathematical prerequisites without network probes."""
-        from src.config.accessor import get_env_config
         from src.factors.registry import get_default_registry
 
         registry = get_default_registry()
-        configured = bool(get_env_config().data.tushare_token.strip())
-        installed = importlib.util.find_spec("tushare") is not None
         return {"universes": {
-            "csi300": {"ready": configured and installed, "reason": "tushare_ready" if configured and installed else "tushare_token_missing" if not configured else "tushare_dependency_missing"},
             "sp500": {"ready": True, "reason": "public_data"},
-            "btc-usdt": {"ready": False, "reason": "single_asset"},
         }, "zoo_counts": {zoo: len(registry.list(zoo=zoo)) for zoo in sorted(_VALID_ZOOS)}}
 
     @app.get("/alpha/bench/{job_id}", dependencies=[Depends(require_auth)])
@@ -549,8 +541,6 @@ def register_alpha_routes(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=f"invalid period: {exc}")
 
-        if payload.universe == "btc-usdt":
-            raise HTTPException(status_code=400, detail="BTC-USDT is single-asset; cross-sectional IC needs at least two instruments. Choose a stock universe.")
         if payload.alpha_id:
             from src.factors.registry import get_default_registry
             try:
@@ -658,8 +648,6 @@ def register_alpha_routes(
     async def kick_off_compare(payload: CompareRequest) -> dict[str, Any]:
         """Queue a background head-to-head comparison and return a job_id."""
         from src.tools.alpha_bench_tool import _parse_period
-        if payload.universe == "btc-usdt":
-            raise HTTPException(status_code=400, detail="BTC-USDT is single-asset; cross-sectional IC needs at least two instruments. Choose a stock universe.")
 
         try:
             _parse_period(payload.period)

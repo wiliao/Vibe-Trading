@@ -130,7 +130,7 @@ class TestRecoveryAction:
             success=True,
         )
         validation = ledger.validate_final_answer(
-            "562500.SS（yahoo，CNY）2026-06-23 收盘价 1.137。"
+            "562500.SS（yahoo，USD）2026-06-23 收盘价 1.137。"
         )
 
         assert validation.valid is True

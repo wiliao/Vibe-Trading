@@ -17,14 +17,6 @@ def test_fiat_cross_is_not_crypto(symbol: str) -> None:
     assert _infer_market_from_symbol(symbol) == "other"
 
 
-@pytest.mark.parametrize(
-    "symbol",
-    ["BTC-USD", "BTC/USD", "ETH/BTC", "ETH-USDT", "SOL/USDC", "BTC-EUR", "ETH-USD"],
-)
-def test_crypto_pairs_stay_crypto(symbol: str) -> None:
-    assert _infer_market_from_symbol(symbol) == "crypto"
-
-
 def test_generic_journal_row_for_a_currency_cross_gets_other_market() -> None:
     df = pd.DataFrame(
         {

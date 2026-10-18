@@ -16,7 +16,7 @@ __alpha_meta__ = {
         r"\right)"
     ),
     "columns_required": ["fund:revenue_growth"],
-    "universe": ["equity_us", "equity_cn", "equity_hk"],
+    "universe": ["equity_us"],
     "frequency": ["1d"],
     "decay_horizon": 252,
     "min_warmup_bars": 1,

@@ -11,7 +11,7 @@ import { useAgentStore } from "@/stores/agent";
 const apiMock = vi.hoisted(() => ({
   getGoal: vi.fn(),
   getLLMSettings: vi.fn(),
-  getRunPreview: vi.fn(),
+  getRun: vi.fn(),
   getSessionMessages: vi.fn(),
   sseUrl: vi.fn((sid: string) => `/sessions/${sid}/events`),
 }));
@@ -59,7 +59,7 @@ describe("Agent grounding status line", () => {
     useAgentStore.getState().reset();
     sseMock.connect.mockClear();
     apiMock.getGoal.mockResolvedValue(null);
-    apiMock.getRunPreview.mockResolvedValue({ metrics: null, equity_curve: [], report_worthy: false });
+    apiMock.getRun.mockResolvedValue({});
     apiMock.getSessionMessages.mockResolvedValue([]);
     apiMock.getLLMSettings.mockResolvedValue({
       provider: "deepseek",

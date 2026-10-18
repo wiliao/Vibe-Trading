@@ -26,6 +26,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from src.shadow_account.indicators import RSI_PERIOD as _RSI_PERIOD, compute_rsi as _compute_rsi
 from src.shadow_account.models import PRICE_FEATURES, ShadowProfile, ShadowRule
 from src.shadow_account.storage import hash_journal, new_shadow_id, now_iso
 from src.tools.trade_journal_parsers import parse_file, records_to_dataframe
@@ -43,7 +44,6 @@ _CATEGORICAL_FEATURES = ("market",)
 # Names live on the data-contract boundary (models.PRICE_FEATURES) so the
 # extractor, codegen, and scanner cannot drift; aliased here for local use.
 _PRICE_FEATURES = PRICE_FEATURES
-_RSI_PERIOD = 14
 _PRIOR_RETURN_WINDOW = 5
 # Calendar buffer added before the earliest buy_dt so the RSI warmup has enough
 # trading bars even across weekends/holidays.
@@ -176,13 +176,14 @@ def _wilder_average(values: pd.Series, period: int) -> pd.Series:
         return result
 
     seed = valid.iloc[:period].mean()
-    result.loc[valid.index[period - 1]] = seed
+    valid_positions = np.flatnonzero(values.notna().to_numpy())
+    result.iloc[valid_positions[period - 1]] = seed
 
     remaining = valid.iloc[period:]
     if len(remaining) > 0:
         tail = pd.concat([pd.Series([seed]), remaining])
         smoothed_tail = tail.ewm(alpha=1 / period, adjust=False).mean().iloc[1:]
-        result.loc[remaining.index] = smoothed_tail.to_numpy()
+        result.iloc[valid_positions[period:]] = smoothed_tail.to_numpy()
     return result
 
 

@@ -139,8 +139,6 @@
     "connectorStatusUnavailable": "وضعیت در دسترس نیست",
     "connectedAccessUnknown": "متصل · سطح دسترسی نامشخص",
     "missingLongbridgeVariables": "پیکربندی ناقص است. این متغیرها را در agent/.env تنظیم کنید و سرویس را دوباره بسازید:",
-    "missingEtoroVariables": "پیکربندی ناقص است. این متغیرهای محیطی را تنظیم کنید یا فایل ~/.vibe-trading/etoro.json بسازید:",
-    "missingEtoroFileHint": "فایل نمونه: {\"api_key\": \"کلید عمومی شما\", \"user_key\": \"کلید کاربری شما\", \"profile\": \"live-readonly\"}. پروفایل‌ها: etoro-paper-sdk، etoro-live-sdk-readonly، etoro-paper-trade، etoro-live-trade.",
     "missingConnectorVariables": "پیکربندی ناقص است. اعتبارنامه‌های کانکتور را در ~/.vibe-trading/ یا agent/.env تنظیم کنید و اتصال را راستی‌آزمایی کنید.",
     "pathSeparatedKeyBound": "مسیر جداشده دمو/واقعی (جفت‌کلید مشترک)",
     "sdkConnectorProfile": "کانکتور مستقیم SDK · پروفایل فقط‌خواندنی",
@@ -327,25 +325,19 @@
       "portfolioPrompt": "حساب‌ها و دارایی‌های متصل من، از جمله تمرکز و ریسک‌های سبد را خلاصه کن. اگر حسابی متصل نیست، ابتدا روش راه‌اندازی را توضیح بده. هیچ سفارشی ثبت یا تغییر نده."
     },
     "categories": {
-      "multiMarketBacktest": "بک‌تست سهام A",
       "researchAnalysis": "پژوهش و تحلیل",
       "swarmTeams": "تیم‌های تحلیل‌گر هوش مصنوعی",
       "docWebResearch": "پژوهش سند و وب",
       "tradeJournal": "دفتر معاملات",
       "tradingConnectors": "کانکتورهای معاملاتی",
       "shadowAccount": "حساب سایه",
-      "valueInvesting": "سرمایه‌گذاری ارزشی"
+      "valueInvesting": "سرمایه‌گذاری ارزشی",
+      "multiMarketBacktest": "US & Canada Backtest"
     },
     "examples": {
       "crossMarketPortfolio": "پورتفولیوی سه‌سهمی متوازن",
-      "crossMarketPortfolioDesc": "سرمایه را بین ۳ سهم A تقسیم کنید تا هر سهم ریسک برابر ببرد (ریسک پاریتی) و با وزن برابر مقایسه کنید",
-      "crossMarketPortfolioPrompt": "یک پورتفولیوی ریسک‌پاریتی با 000001.SZ و 600519.SH و 000858.SZ بساز، برای کل سال ۲۰۲۴ بک‌تست بگیر و با بنچمارک وزن برابر مقایسه کن",
-      "btcMacd": "استراتژی MACD سهام A",
-      "btcMacdDesc": "بک‌تست استراتژی MACD در سطح دقیقه برای سهام A",
-      "btcMacdPrompt": "استراتژی MACD را روی کندل‌های ۵ دقیقه‌ای 000001.SZ بک‌تست کن: fast=12، slow=26، signal=9، ۳۰ روز اخیر",
       "usTechMaxDiv": "پراکندگی ریسک بین سهام بزرگ",
       "usTechMaxDivDesc": "وزن‌دهی ۵ سهم بزرگ به‌گونه‌ای که هیچ نمادی ریسک را مسلط نکند (بهینه‌ساز حداکثر تنوع)",
-      "usTechMaxDivPrompt": "پورتفولیوی حداکثر تنوع را برای 600519.SH و 000858.SZ و 601318.SH و 000001.SZ و 600036.SH برای کل سال ۲۰۲۴ بک‌تست کن",
       "multiFactorAlpha": "مدل آلفای چندعاملی",
       "multiFactorAlphaDesc": "ترکیب ۴ سیگنال سهم‌گزینی روی ۳۰۰ سهم با وزن‌دهی بر اساس قدرت پیش‌بینی بازده (IC)",
       "multiFactorAlphaPrompt": "یک مدل آلفای چندعاملی با مومنتوم، بازگشت، نوسان و گردش معاملات روی اعضای CSI 300 با ترکیب وزنی مبتنی بر IC بساز و ۲۰۲۳ تا ۲۰۲۴ بک‌تست بگیر",
@@ -354,19 +346,16 @@
       "optionsGreeksPrompt": "گریک‌های آپشن را با بلک-شولز محاسبه کن: spot=100، strike=105، نرخ بدون ریسک=۳٪، نوسان=۲۵٪، سررسید=۹۰ روز؛ دلتا/گاما/تتا/وگا را تحلیل کن",
       "valueCommittee": "کمیته سرمایه‌گذاری ارزشی",
       "valueCommitteeDesc": "مناظره چهار استاد (بافیت / مانگر / دوان یونگ‌پینگ / لی لو) روی یک سهم",
-      "valueCommitteePrompt": "با run_swarm و پرست value_investing_committee شرکت تنسنت (00700.HK) را تحلیل کن: بافیت درباره خندق و قیمت، مانگر درباره وارونگی، دوان یونگ‌پینگ درباره کسب‌وکار و مدیریت، لی لو درباره قطعیت ده‌ساله؛ سپس رئیس اجماع و تناقض‌ها را جمع‌بندی کند",
       "bottleneckHunter": "شکارچی گلوگاه زنجیره تأمین",
       "bottleneckHunterDesc": "تأمین‌کنندگان کوچکی که یک روند بزرگ بدون آن‌ها ممکن نیست را پیدا کن و ارزانی‌شان را بسنج",
       "bottleneckHunterPrompt": "از مهارت bottleneck-hunter برای یافتن گلوگاه‌های لایه ۲/۳ زنجیره تأمین در زیرساخت هوش مصنوعی (اپتیک/لیزر/زیرلایه InP) استفاده کن؛ هر نقطه گلوگاه را امتیازده و شرکت‌های واجد شرط ارزش‌گذاری را فهرست کن",
       "thesisTracker": "ردیاب تِزیس سرمایه‌گذاری",
       "thesisTrackerDesc": "در ۵ جمله بنویس چرا سهام را نگه می‌داری و خطوط قرمزی که به فروش می‌رساند",
-      "thesisTrackerPrompt": "از مهارت thesis-tracker برای ساخت تِزیس سرمایه‌گذاری مائوتای کوئی‌جو (600519.SH) استفاده کن: تِزیس مرکزی ۵ جمله‌ای، فرض‌های ابطال‌پذیر، خطوط قرمز و لنگرهای ارزش‌گذاری، با financial_rigor راستی‌آزمایی شود",
       "valuationCheck": "بررسی گران‌بودن یک سهم",
       "valuationCheckDesc": "محاسبه دقیق PE / PB / ROE / ارزش بازار و آزمون فشار در ۳ سناریوی رشد",
       "valuationCheckPrompt": "از ابزار financial_rigor برای راستی‌آزمایی ارزش‌گذاری مائوتای کوئی‌جو استفاده کن: قیمت ۱۵۰۰، EPS برابر ۶۸.۶، ارزش دفتری هر سهم ۱۸۰ — دقیقاً PE و PB و ROE را حساب کن و سپس ارزش‌گذاری سه‌سناریویی (رشد ۱۲٪/۸٪/۰٪، PE برابر ۲۲/۱۸/۱۴، سه سال)",
       "investmentCommittee": "خرید یا فروش؟ کمیته تصمیم بگیرد",
       "investmentCommitteeDesc": "مناظره چندایجنسی: خرید در برابر فروش، بررسی ریسک، تصمیم مدیر پرتفوی",
-      "investmentCommitteePrompt": "[حالت تیمی Swarm] با پرست investment_committee ارزیابی کن که با توجه به شرایط فعلی بازار روی 600519.SH خرید یا فروش بگیریم",
       "quantStrategyDesk": "میز استراتژی کمّی",
       "quantStrategyDeskDesc": "خط لوله غربالگری ← پژوهش فاکتور ← بک‌تست ← ممیزی ریسک",
       "quantStrategyDeskPrompt": "[حالت تیمی Swarm] با پرست quant_strategy_desk بهترین استراتژی مومنتوم را روی اعضای CSI 300 پیدا و بک‌تست کن",
@@ -374,8 +363,6 @@
       "earningsReportDesc": "فایل PDF بارگذاری کنید و درباره ارقام مالی بپرسید",
       "earningsReportPrompt": "متریک‌های کلیدی مالی، ریسک‌ها و چشم‌انداز گزارش مالی بارگذاری‌شده را خلاصه کن",
       "macroResearch": "پژوهش وب: چشم‌انداز کلان",
-      "macroResearchDesc": "تحلیل کلان و چشم‌انداز بازار سهام A",
-      "macroResearchPrompt": "آخرین گزارش سیاست پولی بانک مرکزی را بخوان و تأثیر آن بر بازار سهام A را خلاصه کن",
       "analyzeBrokerExport": "تحلیل خروجی کارگزاری من",
       "analyzeBrokerExportDesc": "خروجی تونگ‌هواشون / ایست‌مانی / فوتو یا هر CSV — روزهای نگهداری، نرخ برد، نسبت سود به زیان، الگوی زمانی",
       "analyzeBrokerExportPrompt": "دفتر معاملاتی را که همین حالا بارگذاری کردم تحلیل کن — پروفایل کامل با آمار نگهداری، نرخ برد، نمادهای برتر و توزیع ساعتی",
@@ -390,7 +377,6 @@
       "analyzePortfolioPrompt": "با پروفایل کانکتور انتخاب‌شده، حساب، موقعیت‌ها، تمرکز، نقدی و ریسک پورتفولیوی من را خلاصه کن. هیچ سفارشی ثبت یا تغییر نده.",
       "quoteTrend": "نرخ و روند",
       "quoteTrendDesc": "دریافت نرخ لحظه‌ای و کندل‌های روزانه اخیر از کانکتور انتخاب‌شده",
-      "quoteTrendPrompt": "با کانکتور انتخاب‌شده نرخ 600519.SH و ۳۰ کندل روزانه بگیر و نرخ فعلی را با روند اخیر خلاصه کن. فقط‌خواندنی بمان.",
       "trainShadow": "آموزش سایه من از دفتر معاملات",
       "trainShadowDesc": "استخراج قواعد استراتژی شما از CSV کارگزاری و ذخیره پروفایل سایه",
       "trainShadowPrompt": "حساب سایه‌ام را از دفتر معاملاتی‌ای که همین حالا بارگذاری کردم آموزش بده — قواعد استخراج‌شده را نشان بده و تأیید کن که شبیه رفتار من است",
@@ -402,7 +388,19 @@
       "shadowReportPrompt": "گزارش سایه را بساز و نشانی آن را بده — با اختلاف شما-نسبت-به-سایه شروع کن",
       "adaptStrategy": "تطبیق راهبرد ثبت‌شده",
       "adaptStrategyDesc": "حفظ سیگنال و آزمون مجموعه دارایی جدید",
-      "adaptStrategyPrompt": "کمک کنید راهبرد ثبت‌شده را برای مجموعه دارایی و بازه زمانی جدید تطبیق دهم. ابتدا راهبردها و شواهد راهبرد اصلی را بررسی کنید و شناسه، دارایی‌ها، تاریخ‌ها و اندازه موقعیت‌های نامشخص را از من بپرسید. سیگنال را حفظ کنید، کد راهبرد فرزند را تولید و پس‌آزمایی کنید و فقط شواهد به‌روز خود آن را گزارش دهید."
+      "adaptStrategyPrompt": "کمک کنید راهبرد ثبت‌شده را برای مجموعه دارایی و بازه زمانی جدید تطبیق دهم. ابتدا راهبردها و شواهد راهبرد اصلی را بررسی کنید و شناسه، دارایی‌ها، تاریخ‌ها و اندازه موقعیت‌های نامشخص را از من بپرسید. سیگنال را حفظ کنید، کد راهبرد فرزند را تولید و پس‌آزمایی کنید و فقط شواهد به‌روز خود آن را گزارش دهید.",
+      "crossMarketPortfolioDesc": "Split money across 3 US/Canada stocks so each carries equal risk (risk parity), then compare to equal weights",
+      "crossMarketPortfolioPrompt": "Build a risk-parity portfolio with AAPL.US, MSFT.US, RY.TO, backtest for the full year of 2024, and compare with equal-weighted benchmark",
+      "usMacd": "US Equity MACD Strategy",
+      "usMacdDesc": "Minute-level US equity MACD strategy backtest",
+      "usMacdPrompt": "Backtest MACD strategy on AAPL.US 5-minute bars: fast=12, slow=26, signal=9, last 30 days",
+      "usTechMaxDivPrompt": "Backtest the maximum diversification portfolio for AAPL.US, MSFT.US, NVDA.US, AMZN.US, GOOGL.US for the full year of 2024",
+      "valueCommitteePrompt": "Use run_swarm with the value_investing_committee preset to analyze Apple (AAPL.US): Buffett on moat & price, Munger on inversion, Duan Yongping on business & management, Li Lu on 10-year certainty, then the chair synthesizes consensus and contradictions",
+      "thesisTrackerPrompt": "Use the thesis-tracker skill to build an investment thesis for Apple (AAPL.US): 5-sentence core thesis, falsifiable assumptions, red lines, and valuation anchors, verified with financial_rigor",
+      "investmentCommitteePrompt": "[Swarm Team Mode] Use the investment_committee preset to evaluate whether to go long or short on AAPL.US given current market conditions",
+      "macroResearchDesc": "Macro analysis and US market outlook",
+      "macroResearchPrompt": "Read the latest central bank monetary policy report and summarize its impact on the US market",
+      "quoteTrendPrompt": "Use the selected trading connector to fetch an AAPL.US quote and 30 daily bars, then summarize the current quote versus the recent trend. Keep it read-only."
     },
     "taskSubtitle": "درباره یک سهم، یک استراتژی یا پورتفولیوی خود بپرسید — داده را می‌کشم، محاسبه می‌کنم و همه گام‌ها را نشان می‌دهم.",
     "quickActions": "اقدامات سریع",
@@ -456,14 +454,11 @@
     "useDefaultModel": "استفاده از مدل پیش‌فرض",
     "useDefaultUrl": "استفاده از URL پیش‌فرض",
     "dataSourcesDesc": "منابع داده خارجی برای موتور بک‌تست را پیکربندی کنید.",
-    "tushareDesc": "داده تاریخی سهام A چین (نیازمند متغیر محیطی TUSHARE_TOKEN).",
-    "baostockDesc": "داده جایگزین سهام A از طریق پروتکل TCP (بدون نیاز به کلید API).",
     "status": "وضعیت",
     "installed": "نصب‌شده",
     "notInstalled": "نصب‌نشده",
     "token": "توکن",
     "tokenConfigured": "توکن پیکربندی‌شده",
-    "tokenNotSet": "متغیر محیطی TUSHARE_TOKEN تنظیم نشده است",
     "apiTimeout": "زمان انتظار درخواست API",
     "loaderAvailable": "بارگذار موجود",
     "noProjectLoader": "بارگذار پروژه موجود نیست",
@@ -1057,32 +1052,15 @@
       "noMarkets": "هیچ منبع داده بازار ثبت نشده است.",
       "howItWorksTitle": "نحوه‌ی کار",
       "howItWorks": "برای نمادهای خودتشخیص، منابع از بالا به پایین امتحان می‌شوند؛ منبعی که شکست بخورد به بعدی می‌رسد. ذخیره بلافاصله اعمال می‌شود — نیازی به راه‌اندازی مجدد نیست.",
-      "caliberCaveat": "هشدار کالیبره: منابع در مبنا تعدیل تفاوت دارند — مثلاً Yahoo قیمت خام (تعدیل‌نشده) می‌دهد اما Tencent/Eastmoney/Tushare/BaoStock قیمت تعدیل‌شده — پس تغییر ترتیب می‌تواند اعداد بک‌تست را عوض کند.",
       "markets": {
-        "a_share": "سهام چین (A-Share)",
         "us_equity": "سهام آمریکا",
-        "hk_equity": "سهام هنگ‌کنگ",
-        "india_equity": "سهام هند",
-        "kr_equity": "سهام کره",
         "ca_equity": "سهام کانادا",
-        "vietnam_equity": "سهام ویتنام",
-        "ar_equity": "سهام آرژانتین",
         "br_equity": "سهام برزیل",
-        "uk_equity": "سهام بریتانیا",
-        "index": "شاخص‌ها",
-        "crypto": "رمزارز",
-        "futures": "آتی",
-        "fund": "صندوق‌ها",
-        "macro": "کلان",
-        "forex": "فارکس"
-      }
+        "index": "شاخص‌ها"
+      },
+      "caliberCaveat": "Sources can use different price adjustments. Check the returned adjustment/provenance and run-card warnings; changing source order can change backtest results."
     },
-    "tushareToken": "توکن توشار",
-    "gildataToken": "توکن Gildata",
-    "clearTushareToken": "پاک‌کردن توکن توشار ذخیره‌شده",
-    "clearGildataToken": "پاک کردن توکن ذخیره‌شده Gildata",
     "saveDataSourceSettings": "ذخیره تنظیمات منبع داده",
-    "baostock": "بائواستاک",
     "loadLlmSettingsFailed": "بارگذاری تنظیمات LLM ناموفق بود: {{message}}",
     "loadDataSourceSettingsFailed": "بارگذاری تنظیمات منبع داده ناموفق بود: {{message}}",
     "llmSettingsSaved": "تنظیمات LLM ذخیره شد",
@@ -1096,9 +1074,7 @@
     "providerUsesManagedAuth": "این ارائه‌دهنده احراز هویت را مدیریت می‌کند. اجرا کنید: {{command}}",
     "noApiKeyRequired": "این ارائه‌دهنده کلید API لازم ندارد.",
     "keepCurrentToken": "برای حفظ توکن فعلی خالی بگذارید",
-    "iwencaiApiKey": "کلید API iWenCai",
     "fredApiKey": "کلید API FRED",
-    "iwencaiDesc": "برای غربالگری معنایی سهم از طریق iWenCai (问财) استفاده می‌شود. کلید رایگان لازم است.",
     "clearSavedKey": "پاک‌کردن کلید ذخیره‌شده",
     "fredDesc": "برای داده‌های کلان اقتصادی FRED (CPI، GDP، بیکاری و…) استفاده می‌شود. کلید رایگان از fred.stlouisfed.org.",
     "featureFlags": "پرچم‌های ویژگی",
@@ -1111,9 +1087,7 @@
     "providerChangeHint": "تغییر ارائه‌دهنده مدل و نقطه پایانی پیشنهادی را به‌روزرسانی می‌کند.",
     "oauth": "OAuth",
     "authentication": "احراز هویت",
-    "apiKey": "کلید API",
-    "tushareTokenDesc": "برای داده سهام A، آینده، صندوق و کلان چین استفاده می‌شود. اگر تنظیم نشود، در صورت وجود، پروژه به AKShare برمی‌گردد.",
-    "gildataTokenDesc": "داده اختیاری Gildata: قیمت روزانه تعدیل‌شده سهام A چین، قیمت خام سهام هنگ‌کنگ و شاخص‌ها، خالص ارزش دارایی صندوق‌های خارج از بورس، و ابزارهای اقتصاد کلان، اطلاعیه و پژوهش چین."
+    "apiKey": "کلید API"
   },
   "qveris": {
     "title": "بازار ابزار QVeris",
@@ -1159,7 +1133,6 @@
     "save": "ذخیره",
     "cancelGoal": "لغو هدف",
     "describeGoal": "هدف پژوهشی پیوست‌شده به این نشست را توصیف کنید",
-    "placeholder": "مثلاً آزمون یک استراتژی ساده میانگین متحرک روی 000001.SZ در سال ۲۰۲۴",
     "send": "ارسال پیام",
     "messageInputLabel": "پیام به ایجنت",
     "inputHint": "Enter برای ارسال · Shift+Enter برای خط جدید",
@@ -1236,7 +1209,8 @@
     "failedToResumeConnector": "ازسرگیری کانکتور ناموفق بود.",
     "tokenUsage": {
       "live": "توکن"
-    }
+    },
+    "placeholder": "e.g. Test a simple moving-average strategy on AAPL.US over 2024"
   },
   "runDetail": {
     "title": "جزئیات اجرا",
@@ -1404,19 +1378,9 @@
       "noPositions": "برای این اجرا وزن موقعیتی ثبت نشده است.",
       "holdingsCount": "{{count}} دارایی",
       "assetClass": {
-        "a_share": "سهام A",
         "us_equity": "سهام آمریکا",
-        "hk_equity": "سهام هنگ‌کنگ",
         "ca_equity": "سهام کانادا",
-        "kr_equity": "سهام کره",
-        "india_equity": "سهام هند",
-        "crypto": "رمزارز",
-        "futures": "آینده",
-        "forex": "فارکس",
-        "ar_equity": "سهام آرژانتین",
         "br_equity": "سهام برزیل",
-        "uk_equity": "سهام بریتانیا",
-        "vietnam_equity": "سهام ویتنام",
         "other": "سایر"
       }
     },
@@ -1492,7 +1456,6 @@
   "correlation": {
     "title": "ماتریس همبستگی",
     "assetCodes": "نمادهای دارایی",
-    "assetCodesHint": "نمادهای جدا با ویرگول، مثلاً 000001.SZ,600519.SH,000858.SZ",
     "windowDays": "پنجره (روز)",
     "method": "روش",
     "method_pearson": "پیرسون",
@@ -1506,7 +1469,8 @@
     "regimeSmoothed": "هموارشده",
     "regimeFused": "ترکیبی",
     "regimeEnterThreshold": "ورود",
-    "regimeExitThreshold": "خروج"
+    "regimeExitThreshold": "خروج",
+    "assetCodesHint": "Comma-separated ticker symbols, e.g. AAPL.US,MSFT.US,SPY.US"
   },
   "options": {
     "title": "آزمایشگاه آپشن",
@@ -1699,28 +1663,18 @@
     "zooCardTitle": {
       "qlib158": "Qlib 158",
       "alpha101": "۱۰۱ آلفای فرمولی کاکوشادزه",
-      "gtja191": "GTJA 191",
       "academic": "ناهنجاری‌های دانشگاهی",
       "fundamental": "بنیادی‌های PIT-safe"
     },
     "zooCardDesc": {
       "qlib158": "کتابخانه کامل ۱۵۸ ویژگی مایکروسافت Qlib شامل سیگنال‌های مومنتوم، نوسان، حجم و آماری غلتان.",
       "alpha101": "۱۰۱ آلفای فرمولی کاکوشادزه (۲۰۱۵)؛ سیگنال‌های مقطعی افق کوتاه.",
-      "gtja191": "۱۹۱ آلفای شرکت اوراق بهادار گووتای جون‌آن؛ سیگنال‌های تکنیکال و ریزساختاری متناسب با بازار سهام A چین.",
       "academic": "ناهنجاری‌های افق بلند گزینش‌شده از ادبیات دانشگاهی (ارزش، مومنتوم، کیفیت، کم‌نوسان و…).",
       "fundamental": "فاکتورهای کیفیت و ارزش محاسبه‌شده از ارقام شرکت‌های SEC با مبنای PIT-safe — بازده سود، ROE، سودآوری ناخالص، رشد دارایی (لنگر بر تاریخ ثبت)."
     },
     "universeOption": {
-      "csi300": "CSI 300 (سهام A چین)",
       "sp500": "S&P 500 (آمریکا)",
-      "btc-usdt": "BTC-USDT (رمزارز)",
-      "equity_cn": "سهام A چین",
-      "equity_us": "سهام آمریکا",
-      "equity_hk": "سهام هنگ‌کنگ",
-      "equity_in": "سهام هند",
-      "equity_kr": "سهام کره",
-      "crypto": "رمزارز",
-      "futures": "آینده"
+      "equity_us": "سهام آمریکا"
     },
     "themes": {
       "momentum": "مومنتوم",
@@ -1750,11 +1704,11 @@
     "selectAlphaForCompare": "انتخاب {{id}} برای مقایسه",
     "failedToLoadAlpha": "بارگذاری آلفا ناموفق بود",
     "failedToStartBench": "شروع بنچ ناموفق بود",
-    "singleAssetHint": "{{message}} برای IC مقطعی معنادار `sp500` یا `csi300` را امتحان کنید.",
     "benchStreamError": "خطای جریان بنچ",
     "job": "کار {{id}}…",
     "compareStreamError": "خطای جریان مقایسه",
-    "failedToStartComparison": "شروع مقایسه ناموفق بود"
+    "failedToStartComparison": "شروع مقایسه ناموفق بود",
+    "singleAssetHint": "{{message}} Try `sp500` for a meaningful cross-sectional IC."
   },
   "validation": {
     "noData": "داده اعتبارسنجی موجود نیست.",
@@ -1927,7 +1881,6 @@
     "featureAgent": "ایجنت هوش مصنوعی",
     "featureAgentDesc": "تولید استراتژی با زبان طبیعی و استدلال ReAct",
     "featureBacktest": "بک‌تست داخلی",
-    "featureBacktestDesc": "منابع داده متعدد پوشش‌دهنده تحلیل کمّی سهام A",
     "featureStreaming": "پخش زنده",
     "featureStreamingDesc": "فکر کردن، فراخوانی ابزار و تکرار ایجنت را ببینید",
     "featureReplay": "بازپخش استراتژی",
@@ -1940,7 +1893,8 @@
     "step3Title": "۳. نتایج را بررسی کنید",
     "step3Desc": "متریک‌های عملکرد، منحنی ارزش حساب و Pine Script قابل‌خروجی استراتژی را ببینید.",
     "step4Title": "۴. هر وقت آماده بودید واقعی شوید",
-    "step4Desc": "در صورت تمایل یک ماندیت معاملاتی با محدودیت‌های صریح مصوب کنید — بدون تأیید شما هیچ معامله‌ای انجام نمی‌شود."
+    "step4Desc": "در صورت تمایل یک ماندیت معاملاتی با محدودیت‌های صریح مصوب کنید — بدون تأیید شما هیچ معامله‌ای انجام نمی‌شود.",
+    "featureBacktestDesc": "Multiple data sources covering US and Canadian equities quantitative analysis"
   },
   "errorBoundary": {
     "somethingWrong": "خطایی رخ داد. برای ادامه صفحه را بازخوانی کنید."
@@ -2020,25 +1974,16 @@
     "factor_analysis": "تحلیل فاکتورها",
     "financial_rigor": "راستی‌آزمایی تحلیل مالی",
     "generate_backtest_config": "تولید پیکربندی بک‌تست",
-    "get_block_trades": "دریافت معاملات عمده",
-    "get_dragon_tiger": "دریافت فهرست اژدها-ببر",
     "get_financial_statements": "دریافت صورت‌های مالی",
     "get_fund_flow": "دریافت جریان صندوق",
     "get_fundamentals": "دریافت بنیادها",
-    "get_lockup_expiry": "دریافت انقضای قفل سهام",
     "get_macro_series": "دریافت سری‌های کلان",
-    "get_margin_trading": "دریافت معاملات مارجین",
     "get_market_data": "دریافت داده بازار",
-    "get_northbound_flow": "دریافت جریان شمال‌مقصد",
     "get_options_chain": "دریافت زنجیره آپشن",
     "get_research_goal": "مشاهده هدف پژوهشی",
-    "get_research_reports": "دریافت گزارش‌های پژوهشی",
     "get_sec_filings": "دریافت پرونده‌های SEC",
-    "get_sector_info": "دریافت داده بخش",
-    "get_shareholder_count": "دریافت تعداد سهامداران",
     "get_stock_news": "دریافت اخبار سهم",
     "get_stock_profile": "دریافت پروفایل سهم",
-    "iwencai_search": "جستجوی iWenCai",
     "link_autopilot_backtest": "پیوند بک‌تست اتوپایلوت",
     "link_backtest": "پیوند بک‌تست فرضیه",
     "load_skill": "بارگذاری دانش استراتژی",
@@ -2374,10 +2319,6 @@
     "evaluationScope": "{{count}} عامل در یک مجموعه سهام ارزیابی خواهد شد.",
     "checkingData": "در حال بررسی نیازهای داده…",
     "ready_public_data": "از داده عمومی استفاده می‌کند. دسترسی هنگام اجرا بررسی می‌شود.",
-    "ready_tushare_ready": "Tushare تنظیم شده است. CSI 300 به مجوز داده روزانه، ضریب تعدیل و اعضای تاریخی نیز نیاز دارد.",
-    "ready_tushare_token_missing": "CSI 300 به توکن Tushare و مجوز داده نیاز دارد. آن را در تنظیمات وارد کنید یا از S&P 500 استفاده کنید.",
-    "ready_tushare_dependency_missing": "وابستگی Tushare را نصب کنید یا از S&P 500 استفاده کنید.",
-    "ready_single_asset": "BTC-USDT یک دارایی است؛ IC مقطعی به مجموعه‌ای از سهام نیاز دارد. CSI 300 یا S&P 500 را انتخاب کنید.",
     "stage_loading_data": "در حال بارگذاری مجموعه سهام و تاریخچه قیمت…",
     "stage_preparing_returns": "در حال آماده‌سازی بازده‌های آتی…",
     "stage_computing": "در حال محاسبه امتیاز عامل‌ها…",
@@ -2393,7 +2334,8 @@
     "degradedUniverse": "فهرست اعضای شاخص دریافت نشد؛ این اجرا از مجموعه جایگزین کوچک‌تر و اعلام‌شده استفاده می‌کند.",
     "selectedFactor": "عامل انتخابی: {{id}}. فقط همین عامل ارزیابی می‌شود.",
     "fundamentalsRequirement": "عامل‌های بنیادی به صورت‌های مالی SEC در زمان دسترسی واقعی و مجموعه سهام آمریکا (S&P 500) نیاز دارند.",
-    "noEvaluableFactors": "هیچ عاملی قابل ارزیابی نبود. تاریخچه طولانی‌تری امتحان کنید و فیلدهای لازم و مجموعه سهام عامل را بررسی کنید."
+    "noEvaluableFactors": "هیچ عاملی قابل ارزیابی نبود. تاریخچه طولانی‌تری امتحان کنید و فیلدهای لازم و مجموعه سهام عامل را بررسی کنید.",
+    "ready_single_asset": "BTC is one asset; cross-sectional IC needs a stock universe. Choose S&P 500 or S&P 500."
   },
   "customProviders": {
     "loadFailed": "بارگذاری ارائه‌دهندگان سفارشی ناموفق بود",

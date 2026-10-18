@@ -301,7 +301,7 @@ def test_run_bench_strict_places_oos_after_training_cutoff(
     _stub_panel(monkeypatch, n_rows=120)
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=True,
         n_random_seeds=2,
@@ -324,7 +324,7 @@ def test_oos_boundary_with_no_usable_alpha_rows_returns_error(
     _stub_panel(monkeypatch, n_rows=80)
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=False,
         registry=_StubRegistry(panel={}),
@@ -340,7 +340,7 @@ def test_oos_boundary_with_no_usable_alpha_rows_returns_error(
 def test_run_bench_strict_rejects_two_oos_boundaries() -> None:
     result = run_bench_strict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2024-2024",
         random_control=True,
         oos_split="2024-03-01",

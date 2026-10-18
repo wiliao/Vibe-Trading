@@ -36,7 +36,7 @@ from src.agent.grounding.figures import (
 
 pytestmark = pytest.mark.unit
 
-SYMBOL = "159516.SZ"
+SYMBOL = "AAPL.US"
 
 
 def _market_payload() -> str:
@@ -63,9 +63,9 @@ def _market_payload() -> str:
             ],
             "_provenance": {
                 SYMBOL: {
-                    "source": "akshare",
+                    "source": "yahoo",
                     "requested_source": "auto",
-                    "detected_source": "akshare",
+                    "detected_source": "yahoo",
                     "fallback_used": False,
                     "currency_conversion": "none",
                 }
@@ -74,7 +74,7 @@ def _market_payload() -> str:
     )
 
 
-def _ledger(tmp_path: Path, *, message: str = "分析 159516.SZ 并给出买入价") -> GroundingLedger:
+def _ledger(tmp_path: Path, *, message: str = "分析 AAPL.US 并给出买入价") -> GroundingLedger:
     ledger = GroundingLedger(run_dir=tmp_path, user_message=message)
     ledger.ingest_tool_result(
         tool_name="get_market_data",
@@ -86,7 +86,7 @@ def _ledger(tmp_path: Path, *, message: str = "分析 159516.SZ 并给出买入�
     return ledger
 
 
-HDR = "159516.SZ（akshare，CNY）最新收盘 0.666 元。"
+HDR = "AAPL.US（yahoo，USD）最新收盘 0.666 美元。"
 
 HDR_ROW = "0.666 | observed | close 2026-09-09 | c1"
 
@@ -104,7 +104,7 @@ def test_the_block_parses_the_spec_example() -> None:
     """Every role, every optional field, exactly as §2 writes it."""
     block = parse_figures_block(
         "answer text\n\n```figures\n"
-        "0.666 | observed | 159516.SZ close 2026-09-09 | c1\n"
+        "0.666 | observed | AAPL.US close 2026-09-09 | c1\n"
         "0.646 | derived  | 0.666 × 0.97 | c1\n"
         "37%   | derived  | (0.666 − 1.053) / 1.053 | c1\n"
         "0.95  | proposed | entry\n"
@@ -297,12 +297,12 @@ def test_structural_shapes_need_no_declaration(text: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "收盘 0.666 元",                          # decimal
+        "收盘 0.666 美元",                          # decimal
         "回撤 37%",                               # percent
         "回撤 37 ％",                             # full-width percent
-        "成本 820 CNY",                           # integer + ISO code
+        "成本 820 USD",                           # integer + ISO code
         "entry at $100",                          # integer + currency symbol
-        "报价 100 元",                            # integer + CJK currency
+        "报价 100 美元",                            # integer + CJK currency
         "| 收盘 |\n|---|\n| 0.666 |",             # table cell
         "The close was 0.666",                    # decimal, English prose
         "Down 37% from the high",                 # percent, English prose
@@ -353,14 +353,14 @@ def test_a_bare_integer_inside_a_table_cell_is_still_a_measurement(
     a value the report is presenting as data, so it is. The pair below is the
     whole rule: the same "300" passes in prose and is checked in a cell.
     """
-    prose = "159516.SZ（akshare，CNY）指数覆盖 300 只成分股。"
-    cell = "| 代码 | 收盘 |\n|---|---|\n| 159516.SZ | 300 |\n"
+    prose = "AAPL.US（yahoo，USD）指数覆盖 300 只成分股。"
+    cell = "| 代码 | 收盘 |\n|---|---|\n| AAPL.US | 300 |\n"
 
     assert _shapes(prose)["300"] == "bare"
     assert _shapes(cell)["300"] == "measured"
     assert _ledger(tmp_path).validate_final_answer(prose).valid is True
     rejected = _ledger(tmp_path).validate_final_answer(
-        "159516.SZ（akshare，CNY）\n\n" + cell
+        "AAPL.US（yahoo，USD）\n\n" + cell
     )
     assert [issue["value"] for issue in rejected.issues] == ["300"]
 
@@ -384,9 +384,9 @@ def test_a_market_data_rows_own_volume_is_evidence(tmp_path: Path) -> None:
 
 
 def test_a_currency_word_is_bounded_so_a_cjk_word_is_not_money() -> None:
-    """"3 元宵节后" is not three yuan; "3 美元" is three dollars."""
-    assert _shapes("买入 3 美元")["3"] == "measured"
-    assert _shapes("3 元宵节后关注")["3"] == "bare"
+    """"3 美元宵节后" is not three yuan; "3 美美元" is three dollars."""
+    assert _shapes("买入 3 美美元")["3"] == "measured"
+    assert _shapes("3 美元宵节后关注")["3"] == "bare"
 
 
 def _measured(text: str) -> set[str]:
@@ -402,7 +402,7 @@ def test_a_fenced_code_block_is_not_prose() -> None:
 
 def test_a_date_column_and_a_symbol_column_are_exempt_inside_a_table() -> None:
     """A table declares its own columns; its date is not a measurement."""
-    text = "| 日期 | 代码 | 收盘 |\n|---|---|---|\n| 2026-09-09 | 159516.SZ | 0.666 |"
+    text = "| 日期 | 代码 | 收盘 |\n|---|---|---|\n| 2026-09-09 | AAPL.US | 0.666 |"
     assert _measured(text) == {"0.666"}
 
 
@@ -416,7 +416,7 @@ def test_observed_passes_on_evidence_and_fails_off_it(tmp_path: Path) -> None:
 
     grounded = ledger.validate_final_answer(HDR + _block(HDR_ROW))
     invented = ledger.validate_final_answer(
-        "159516.SZ（akshare，CNY）最新收盘 0.888 元。"
+        "AAPL.US（yahoo，USD）最新收盘 0.888 美元。"
         + _block("0.888 | observed | close | c1")
     )
 
@@ -452,13 +452,13 @@ def test_derived_passes_on_its_own_arithmetic_and_fails_without_it(
     ledger = _ledger(tmp_path)
 
     correct = ledger.validate_final_answer(
-        HDR + declared_parameter("97%") + " 第一档 0.646 元。" + _block(HDR_ROW, "0.646 | derived | 0.666 × 0.97 | c1")
+        HDR + declared_parameter("97%") + " 第一档 0.646 美元。" + _block(HDR_ROW, "0.646 | derived | 0.666 × 0.97 | c1")
     )
     wrong_result = ledger.validate_final_answer(
-        HDR + declared_parameter("97%") + " 第一档 0.700 元。" + _block(HDR_ROW, "0.700 | derived | 0.666 × 0.97 | c1")
+        HDR + declared_parameter("97%") + " 第一档 0.700 美元。" + _block(HDR_ROW, "0.700 | derived | 0.666 × 0.97 | c1")
     )
     unanchored = ledger.validate_final_answer(
-        HDR + declared_parameter("97%") + " 第一档 0.646 元。" + _block(HDR_ROW, "0.646 | derived | 0.500 × 1.292 | c1")
+        HDR + declared_parameter("97%") + " 第一档 0.646 美元。" + _block(HDR_ROW, "0.646 | derived | 0.500 × 1.292 | c1")
     )
 
     assert correct.valid is True, correct.issues
@@ -475,13 +475,13 @@ def test_derived_currency_must_match_evidence(tmp_path: Path) -> None:
     matching = ledger.validate_final_answer(
         HDR
         + declared_parameter("97%")
-        + " 第一档 0.646 CNY。"
+        + " 第一档 0.646 USD。"
         + _block(HDR_ROW, row)
     )
     mismatched = ledger.validate_final_answer(
         HDR
         + declared_parameter("97%")
-        + " 第一档 0.646 USD。"
+        + " 第一档 0.646 CAD。"
         + _block(HDR_ROW, row)
     )
 
@@ -494,7 +494,7 @@ def test_derived_covers_only_the_value_it_declares(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        HDR + declared_parameter("97%") + " 第一档 0.646 元，第二档 0.400 元。"
+        HDR + declared_parameter("97%") + " 第一档 0.646 美元，第二档 0.400 美元。"
         + _block(HDR_ROW, "0.646 | derived | 0.666 × 0.97 | c1", "0.400 | proposed | 第二档")
     )
 
@@ -506,16 +506,16 @@ def test_proposed_passes_inside_the_observed_range_and_fails_outside_it(
 ) -> None:
     """§1 decision 2, with the spec's own two numbers.
 
-    0.65 is inside 159516.SZ's observed 0.567–1.053 and passes; 0.881 against
+    0.65 is inside AAPL.US's observed 0.567–1.053 and passes; 0.881 against
     a session that only observed 1.110–1.180 does not.
     """
     ledger = _ledger(tmp_path)
 
     inside = ledger.validate_final_answer(
-        HDR + " 建议买入价 0.65 元。" + _block(HDR_ROW, "0.65 | proposed | entry")
+        HDR + " 建议买入价 0.65 美元。" + _block(HDR_ROW, "0.65 | proposed | entry")
     )
     outside = ledger.validate_final_answer(
-        HDR + " 建议买入价 2.50 元。" + _block(HDR_ROW, "2.50 | proposed | entry")
+        HDR + " 建议买入价 2.50 美元。" + _block(HDR_ROW, "2.50 | proposed | entry")
     )
 
     assert inside.valid is True, inside.issues
@@ -527,7 +527,7 @@ def test_proposed_outside_the_range_passes_with_a_derivation(tmp_path: Path) -> 
     ledger = _ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        HDR + declared_parameter("2") + " 目标价 1.332 元。" + _block(HDR_ROW, "1.332 | proposed | 0.666 × 2 | c1")
+        HDR + declared_parameter("2") + " 目标价 1.332 美元。" + _block(HDR_ROW, "1.332 | proposed | 0.666 × 2 | c1")
     )
 
     assert result.valid is True, result.issues
@@ -537,11 +537,11 @@ def test_proposed_currency_must_match_evidence(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
 
     matching = ledger.validate_final_answer(
-        HDR + " 建议买入价 0.65 CNY。"
+        HDR + " 建议买入价 0.65 USD。"
         + _block(HDR_ROW, "0.65 | proposed | entry")
     )
     mismatched = ledger.validate_final_answer(
-        HDR + " 建议买入价 0.65 USD。"
+        HDR + " 建议买入价 0.65 CAD。"
         + _block(HDR_ROW, "0.65 | proposed | entry")
     )
 
@@ -596,7 +596,7 @@ def test_undeclared_mode_validates_measurements_as_observed(tmp_path: Path) -> N
     ledger = _ledger(tmp_path)
 
     correct = ledger.validate_final_answer(HDR)
-    invented = ledger.validate_final_answer("159516.SZ（akshare，CNY）最新收盘 0.888 元。")
+    invented = ledger.validate_final_answer("AAPL.US（yahoo，USD）最新收盘 0.888 美元。")
 
     assert correct.valid is True, correct.issues
     assert [issue["code"] for issue in invented.issues] == ["numeric_claim_conflict"]
@@ -606,7 +606,7 @@ def test_undeclared_mode_does_not_guess_proposed_or_derived(tmp_path: Path) -> N
     """§4: it names the figures to declare instead of inventing a role for them."""
     ledger = _ledger(tmp_path)
 
-    result = ledger.validate_final_answer(HDR + " 建议买入价 0.646 元（0.666 × 0.97）。")
+    result = ledger.validate_final_answer(HDR + " 建议买入价 0.646 美元（0.666 × 0.97）。")
 
     assert result.valid is False
     assert {issue["role"] for issue in result.issues} == {"observed"}
@@ -625,7 +625,7 @@ def test_the_correction_prompt_names_each_figure_and_its_reason(
     """
     ledger = _ledger(tmp_path)
     validation = ledger.validate_final_answer(
-        HDR + " 建议买入价 2.50 元。" + _block(HDR_ROW, "2.50 | proposed | entry")
+        HDR + " 建议买入价 2.50 美元。" + _block(HDR_ROW, "2.50 | proposed | entry")
     )
 
     prompt = ledger.correction_prompt(validation)
@@ -649,7 +649,7 @@ def test_a_value_is_called_repeated_only_from_its_second_rejection(
     "repeatedly", which is false and trains it to ignore the line.
     """
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 2.50 元。" + _block(HDR_ROW, "2.50 | proposed | entry")
+    draft = HDR + " 建议买入价 2.50 美元。" + _block(HDR_ROW, "2.50 | proposed | entry")
 
     first = ledger.correction_prompt(ledger.validate_final_answer(draft))
     second = ledger.correction_prompt(ledger.validate_final_answer(draft))
@@ -690,8 +690,8 @@ def test_the_verdict_does_not_depend_on_the_words_around_the_figure(
     citation subject, a forecast frame — and the branch decided the verdict.
     """
     sentences = [
-        "收盘 0.666 元。", "现价 0.666 元。", "目标位 0.666 元。", "支撑位 0.666 元。",
-        "SMA20 位于 0.666 元。", "预计 0.666 元。", "论文称 0.666 元。", "0.666 元。",
+        "收盘 0.666 美元。", "现价 0.666 美元。", "目标位 0.666 美元。", "支撑位 0.666 美元。",
+        "SMA20 位于 0.666 美元。", "预计 0.666 美元。", "论文称 0.666 美元。", "0.666 美元。",
         "The close was 0.666.", "Target 0.666.", "Support at 0.666.",
         "It last traded at 0.666.",
     ]
@@ -699,7 +699,7 @@ def test_the_verdict_does_not_depend_on_the_words_around_the_figure(
 
     verdicts = {
         sentence: ledger.validate_final_answer(
-            "159516.SZ（akshare，CNY）" + sentence + _block(HDR_ROW)
+            "AAPL.US（yahoo，USD）" + sentence + _block(HDR_ROW)
         ).valid
         for sentence in sentences
     }
@@ -712,15 +712,15 @@ def test_a_fabricated_figure_is_refused_under_all_the_same_words(
 ) -> None:
     """The other side of the same property, so it is not satisfied by "accept"."""
     sentences = [
-        "收盘 0.888 元。", "现价 0.888 元。", "目标位 0.888 元。", "支撑位 0.888 元。",
-        "SMA20 位于 0.888 元。", "论文称 0.888 元。", "0.888 元。",
+        "收盘 0.888 美元。", "现价 0.888 美元。", "目标位 0.888 美元。", "支撑位 0.888 美元。",
+        "SMA20 位于 0.888 美元。", "论文称 0.888 美元。", "0.888 美元。",
         "The close was 0.888.", "Support at 0.888.", "It last traded at 0.888.",
     ]
     ledger = _ledger(tmp_path)
 
     verdicts = {
         sentence: ledger.validate_final_answer(
-            "159516.SZ（akshare，CNY）" + sentence
+            "AAPL.US（yahoo，USD）" + sentence
             + _block("0.888 | observed | close | c1")
         ).valid
         for sentence in sentences
@@ -756,8 +756,8 @@ def test_the_chinese_prompt_example_passes_the_gate_it_describes(tmp_path: Path)
     """The example sits on the same two bars this module probes with."""
     ledger = _ledger(tmp_path)
     prose = (
-        "159516.SZ（akshare，CNY）最新收盘 0.666 元，第一档 0.646 元，"
-        "折扣系数97%。较 5 月高点回撤 37%，买入参考 0.62 元。"
+        "AAPL.US（yahoo，USD）最新收盘 0.666 美元，第一档 0.646 美元，"
+        "折扣系数97%。较 5 月高点回撤 37%，买入参考 0.62 美元。"
     )
 
     result = ledger.validate_final_answer(prose + "\n\n" + _prompt_blocks()[0])
@@ -774,7 +774,7 @@ def test_the_chinese_prompt_example_passes_the_gate_it_describes(tmp_path: Path)
         ("答案。\n\n``", len("答案。\n\n")),
         ("答案。\n\n```fig", len("答案。\n\n")),
         ("答案。\n```python\nx = 1\n", len("答案。\n```python\nx = 1\n")),
-        ("收盘 0.666 元。", len("收盘 ")),            # an unchecked measurement waits
+        ("收盘 0.666 美元。", len("收盘 ")),            # an unchecked measurement waits
         ("复盘 3", len("复盘 ")),                     # a number still being written waits
         ("复盘 3 次。", len("复盘 3 次。")),          # a finished bare integer streams
     ],
@@ -792,13 +792,13 @@ def test_a_magnitude_mark_scales_the_comparison_not_the_shape(tmp_path: Path) ->
     ledger = _ledger(tmp_path)
 
     in_millions = ledger.validate_final_answer(
-        HDR + " 成交量 0.235M 手。" + _block(HDR_ROW, "0.235M | observed | volume 2026-09-09 | 159516.SZ")
+        HDR + " 成交量 0.235M 手。" + _block(HDR_ROW, "0.235M | observed | volume 2026-09-09 | AAPL.US")
     )
     in_wan = ledger.validate_final_answer(
         HDR + " 成交量 23.46万 手。" + _block(HDR_ROW, "23.46 | observed | volume 2026-09-09 | c1")
     )
     invented = ledger.validate_final_answer(
-        HDR + " 成交量 0.300M 手。" + _block(HDR_ROW, "0.300M | observed | volume | 159516.SZ")
+        HDR + " 成交量 0.300M 手。" + _block(HDR_ROW, "0.300M | observed | volume | AAPL.US")
     )
 
     assert in_millions.valid, in_millions.issues
@@ -852,7 +852,7 @@ def test_an_untagged_fence_is_prose_and_a_tagged_one_is_code() -> None:
 
 _RANKED = (
     "| # | 代码 | 市盈率 |\n|---|---|---|\n"
-    "| 1 | 159516.SZ | 45 |\n| 2 | 159516.SZ | 38 |\n| 3 | 159516.SZ | 52 |\n"
+    "| 1 | AAPL.US | 45 |\n| 2 | AAPL.US | 38 |\n| 3 | AAPL.US | 52 |\n"
 )
 
 
@@ -915,6 +915,6 @@ def test_a_cell_is_read_as_prose_only_where_it_holds_words(cell: str, figure: st
 
 def test_words_in_a_price_column_cell_do_not_unbind_it() -> None:
     """The header bound the column to a close; "300 est" under it is still a close."""
-    table = "| 代码 | 收盘 |\n|---|---|\n| 159516.SZ | 300 est |\n"
+    table = "| 代码 | 收盘 |\n|---|---|\n| AAPL.US | 300 est |\n"
     shapes = {f.text: f.shape for f in scan_figures(table, parse_figures_block(table))}
     assert shapes["300"] == "measured"

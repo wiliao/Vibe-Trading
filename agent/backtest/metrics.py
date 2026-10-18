@@ -236,7 +236,7 @@ def buy_and_hold_return(close: Any) -> Optional[float]:
     return last / first - 1.0
 
 
-def win_rate_and_stats(trades: List[TradeRecord]) -> Dict[str, float]:
+def win_rate_and_stats(trades: List[TradeRecord]) -> Dict[str, Optional[float]]:
     """Win rate and P&L statistics from completed trades.
 
     Args:
@@ -244,7 +244,9 @@ def win_rate_and_stats(trades: List[TradeRecord]) -> Dict[str, float]:
 
     Returns:
         Dict with win_rate, profit_loss_ratio, max_consecutive_loss,
-        avg_holding_bars, profit_factor.
+        avg_holding_bars, profit_factor. profit_loss_ratio and profit_factor
+        are ``None`` when no trade lost, since both divide by the losses.
+        Average holding bars includes valid zero-duration completed trades.
     """
     if not trades:
         return {
@@ -260,13 +262,16 @@ def win_rate_and_stats(trades: List[TradeRecord]) -> Dict[str, float]:
 
     win_rate = len(wins) / len(trades)
 
+    # With no losing trade both ratios have no denominator. 0.0 would read as
+    # "no profit at all" and rank a run that never lost below every other run,
+    # so they are None: an empty metrics.csv cell and null in JSON.
     avg_win = float(np.mean(wins)) if wins else 0.0
-    avg_loss = abs(float(np.mean(losses))) if losses else 1e-10
-    profit_loss_ratio = avg_win / avg_loss if avg_loss > 1e-10 else 0.0
+    avg_loss = abs(float(np.mean(losses))) if losses else 0.0
+    profit_loss_ratio = avg_win / avg_loss if avg_loss > 1e-10 else None
 
     gross_profit = sum(wins) if wins else 0.0
-    gross_loss = abs(sum(losses)) if losses else 1e-10
-    profit_factor = gross_profit / gross_loss if gross_loss > 1e-10 else 0.0
+    gross_loss = abs(sum(losses)) if losses else 0.0
+    profit_factor = gross_profit / gross_loss if gross_loss > 1e-10 else None
 
     max_consec = 0
     cur_consec = 0
@@ -277,15 +282,19 @@ def win_rate_and_stats(trades: List[TradeRecord]) -> Dict[str, float]:
         else:
             cur_consec = 0
 
-    hold_bars = [t.holding_bars for t in trades if t.holding_bars > 0]
+    # A completed same-bar trade has a valid zero duration and still counts
+    # in the per-trade average. Keep excluding invalid negative durations.
+    hold_bars = [t.holding_bars for t in trades if t.holding_bars >= 0]
     avg_holding = float(np.mean(hold_bars)) if hold_bars else 0.0
 
     return {
         "win_rate": win_rate,
-        "profit_loss_ratio": round(profit_loss_ratio, 4),
+        "profit_loss_ratio": (
+            round(profit_loss_ratio, 4) if profit_loss_ratio is not None else None
+        ),
         "max_consecutive_loss": max_consec,
         "avg_holding_bars": round(avg_holding, 1),
-        "profit_factor": round(profit_factor, 4),
+        "profit_factor": round(profit_factor, 4) if profit_factor is not None else None,
     }
 
 
@@ -431,6 +440,22 @@ def calc_fill_turnover_series(
     return (traded_margin / denominator).replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
 
+def period_returns(equity_curve: pd.Series, initial_cash: float) -> pd.Series:
+    """Per-bar returns seeded with the pre-first-bar cash mark.
+
+    The account holds ``initial_cash`` before the first recorded bar, so the
+    first return measures that bar's fill from cash rather than starting the
+    series at a hard zero. ``prod(1 + r) - 1`` then reproduces
+    ``equity[-1] / initial_cash - 1`` exactly, which is what ``total_return``
+    and the drawdown path already assume. When the first bar carries no fill
+    (equity == cash) the seed is 0 and the series matches a plain pct_change.
+    """
+    ret = equity_curve.pct_change(fill_method=None)
+    if len(ret) and np.isfinite(initial_cash) and initial_cash > 0:
+        ret.iloc[0] = equity_curve.iloc[0] / float(initial_cash) - 1.0
+    return ret
+
+
 def calc_metrics(
     equity_curve: pd.Series,
     trades: List[TradeRecord],
@@ -468,7 +493,7 @@ def calc_metrics(
     else:
         bpy = bars_per_year
 
-    port_ret = equity_curve.pct_change().fillna(0.0)
+    port_ret = period_returns(equity_curve, initial_cash).fillna(0.0)
     # Equity that touches zero then recovers (100 → 0 → 50) yields non-finite
     # pct_change values; options metrics already skip risk ratios in that case.
     returns_finite = bool(np.isfinite(port_ret.to_numpy(dtype=float, copy=False)).all())
@@ -492,7 +517,7 @@ def calc_metrics(
             ann_ret = float("inf")
     # ``Series.std()`` uses ddof=1, so a single-observation return series
     # (e.g. a one-bar backtest) yields NaN and poisons the Sharpe ratio.
-    # Guard the small sample the same way ``downside_std`` is guarded below.
+    # Guard the small sample before calculating volatility.
     vol = float(port_ret.std()) if len(port_ret) > 1 and returns_finite else 0.0
     sharpe = (
         float(port_ret.mean() / (vol + 1e-10) * np.sqrt(bpy))
@@ -512,12 +537,18 @@ def calc_metrics(
     max_dd = float(dd.min())
 
     calmar = ann_ret / abs(max_dd) if abs(max_dd) > 1e-10 else 0.0
+    if not np.isfinite(calmar):
+        calmar = 0.0
 
-    # Sortino
+    # Sortino: zero-target downside RMS, with all return periods in the divisor.
     if returns_finite:
         downside = port_ret[port_ret < 0]
-        downside_std = float(downside.std()) if len(downside) > 1 else 1e-10
-        sortino = float(port_ret.mean() / (downside_std + 1e-10) * np.sqrt(bpy))
+        downside_deviation = (
+            float(np.sqrt((downside**2).sum() / len(port_ret)))
+            if len(downside) > 0
+            else 1e-10  # Preserve the existing no-downside fallback.
+        )
+        sortino = float(port_ret.mean() / (downside_deviation + 1e-10) * np.sqrt(bpy))
     else:
         sortino = 0.0
     if not np.isfinite(sortino):
@@ -548,7 +579,7 @@ def calc_metrics(
         excess = total_ret - bench_return
         aligned_bench = bench_ret.reindex(port_ret.index).fillna(0.0)
         active_ret = port_ret - aligned_bench
-        # Same ddof=1 small-sample guard as ``vol`` / ``downside_std`` so the
+        # Same ddof=1 small-sample guard as ``vol`` so the
         # information ratio stays finite for a single-observation series.
         active_std = float(active_ret.std()) if len(active_ret) > 1 and returns_finite else 0.0
         ir = (

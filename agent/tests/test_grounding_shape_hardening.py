@@ -21,10 +21,10 @@ from src.agent.grounding.figures import Figure, parse_figures_block, scan_figure
 
 pytestmark = pytest.mark.unit
 
-SYMBOL = "159516.SZ"
-HDR = "159516.SZ（akshare，CNY）最新收盘 0.666 元。"
+SYMBOL = "AAPL.US"
+HDR = "AAPL.US（yahoo，USD）最新收盘 0.666 美元。"
 HDR_ROW = "0.666 | observed | close 2026-09-09 | c1"
-LEAD = "159516.SZ（akshare，CNY）"
+LEAD = "AAPL.US（yahoo，USD）"
 
 BACKSLASH = chr(92)
 NBSP, NNBSP, FIGURE_SPACE = chr(0x00A0), chr(0x202F), chr(0x2007)
@@ -44,8 +44,8 @@ def _market_payload() -> str:
                  "close": 0.666, "volume": 234567},
             ],
             "_provenance": {
-                SYMBOL: {"source": "akshare", "requested_source": "auto",
-                         "detected_source": "akshare", "fallback_used": False,
+                SYMBOL: {"source": "yahoo", "requested_source": "auto",
+                         "detected_source": "yahoo", "fallback_used": False,
                          "currency_conversion": "none"}
             },
         }
@@ -53,7 +53,7 @@ def _market_payload() -> str:
 
 
 def _ledger(tmp_path: Path) -> GroundingLedger:
-    ledger = GroundingLedger(run_dir=tmp_path, user_message="分析 159516.SZ 并给出买入价")
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="分析 AAPL.US 并给出买入价")
     ledger.ingest_tool_result(
         tool_name="get_market_data",
         arguments={"codes": [SYMBOL]},
@@ -111,7 +111,7 @@ def test_a_disguised_decimal_is_checked_as_the_decimal_it_renders(
 
 
 def test_every_figure_keeps_its_original_spelling_and_offsets() -> None:
-    text = f"A 0{chr(0x200B)}.888 B 5{BACKSLASH}% C 0&#46;5 D 52{NBSP}% E CNY0.888"
+    text = f"A 0{chr(0x200B)}.888 B 5{BACKSLASH}% C 0&#46;5 D 52{NBSP}% E USD0.888"
 
     figures = _figures(text)
 
@@ -120,7 +120,7 @@ def test_every_figure_keeps_its_original_spelling_and_offsets() -> None:
     ]
     assert all(text[figure.start : figure.end] == figure.text for figure in figures)
     assert [figure.digits for figure in figures] == ["0.888", "5", "0.5", "52", "0.888"]
-    assert text[slice(*figures[-1].extent)] == "CNY0.888"
+    assert text[slice(*figures[-1].extent)] == "USD0.888"
 
 
 @pytest.mark.parametrize("space", [NBSP, NNBSP, FIGURE_SPACE])
@@ -160,11 +160,11 @@ def test_an_escaped_percent_sign_is_a_percent(written: str, value: float) -> Non
 
 
 def test_an_iso_code_glued_to_digits_is_a_currency_mark(tmp_path: Path) -> None:
-    """The identifier lookbehind used to turn "CNY0.888" into a bare "888"."""
+    """The identifier lookbehind used to turn "USD0.888" into a bare "888"."""
     ledger = _ledger(tmp_path)
 
-    refused = ledger.validate_final_answer(f"{LEAD}最新收盘 CNY0.888。")
-    passed = ledger.validate_final_answer(f"{LEAD}最新收盘 CNY0.666。")
+    refused = ledger.validate_final_answer(f"{LEAD}最新收盘 USD0.888。")
+    passed = ledger.validate_final_answer(f"{LEAD}最新收盘 USD0.666。")
 
     assert _values(refused) == ["0.888"]
     assert passed.valid, passed.issues
@@ -182,8 +182,8 @@ def test_an_iso_code_glued_to_digits_is_a_currency_mark(tmp_path: Path) -> None:
         ("Cost 100 EUR", "EUR"),
         ("Cost €100", "EUR"),
         ("Cost £100", "GBP"),
-        ("Cost 100 CNY", "CNY"),
-        ("Cost 100 人民币", "CNY"),
+        ("Cost 100 USD", "USD"),
+        ("Cost 100 美元", "USD"),
         ("Cost ¥100", None),
         ("Cost $100", None),
         ("Cost 100 shares", None),
@@ -205,13 +205,13 @@ def test_currency_identity_is_preserved(
 @pytest.mark.parametrize(
     ("text", "value", "percent"),
     [
-        ("Schlusskurs 0,666 CNY", 0.666, False),
+        ("Schlusskurs 0,666 USD", 0.666, False),
         ("0,5 im Mittel", 0.5, False),
         ("12,5 %", 12.5, True),
         ("3,95 EUR", 3.95, False),
         ("€3,95", 3.95, False),
         ("drawdown −5,13%", -5.13, True),
-        ("3,50 美元", 3.5, False),
+        ("3,50 美美元", 3.5, False),
     ],
 )
 def test_a_decimal_comma_is_read_as_a_decimal(text: str, value: float, percent: bool) -> None:
@@ -238,8 +238,8 @@ def test_a_thousands_grouping_stays_grouped(text: str, values: list[float]) -> N
 def test_a_true_decimal_comma_close_passes_against_its_print(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
 
-    passed = ledger.validate_final_answer(f"{LEAD}Schlusskurs 0,666 CNY.")
-    refused = ledger.validate_final_answer(f"{LEAD}Schlusskurs 0,888 CNY.")
+    passed = ledger.validate_final_answer(f"{LEAD}Schlusskurs 0,666 USD.")
+    refused = ledger.validate_final_answer(f"{LEAD}Schlusskurs 0,888 USD.")
 
     assert passed.valid, passed.issues
     assert _values(refused) == ["0,888"]
@@ -253,14 +253,14 @@ def test_a_true_decimal_comma_close_passes_against_its_print(tmp_path: Path) -> 
 @pytest.mark.parametrize(
     ("text", "measured"),
     [
-        ("```注```\n收盘 0.888 元", {"0.888"}),                       # info holds a backtick
-        ("```注```\n收盘 0.888 元\n```\n", {"0.888"}),               # ...so it opens nothing
+        ("```注```\n收盘 0.888 美元", {"0.888"}),                       # info holds a backtick
+        ("```注```\n收盘 0.888 美元\n```\n", {"0.888"}),               # ...so it opens nothing
         ("见下：\n```python\nentry = 9.99", {"9.99"}),                # unterminated
         ("    ```python\nentry = 9.99\n    ```", {"9.99"}),         # indented four spaces
-        ("   ```python\nentry = 9.99\n   ```\n收盘 0.888 元", {"0.888"}),  # three is a fence
-        ("````python\nx = 9.99\n```\ny = 1.5\n````\n收盘 0.888 元", {"0.888"}),  # short closer
-        ("~~~python\nx = 9.99\n```\ny = 1.5\n~~~\n收盘 0.888 元", {"0.888"}),    # other char
-        ("```python\nx = 9.99\n```js\ny = 1.5\n```\n收盘 0.888 元", {"0.888"}),  # closer with info
+        ("   ```python\nentry = 9.99\n   ```\n收盘 0.888 美元", {"0.888"}),  # three is a fence
+        ("````python\nx = 9.99\n```\ny = 1.5\n````\n收盘 0.888 美元", {"0.888"}),  # short closer
+        ("~~~python\nx = 9.99\n```\ny = 1.5\n~~~\n收盘 0.888 美元", {"0.888"}),    # other char
+        ("```python\nx = 9.99\n```js\ny = 1.5\n```\n收盘 0.888 美元", {"0.888"}),  # closer with info
     ],
 )
 def test_only_a_commonmark_fence_exempts_what_it_holds(text: str, measured: set[str]) -> None:
@@ -275,7 +275,7 @@ def test_a_stray_opener_cannot_swallow_the_declaration_block(tmp_path: Path) -> 
     ledger = _ledger(tmp_path)
 
     refused = ledger.validate_final_answer(
-        "```python\n" + HDR + " 建议买入价 0.888 元。" + _block(HDR_ROW)
+        "```python\n" + HDR + " 建议买入价 0.888 美元。" + _block(HDR_ROW)
     )
     passed = ledger.validate_final_answer("```python\n" + HDR + _block(HDR_ROW))
 
@@ -301,11 +301,11 @@ def test_a_figures_fence_quoted_inside_a_longer_fence_declares_nothing() -> None
     ("text", "figure"),
     [
         ("黄金报价 $2050", "2050"),
-        ("成本 1999 元", "1999"),
+        ("成本 1999 美元", "1999"),
         ("目标 2050 USDT", "2050"),
         ("涨幅 2020%", "2020%"),
         ("| 日期 | 收盘 |\n|---|---|\n| 2026-09-09 | 2050 |", "2050"),
-        ("| 批次 | 收盘 |\n|---|---|\n| 20260909 元 | 0.666 |", "20260909"),
+        ("| 批次 | 收盘 |\n|---|---|\n| 20260909 美元 | 0.666 |", "20260909"),
     ],
 )
 def test_a_year_shaped_number_with_a_measurement_mark_is_measured(text: str, figure: str) -> None:
@@ -449,13 +449,13 @@ def test_an_empty_interior_field_keeps_its_place(tmp_path: Path) -> None:
     [
         ("HK$320.5", 320.5, False, "320.5"),
         ("182.4 USD", 182.4, False, "182.4"),
-        ("0.95 港元", 0.95, False, "0.95"),
-        ("¥0.95元", 0.95, False, "0.95"),
+        ("0.95 港美元", 0.95, False, "0.95"),
+        ("¥0.95美元", 0.95, False, "0.95"),
         ("100 원", 100.0, False, "100"),
         ("100 KRW", 100.0, False, "100"),
         (f"{MINUS}0.5", -0.5, False, "-0.5"),
         ("0.235M", 0.235, False, "0.235"),
-        ("2.4万元", 2.4, False, "2.4"),
+        ("2.4万美元", 2.4, False, "2.4"),
         ("37 %", 37.0, True, "37%"),
         ("52pp", 52.0, True, "52%"),
         ("5200bp", 52.0, True, "52.00%"),
@@ -478,7 +478,7 @@ def test_a_declared_value_tolerates_its_marks(
 
 
 @pytest.mark.parametrize(
-    "written", ["0.95 is entry", "0.95 0.97", "0.95 元/股", "ABCD$3", "3.6ppm", "2026-09-09"]
+    "written", ["0.95 is entry", "0.95 0.97", "0.95 美元/股", "ABCD$3", "3.6ppm", "2026-09-09"]
 )
 def test_a_declared_value_with_anything_else_is_malformed(written: str) -> None:
     assert len(_parse(f"{written} | proposed | entry").malformed) == 1, written
@@ -491,7 +491,7 @@ def test_a_declared_value_with_anything_else_is_malformed(written: str) -> None:
 
 def test_every_figures_block_declares_and_every_one_is_stripped(tmp_path: Path) -> None:
     first = _block(HDR_ROW, "junk line")
-    draft = HDR + first + "\n\n第一档 0.646 元。" + _block("0.646 | derived | 0.666 × 0.97 | c1")
+    draft = HDR + first + "\n\n第一档 0.646 美元。" + _block("0.646 | derived | 0.666 × 0.97 | c1")
 
     block = parse_figures_block(draft)
     assert [d.value for d in block.declarations] == [0.666, 0.646]
@@ -500,13 +500,13 @@ def test_every_figures_block_declares_and_every_one_is_stripped(tmp_path: Path) 
     assert len(block.spans) == 2
 
     stripped = strip_figures_block(draft, block)
-    assert stripped == HDR + "\n\n第一档 0.646 元。"
+    assert stripped == HDR + "\n\n第一档 0.646 美元。"
 
     ledger = _ledger(tmp_path)
-    passed = ledger.validate_final_answer(HDR + declared_parameter("97%") + _block(HDR_ROW) + "\n\n第一档 0.646 元。" + _block("0.646 | derived | 0.666 × 0.97 | c1"))
-    refused = ledger.validate_final_answer(HDR + declared_parameter("97%") + _block(HDR_ROW) + "\n\n第一档 0.700 元。" + _block("0.700 | derived | 0.666 × 0.97 | c1"))
+    passed = ledger.validate_final_answer(HDR + declared_parameter("97%") + _block(HDR_ROW) + "\n\n第一档 0.646 美元。" + _block("0.646 | derived | 0.666 × 0.97 | c1"))
+    refused = ledger.validate_final_answer(HDR + declared_parameter("97%") + _block(HDR_ROW) + "\n\n第一档 0.700 美元。" + _block("0.700 | derived | 0.666 × 0.97 | c1"))
     assert passed.valid, passed.issues
-    assert passed.released_text == HDR + "\n\nChosen coefficient: 97%." + "\n\n第一档 0.646 元。"
+    assert passed.released_text == HDR + "\n\nChosen coefficient: 97%." + "\n\n第一档 0.646 美元。"
     assert _values(refused) == ["0.700"]
     assert "```" not in refused.released_text
 
@@ -578,7 +578,7 @@ def test_yen_and_won_are_currency_marks(text: str, shape: str) -> None:
 def test_a_cut_figure_is_also_cut_where_a_code_fence_restates_it(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
     draft = (
-        HDR + " 建议买入价 2.50 元。\n\n```python\nentry = 2.50\nalso = 2" + BACKSLASH
+        HDR + " 建议买入价 2.50 美元。\n\n```python\nentry = 2.50\nalso = 2" + BACKSLASH
         + ".50\nstop = 0.60\n```\n" + _block(HDR_ROW, "2.50 | proposed | entry")
     )
 
@@ -587,7 +587,7 @@ def test_a_cut_figure_is_also_cut_where_a_code_fence_restates_it(tmp_path: Path)
     assert released is not None
     assert "2.50" not in released and "2" + BACKSLASH + ".50" not in released
     assert "stop = 0.60" in released
-    assert "最新收盘 0.666 元" in released
+    assert "最新收盘 0.666 美元" in released
     assert "※ 略去 3 处" in released
     assert ledger.figures_removed == 3
 
@@ -595,14 +595,14 @@ def test_a_cut_figure_is_also_cut_where_a_code_fence_restates_it(tmp_path: Path)
 def test_a_malformed_block_is_dropped_and_the_draft_is_cut_as_usual(tmp_path: Path) -> None:
     """An unreadable declaration used to force the canned fallback."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 0.65 元，止损 2.50 元。" + _block(HDR_ROW, "0.65 | proposed | entry", "2.50 is my stop")
+    draft = HDR + " 建议买入价 0.65 美元，止损 2.50 美元。" + _block(HDR_ROW, "0.65 | proposed | entry", "2.50 is my stop")
 
     validation = ledger.validate_final_answer(draft)
     assert "figures_block_malformed" in [issue["code"] for issue in validation.issues]
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "最新收盘 0.666 元" in released
+    assert "最新收盘 0.666 美元" in released
     # Without the block, 0.65 is an observed claim like any other and is cut too.
     assert "0.65" not in released and "2.50" not in released
     assert "figures" not in released and "observed" not in released
@@ -620,7 +620,7 @@ def test_a_malformed_line_with_nothing_to_cut_releases_the_checked_text(tmp_path
 
 def test_a_malformed_block_does_not_release_what_still_fails(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
-    draft = "600000.SH 最新收盘 9.99 元。" + _block("9.99 | observed | close", "see above")
+    draft = "600000.SH 最新收盘 9.99 美元。" + _block("9.99 | observed | close", "see above")
 
     assert ledger.redacted_release(draft, ledger.validate_final_answer(draft)) is None
 
@@ -628,7 +628,7 @@ def test_a_malformed_block_does_not_release_what_still_fails(tmp_path: Path) -> 
 def test_a_flagged_span_that_is_not_a_located_figure_refuses_release(tmp_path: Path) -> None:
     """The cut anchors on a figure the scan found; any other span fails closed."""
     ledger = _ledger(tmp_path)
-    draft = HDR + " 建议买入价 2.50 元。"
+    draft = HDR + " 建议买入价 2.50 美元。"
     validation = ledger.validate_final_answer(draft)
     [issue] = validation.issues
     shifted = dict(issue, span=[issue["span"][0] - 2, issue["span"][1]])
@@ -648,7 +648,7 @@ def test_an_undeclared_figure_on_the_last_draft_is_cut_not_fallen_back(tmp_path:
     released = ledger.redacted_release(draft, validation)
 
     assert released is not None
-    assert "3.5" not in released and "最新收盘 0.666 元" in released
+    assert "3.5" not in released and "最新收盘 0.666 美元" in released
     assert "※ 略去 1 处" in released
 
 
@@ -661,7 +661,7 @@ def test_a_three_character_currency_word_is_money_and_a_four_character_run_is_no
     tmp_path: Path,
 ) -> None:
     assert _shapes("报价 100 人民币")["100"] == "measured"
-    assert _shapes("报价 100 人民币元宵")["100"] == "bare"
+    assert _shapes("报价 100 人民币美元宵")["100"] == "bare"
 
     ledger = _ledger(tmp_path)
     draft = HDR + " 另报价 100 人民币。"
@@ -673,8 +673,8 @@ def test_a_three_character_currency_word_is_money_and_a_four_character_run_is_no
 def test_a_line_opening_with_a_figure_is_not_an_ordinal(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
 
-    refused = ledger.validate_final_answer(LEAD + "\n1.171 元是收盘价")
-    passed = ledger.validate_final_answer(LEAD + "\n0.666 元是收盘价\n1. 第一条")
+    refused = ledger.validate_final_answer(LEAD + "\n1.171 美元是收盘价")
+    passed = ledger.validate_final_answer(LEAD + "\n0.666 美元是收盘价\n1. 第一条")
 
     assert _values(refused) == ["1.171"]
     assert passed.valid, passed.issues

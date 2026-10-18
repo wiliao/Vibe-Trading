@@ -22,6 +22,9 @@ from src.trading.types import (
 # runtime SDK call.
 _FUTU_READS = READ_CAPABILITIES + FUTU_EXTENDED_READ_CAPABILITIES
 
+# Market filter is omitted on purpose. Profile config overwrites futu.json, so
+# pinning HK here would hide a saved US (or other) market. Unset stays HK via
+# FutuConfig.filter_trdmarket.
 FUTU_PROFILES: tuple[TradingProfile, ...] = (
     TradingProfile(
         id="futu-paper-sdk",

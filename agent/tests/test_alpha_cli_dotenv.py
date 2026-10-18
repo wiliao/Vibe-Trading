@@ -2,7 +2,7 @@
 
 The ``alpha`` dispatch path skips ``cli._legacy._ensure_cli_env``, so the
 pip-installed CLI never loaded ``~/.vibe-trading/.env`` on this path and the
-csi300 universe failed with "TUSHARE_TOKEN not in agent/.env or environment".
+sp500 universe failed with "FINNHUB_API_KEY not in agent/.env or environment".
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def _order(monkeypatch):
 def _ns_bench(**overrides):
     base = dict(
         zoo="alpha101",
-        universe="csi300",
+        universe="sp500",
         period="2020-2025",
         top=20,
         yes=True,
@@ -63,7 +63,7 @@ def _ns_compare(**overrides):
     base = dict(
         alpha_ids=["alpha001", "alpha002"],
         zoo=None,
-        universe="csi300",
+        universe="sp500",
         period="2020-2025",
         sort="ir",
         compare_all=False,
@@ -178,14 +178,14 @@ def test_load_cli_env_reads_dotenv_file(monkeypatch, tmp_path):
 
     dotenv = tmp_path / ".env"
     token = "cli_dotenv_regression_token"
-    dotenv.write_text(f"TUSHARE_TOKEN={token}\n", encoding="utf-8")
-    monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+    dotenv.write_text(f"FINNHUB_API_KEY={token}\n", encoding="utf-8")
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
     monkeypatch.setattr(llm, "_ENV_CANDIDATES", [dotenv])
     monkeypatch.setattr(llm, "_dotenv_loaded", False)
 
     try:
         cli_handlers._load_cli_env()
-        assert os.environ.get("TUSHARE_TOKEN") == token
-        assert get_env_config().data.tushare_token == token
+        assert os.environ.get("FINNHUB_API_KEY") == token
+        assert get_env_config().data.finnhub_api_key == token
     finally:
-        os.environ.pop("TUSHARE_TOKEN", None)
+        os.environ.pop("FINNHUB_API_KEY", None)

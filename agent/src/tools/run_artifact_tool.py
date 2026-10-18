@@ -588,7 +588,7 @@ class RunArtifactTool(BaseTool):
                 "type": "string",
                 "description": (
                     "Artifact alias: equity | trades | metrics | positions | "
-                    "target_positions | ohlcv:<CODE> (e.g. ohlcv:600519.SH) | "
+                    "target_positions | ohlcv:<CODE> (e.g. ohlcv:AAPL.US) | "
                     "run_card — or a run_dir-relative path listed in the "
                     "run_card.json artifacts manifest (e.g. "
                     "artifacts/validation.json)"

@@ -87,7 +87,7 @@ def test_alpha_meta_gate_accepts_declared_columns(module) -> None:
     assert meta.columns_required == module.__alpha_meta__["columns_required"]
     assert meta.decay_horizon == 252
     assert meta.min_warmup_bars == 1
-    assert meta.universe == ["equity_us", "equity_cn", "equity_hk"]
+    assert meta.universe == ["equity_us"]
     assert meta.frequency == ["1d"]
 
 

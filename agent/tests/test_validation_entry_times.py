@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from backtest.engines.china_a import ChinaAEngine
+from backtest.engines.global_equity import GlobalEquityEngine
 from backtest.models import TradeRecord
 from backtest.validation import _load_trades, walk_forward_analysis
 
@@ -15,7 +15,7 @@ from backtest.validation import _load_trades, walk_forward_analysis
 def test_round_trip_preserves_entry_window(
     tmp_path: Path, direction: int, same_day: bool
 ) -> None:
-    engine = ChinaAEngine({"initial_cash": 1000.0})
+    engine = GlobalEquityEngine({"initial_cash": 1000.0})
     dates = pd.date_range("2026-01-01", periods=10)
     engine.trades = [
         TradeRecord(

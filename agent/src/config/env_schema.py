@@ -156,7 +156,8 @@ class LLMConfig(_EnvBase):
     """LLM provider and generation parameters.
 
     Sources: ``src/providers/llm.py``, ``src/providers/chat.py``,
-    ``src/providers/openai_codex.py``, ``src/preflight.py``.
+    ``src/providers/openai_codex.py``, ``src/providers/claude_cli.py``,
+    ``src/preflight.py``.
     """
 
     langchain_provider: str = Field(alias="LANGCHAIN_PROVIDER", default="openai")
@@ -167,6 +168,9 @@ class LLMConfig(_EnvBase):
     # preflight could not tell a missing key from a working one and the failure
     # surfaced as an opaque 401 at the first call instead (#1223).
     anthropic_api_key: str = Field(alias="ANTHROPIC_API_KEY", default="")
+    langchain_max_tokens: int | None = Field(
+        alias="LANGCHAIN_MAX_TOKENS", default=None, gt=0
+    )
     anthropic_max_tokens: int | None = Field(alias="ANTHROPIC_MAX_TOKENS", default=None, gt=0)
     timeout_seconds: int = Field(alias="TIMEOUT_SECONDS", default=120)
     max_retries: int = Field(alias="MAX_RETRIES", default=2)
@@ -179,6 +183,15 @@ class LLMConfig(_EnvBase):
     openai_codex_base_url: str = Field(
         alias="OPENAI_CODEX_BASE_URL",
         default="https://chatgpt.com/backend-api/codex/responses",
+    )
+    claude_cli_path: str = Field(alias="CLAUDE_CLI_PATH", default="")
+    # A convenience filter, not a security boundary: live orders are still bound
+    # by the mandate gate whatever this list hides.
+    claude_cli_deny_tool_prefixes: str = Field(
+        alias="CLAUDE_CLI_DENY_TOOL_PREFIXES", default="trading_,etoro_"
+    )
+    claude_cli_bash_policy: str = Field(
+        alias="CLAUDE_CLI_BASH_POLICY", default="python-only"
     )
     openai_model: str = Field(alias="OPENAI_MODEL", default="")
     vibe_trading_disable_http_proxy: EnvBool = Field(
@@ -398,7 +411,24 @@ class AgentTuningConfig(_EnvBase):
     ``src/tools/web_search_tool.py``, ``api_server.py``.
     """
 
+    # Deprecated: counted chars/4 of messages without tool schemas, so no value
+    # tuned against it means anything under real-token accounting. Read only to
+    # warn (src/agent/context_budget.py); compaction ignores it.
     token_threshold: int = Field(alias="TOKEN_THRESHOLD", default=40000)
+    # ReAct loop iteration cap for interactive/web sessions. Heavy pipelines
+    # (multi-layer scoring, batch research) legitimately exceed 50 turns.
+    vibe_trading_agent_max_iterations: int = Field(
+        alias="VIBE_TRADING_AGENT_MAX_ITERATIONS", default=50, ge=1,
+    )
+    vibe_trading_context_window: int | None = Field(
+        alias="VIBE_TRADING_CONTEXT_WINDOW", default=None, gt=0,
+    )
+    # Cost ceiling on the prompt the loop lets a run grow to before compacting,
+    # whatever the model's window. The largest healthy research run measured
+    # on 2026-09-29 sent 154K real input tokens.
+    vibe_trading_context_max_tokens: int = Field(
+        alias="VIBE_TRADING_CONTEXT_MAX_TOKENS", default=200_000, gt=0,
+    )
     vt_heartbeat_interval_s: float = Field(alias="VT_HEARTBEAT_INTERVAL_S", default=3.0)
     vt_reasoning_delta_min_interval_s: float = Field(
         alias="VT_REASONING_DELTA_MIN_INTERVAL_S", default=1.0,
@@ -594,6 +624,17 @@ class MemoryConfig(_EnvBase):
     fts_index_enabled: EnvBool = Field(
         default=False, alias="VT_MEMORY_FTS_INDEX",
         description="Enable SQLite FTS5 search index",
+    )
+
+    # Scheduled consolidation system job (scheduler unification).
+    # Deliberately NOT listed in the preset flag map or the memory flag alias
+    # map above: the preset machinery only touches fields in the alias map, so
+    # VT_MEMORY=on/full can never silently enable a background timer. This
+    # flag is opt-in on its own; the job it gates also no-ops honestly unless
+    # VT_MEMORY_GC is enabled (see src/memory/consolidation.py).
+    consolidation_enabled: EnvBool = Field(
+        default=False, alias="VT_MEMORY_CONSOLIDATION",
+        description="Enable the daily memory-consolidation system job",
     )
 
     @model_validator(mode="before")

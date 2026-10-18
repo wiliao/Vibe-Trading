@@ -87,8 +87,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
-from src.br_data.scheduling import daily_cron_from_env as _br_data_daily_cron
-from src.br_data.scheduling import sync_job_enabled as _br_data_sync_enabled
 from src.memory.consolidation import consolidation_enabled as _memory_consolidation_enabled
 from src.scheduled_research.models import (
     JobStatus,
@@ -242,12 +240,11 @@ class SystemJobSpec:
 # Production spec surface
 # ---------------------------------------------------------------------------
 
-#: The production specs (memory consolidation, br_data sync). Each job is ONE
-#: literal here plus ONE registry entry in ``registry.py``'s
-#: ``_INTERNAL_CALLABLES`` block; ensure_system_jobs, the guards and the
-#: lifespan wiring consume this tuple generically. Predicates and schedule
-#: derivation live in the DOMAIN modules (src.memory.consolidation,
-#: src.br_data.scheduling) so THIS module keeps reading zero env. A valid
+#: The production specs (memory consolidation). Each job is ONE literal here
+#: plus ONE registry entry in ``registry.py``'s ``_INTERNAL_CALLABLES`` block;
+#: ensure_system_jobs, the guards and the lifespan wiring consume this tuple
+#: generically. The predicate lives in the DOMAIN module
+#: (src.memory.consolidation) so THIS module keeps reading zero env. A valid
 #: edited schedule/timezone on a seeded row is trusted per the local-trust
 #: boundary.
 _SYSTEM_JOB_SPECS: tuple[SystemJobSpec, ...] = (
@@ -258,18 +255,6 @@ _SYSTEM_JOB_SPECS: tuple[SystemJobSpec, ...] = (
         internal_callable="memory.consolidate",
         title="Memory consolidation",
         enabled_predicate=_memory_consolidation_enabled,
-    ),
-    # Daily Brazilian official-dataset sync on the São Paulo wall clock
-    # (sync.TZ key). The cron derives from VIBE_BR_SYNC_TIME lazily — at
-    # ensure time, after dotenv load — and drives the FIRST seed only: the
-    # local-trust boundary accepts an edited row afterwards.
-    SystemJobSpec(
-        id="system:br-data-sync",
-        schedule_fn=_br_data_daily_cron,
-        timezone="America/Sao_Paulo",
-        internal_callable="br_data.run_sync",
-        title="Brazilian dataset sync",
-        enabled_predicate=_br_data_sync_enabled,
     ),
 )
 

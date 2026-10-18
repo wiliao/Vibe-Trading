@@ -27,9 +27,3 @@ def test_alpha_bench_report_dir_honors_runtime_root(custom_root: Path) -> None:
     from src.tools import alpha_bench_tool
 
     assert alpha_bench_tool._default_output_dir() == custom_root / "reports"
-
-
-def test_gildata_code_cache_honors_runtime_root(custom_root: Path) -> None:
-    from backtest.loaders import gildata_codes
-
-    assert gildata_codes._cache_path() == custom_root / "cache" / "gildata-codes.json"

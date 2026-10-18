@@ -41,7 +41,7 @@ def _resolver_payload(
             {
                 "symbol": symbol,
                 "name": "机器人ETF",
-                "market": "cn",
+                "market": "us",
                 "type": "ETF",
                 "source": "yahoo",
                 "also_from": ["eastmoney"],
@@ -894,7 +894,7 @@ def test_listed_identity_blocks_private_company_workflow(
             "market": "us",
             "type": "equity",
             "exchange": "NMS",
-            "source": "eastmoney",
+            "source": "yahoo",
             "also_from": ["yahoo"],
             "cik": "0001181412",
         }
@@ -970,7 +970,7 @@ def test_ambiguous_resolution_keeps_consumers_blocked(tmp_path: Path) -> None:
     """Multiple weak candidates must become first-class ambiguous state."""
     candidates = [
         {"symbol": "ABC.US", "name": "ABC Holdings", "source": "yahoo"},
-        {"symbol": "ABC.HK", "name": "ABC Group", "source": "eastmoney"},
+        {"symbol": "ABC.HK", "name": "ABC Group", "source": "yahoo"},
     ]
     agent, _, market, _, trace = _build_direct_agent(
         tmp_path,
@@ -1027,7 +1027,7 @@ def test_final_numeric_gate_rejects_known_trace_contradiction(tmp_path: Path) ->
 建议重仓买入价为 0.881。"""
     )
     good = ledger.validate_final_answer(
-        "562500.SS（Yahoo，CNY）在 2026-06-23 的已观测开盘价为 1.141，收盘价为 1.137。"
+        "562500.SS（Yahoo，USD）在 2026-06-23 的已观测开盘价为 1.141，收盘价为 1.137。"
     )
 
     assert bad.valid is False
@@ -1281,7 +1281,7 @@ class _CorrectingLLM:
             _Response(content="建议买入价为 0.881。"),
             _Response(
                 content=(
-                    "562500.SS（Yahoo，CNY）在 2026-06-23 的已观测收盘价为 1.137。"
+                    "562500.SS（Yahoo，USD）在 2026-06-23 的已观测收盘价为 1.137。"
                 )
             ),
         ]
@@ -1358,20 +1358,20 @@ def test_agent_loop_rejects_then_corrects_ungrounded_final_answer(
 _SHORTLIST_QUERY = "A股低价高增长股票"
 _SHORTLIST_PAYLOAD = _resolver_payload(
     candidates=[
-        {"symbol": "000543.SZ", "name": "皖能电力", "market": "cn", "source": "eastmoney"},
-        {"symbol": "000727.SZ", "name": "冠捷科技", "market": "cn", "source": "eastmoney"},
+        {"symbol": "AAPL.US", "name": "皖能电力", "market": "us", "source": "yahoo"},
+        {"symbol": "000727.SZ", "name": "冠捷科技", "market": "us", "source": "yahoo"},
     ],
     query=_SHORTLIST_QUERY,
 )
 _NARROWED_PAYLOAD = _resolver_payload(
     candidates=[
-        {"symbol": "000543.SZ", "name": "皖能电力", "market": "cn", "source": "eastmoney"},
+        {"symbol": "AAPL.US", "name": "皖能电力", "market": "us", "source": "yahoo"},
     ],
-    query="000543.SZ",
+    query="AAPL.US",
 )
 _SCREENED_MARKET_PAYLOAD = json.dumps(
     {
-        "000543.SZ": [
+        "AAPL.US": [
             {
                 "trade_date": "2026-08-01",
                 "open": 7.9,
@@ -1382,10 +1382,10 @@ _SCREENED_MARKET_PAYLOAD = json.dumps(
             }
         ],
         "_provenance": {
-            "000543.SZ": {
-                "source": "tencent",
+            "AAPL.US": {
+                "source": "yahoo",
                 "requested_source": "auto",
-                "detected_source": "tencent",
+                "detected_source": "yahoo",
                 "fallback_used": False,
                 "currency_conversion": "none",
             }
@@ -1402,7 +1402,7 @@ def _screened_ledger(tmp_path: Path) -> GroundingLedger:
     )
     for call_id, query, payload in (
         ("shortlist", _SHORTLIST_QUERY, _SHORTLIST_PAYLOAD),
-        ("narrow", "000543.SZ", _NARROWED_PAYLOAD),
+        ("narrow", "AAPL.US", _NARROWED_PAYLOAD),
     ):
         ledger.authorize_tool_call(
             "search_symbol",
@@ -1419,7 +1419,7 @@ def _screened_ledger(tmp_path: Path) -> GroundingLedger:
         )
     ledger.ingest_tool_result(
         tool_name="get_market_data",
-        arguments={"codes": ["000543.SZ"]},
+        arguments={"codes": ["AAPL.US"]},
         result=_SCREENED_MARKET_PAYLOAD,
         call_id="prices",
         success=True,
@@ -1464,10 +1464,10 @@ def test_narrowed_lock_retires_the_screening_shortlist(tmp_path: Path) -> None:
     ledger = _screened_ledger(tmp_path)
 
     assert ledger.identity_status == "locked"
-    assert ledger.authorized_symbols == {"000543.SZ"}
+    assert ledger.authorized_symbols == {"AAPL.US"}
     prices = ledger.authorize_tool_call(
         "get_market_data",
-        {"codes": ["000543.SZ"]},
+        {"codes": ["AAPL.US"]},
         batch_authorized_symbols=ledger.authorized_symbols,
         call_id="prices",
         batch_identity_status=ledger.identity_status,
@@ -1481,11 +1481,11 @@ def test_price_validation_ignores_symbol_date_and_quantity_digits(tmp_path: Path
     ledger = _screened_ledger(tmp_path)
 
     for draft in (
-        "000543.SZ 截至 8 月 3 日收盘价 8.20 CNY（source: tencent）",
-        "000543.SZ 买入价 8.20 CNY（股数100，成本 820 CNY；source: tencent）\n\n"
+        "AAPL.US 截至 8 月 3 日收盘价 8.20 USD（source: yahoo）",
+        "AAPL.US 买入价 8.20 USD（股数100，成本 820 USD；source: yahoo）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "820 | derived | 100 × 8.20 | prices\n100 | count | 股数\n```",
-        "000543.SZ 建议持有 1–4 周，买入价 8.20 CNY（source: tencent）",
+        "AAPL.US 建议持有 1–4 周，买入价 8.20 USD（source: yahoo）",
     ):
         result = ledger.validate_final_answer(draft)
         assert result.valid is True, (draft, result.issues)
@@ -1497,7 +1497,7 @@ def test_price_validation_still_rejects_a_quote_outside_observed_range(
     """Masking non-price digits must not weaken the contradiction check (#955)."""
     ledger = _screened_ledger(tmp_path)
 
-    result = ledger.validate_final_answer("000543.SZ 收盘价 42.00 CNY（source: tencent）")
+    result = ledger.validate_final_answer("AAPL.US 收盘价 42.00 USD（source: yahoo）")
 
     assert result.valid is False
     assert [issue["code"] for issue in result.issues] == ["numeric_claim_conflict"]
@@ -1518,11 +1518,11 @@ def test_price_validation_ignores_score_indicator_and_window_digits(
 
     for draft in (
         # The reported shape: a labelled score on a 1-10 scale.
-        "000543.SZ VERDICT: FLAT CONFIDENCE: 6 REASON: 收盘价 8.20 CNY（source: tencent）",
-        "000543.SZ CONFIDENCE: 6/10，收盘价 8.20 CNY（source: tencent）",
+        "AAPL.US VERDICT: FLAT CONFIDENCE: 6 REASON: 收盘价 8.20 USD（source: yahoo）",
+        "AAPL.US CONFIDENCE: 6/10，收盘价 8.20 USD（source: yahoo）",
         # The hyphenated English compound the quantity mask used to stall on.
-        "000543.SZ 现价 8.20 CNY 距 52-week high 有距离（source: tencent）",
-        "000543.SZ 收盘价 8.20 CNY 低于其 20/50/200-day 均线（source: tencent）",
+        "AAPL.US 现价 8.20 USD 距 52-week high 有距离（source: yahoo）",
+        "AAPL.US 收盘价 8.20 USD 低于其 20/50/200-day 均线（source: yahoo）",
     ):
         result = ledger.validate_final_answer(draft)
         assert result.valid is True, (draft, result.issues)
@@ -1541,16 +1541,16 @@ def test_an_indicator_reading_is_checked_against_the_call_it_names(
     ledger = _screened_ledger(tmp_path)
     ledger.ingest_tool_result(
         tool_name="technical_indicators",
-        arguments={"symbol": "000543.SZ"},
+        arguments={"symbol": "AAPL.US"},
         result=json.dumps(
-            {"ok": True, "symbol": "000543.SZ", "indicators": {"rsi_14": 46.7}}
+            {"ok": True, "symbol": "AAPL.US", "indicators": {"rsi_14": 46.7}}
         ),
         call_id="ti1",
         success=True,
     )
 
     grounded = ledger.validate_final_answer(
-        "000543.SZ 现价 8.20 CNY 而 RSI 46.7（source: tencent）\n\n"
+        "AAPL.US 现价 8.20 USD 而 RSI 46.7（source: yahoo）\n\n"
         "```figures\n"
         "8.20 | observed | close | prices\n"
         "46.7 | observed | rsi_14 | ti1\n"
@@ -1559,7 +1559,7 @@ def test_an_indicator_reading_is_checked_against_the_call_it_names(
     assert grounded.valid is True, grounded.issues
 
     invented = ledger.validate_final_answer(
-        "000543.SZ 现价 8.20 CNY 而 RSI 71.2（source: tencent）\n\n"
+        "AAPL.US 现价 8.20 USD 而 RSI 71.2（source: yahoo）\n\n"
         "```figures\n"
         "8.20 | observed | close | prices\n"
         "71.2 | observed | rsi_14 | ti1\n"
@@ -1583,8 +1583,8 @@ def test_price_validation_ignores_short_dates_and_percent_ranges(
     ledger = _screened_ledger(tmp_path)
 
     for draft in (
-        "000543.SZ 8/5 收盘价 8.20 CNY（source: tencent）",
-        "000543.SZ 现价 8.20 CNY，距阻力位仅 1–2%（source: tencent）\n\n"
+        "AAPL.US 8/5 收盘价 8.20 USD（source: yahoo）",
+        "AAPL.US 现价 8.20 USD，距阻力位仅 1–2%（source: yahoo）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "1% | count | 区间下界\n2% | count | 区间上界\n```",
     ):
@@ -1602,7 +1602,7 @@ def test_an_undeclared_percentage_is_reported_not_masked(tmp_path: Path) -> None
     ledger = _screened_ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        "000543.SZ 现价 8.20 CNY，年化波动率 41%（source: tencent）\n\n"
+        "AAPL.US 现价 8.20 USD，年化波动率 41%（source: yahoo）\n\n"
         "```figures\n8.20 | observed | close | prices\n```"
     )
 
@@ -1616,8 +1616,8 @@ def test_iso_date_running_into_cjk_text_is_still_masked(tmp_path: Path) -> None:
     ledger = _screened_ledger(tmp_path)
 
     for draft in (
-        "000543.SZ 收盘价 8.20 CNY（2026-07-14最低）（source: tencent）",
-        "000543.SZ 收盘价 8.20 CNY 自2026-07-14以来最低（source: tencent）",
+        "AAPL.US 收盘价 8.20 USD（2026-07-14最低）（source: yahoo）",
+        "AAPL.US 收盘价 8.20 USD 自2026-07-14以来最低（source: yahoo）",
     ):
         result = ledger.validate_final_answer(draft)
         assert result.valid is True, (draft, result.issues)
@@ -1631,7 +1631,7 @@ def test_short_date_mask_does_not_swallow_a_plain_ratio(tmp_path: Path) -> None:
     """
     ledger = _screened_ledger(tmp_path)
 
-    result = ledger.validate_final_answer("000543.SZ 收盘价 42.00 CNY，P/E 15（source: tencent）")
+    result = ledger.validate_final_answer("AAPL.US 收盘价 42.00 USD，P/E 15（source: yahoo）")
 
     assert result.valid is False
     assert [issue["code"] for issue in result.issues] == ["numeric_claim_conflict"]
@@ -1651,8 +1651,8 @@ def test_a_bare_integer_beside_a_wrong_quote_does_not_shield_it(
     ledger = _screened_ledger(tmp_path)
 
     for draft in (
-        "000543.SZ 52-week high 之下，收盘价 42.00 CNY（source: tencent）",
-        "000543.SZ CONFIDENCE: 6 REASON: 收盘价 42.00 CNY（source: tencent）",
+        "AAPL.US 52-week high 之下，收盘价 42.00 USD（source: yahoo）",
+        "AAPL.US CONFIDENCE: 6 REASON: 收盘价 42.00 USD（source: yahoo）",
     ):
         result = ledger.validate_final_answer(draft)
         assert result.valid is False, draft
@@ -1683,13 +1683,13 @@ def test_screening_run_reaches_a_final_answer_through_the_agent_loop(
     assert skill.calls == 1
 
     resolver.result = _NARROWED_PAYLOAD
-    batch(_tool_call("narrow", "search_symbol", query="000543.SZ"), iteration=3)
-    batch(_tool_call("prices", "get_market_data", codes=["000543.SZ"]), iteration=4)
+    batch(_tool_call("narrow", "search_symbol", query="AAPL.US"), iteration=3)
+    batch(_tool_call("prices", "get_market_data", codes=["AAPL.US"]), iteration=4)
     trace.close()
 
     assert market.calls == 1
     validation = agent._grounding.validate_final_answer(
-        "000543.SZ 买入价 8.20 CNY（股数100，成本 820 CNY；source: tencent）\n\n"
+        "AAPL.US 买入价 8.20 USD（股数100，成本 820 USD；source: yahoo）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "820 | derived | 100 × 8.20 | prices\n100 | count | 股数\n```"
     )
@@ -1709,7 +1709,7 @@ def test_price_table_with_a_year_less_date_matches_its_evidence(tmp_path: Path) 
 
     for date_cell in ("08-01", "8/1", "8月1日", "2026-08-01"):
         draft = (
-            "000543.SZ 行情（source: tencent; currency: CNY）\n\n"
+            "AAPL.US 行情（source: yahoo; currency: USD）\n\n"
             "| 日期 | 开盘 | 最高 | 最低 | 收盘 |\n"
             "| --- | --- | --- | --- | --- |\n"
             f"| {date_cell} | 7.90 | 8.50 | 7.90 | 8.20 |\n"
@@ -1727,7 +1727,7 @@ def test_year_less_date_still_rejects_a_wrong_quote(tmp_path: Path) -> None:
     ledger = _screened_ledger(tmp_path)
 
     draft = (
-        "000543.SZ 行情（source: tencent; currency: CNY）\n\n"
+        "AAPL.US 行情（source: yahoo; currency: USD）\n\n"
         "| 日期 | 开盘 | 最高 | 最低 | 收盘 |\n"
         "| --- | --- | --- | --- | --- |\n"
         "| 08-01 | 7.90 | 8.50 | 7.90 | 42.00 |\n"
@@ -1743,7 +1743,7 @@ def test_a_date_that_names_a_different_day_is_still_unavailable(tmp_path: Path) 
     ledger = _screened_ledger(tmp_path)
 
     draft = (
-        "000543.SZ 行情（source: tencent; currency: CNY）\n\n"
+        "AAPL.US 行情（source: yahoo; currency: USD）\n\n"
         "| 日期 | 开盘 | 最高 | 最低 | 收盘 |\n"
         "| --- | --- | --- | --- | --- |\n"
         "| 07-15 | 7.90 | 8.50 | 7.90 | 8.20 |\n"
@@ -1759,7 +1759,7 @@ def test_plan_level_mask_does_not_shield_a_wrong_quote_end_to_end(tmp_path: Path
     ledger = _screened_ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        "000543.SZ 收盘价 42.00 CNY，目标位 45.00（source: tencent）"
+        "AAPL.US 收盘价 42.00 USD，目标位 45.00（source: yahoo）"
     )
 
     assert result.valid is False
@@ -1778,21 +1778,21 @@ def test_plan_level_alone_reaches_a_valid_answer(tmp_path: Path) -> None:
     ledger = _screened_ledger(tmp_path)
 
     inside_range = ledger.validate_final_answer(
-        "000543.SZ 收盘价 8.20 CNY（source: tencent）。转多信号：收盘 ≥8.40。\n\n"
+        "AAPL.US 收盘价 8.20 USD（source: yahoo）。转多信号：收盘 ≥8.40。\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "8.40 | proposed | 转多触发\n```"
     )
     assert inside_range.valid is True, inside_range.issues
 
     derived_outside = ledger.validate_final_answer(
-        "000543.SZ 收盘价 8.20 CNY（source: tencent）。目标位 9.02。选定系数110%。\n\n"
+        "AAPL.US 收盘价 8.20 USD（source: yahoo）。目标位 9.02。选定系数110%。\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "9.02 | proposed | 8.20 × 1.10 | prices\n110% | count | 选定系数\n```"
     )
     assert derived_outside.valid is True, derived_outside.issues
 
     unanchored = ledger.validate_final_answer(
-        "000543.SZ 收盘价 8.20 CNY（source: tencent）。目标位 42.00。\n\n"
+        "AAPL.US 收盘价 8.20 USD（source: yahoo）。目标位 42.00。\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "42.00 | proposed | 目标\n```"
     )
@@ -1962,7 +1962,7 @@ def _venue_spelling_shortlist() -> str:
                 "name": "Apple Inc",
                 "market": "us",
                 "type": "EQUITY",
-                "source": "eastmoney",
+                "source": "yahoo",
             },
             {
                 "symbol": "US.AAPL",
@@ -2208,7 +2208,7 @@ def test_a_conceptual_question_reaches_its_answer(
     "answer",
     [
         "贵州茅台现价约 1300 元，建议买入。",
-        "600519.SH 收盘价 1300.00 元（source: tencent），建议买入。",
+        "600519.SH 收盘价 1300.00 元（source: yahoo），建议买入。",
     ],
 )
 def test_an_unevidenced_price_is_still_rejected_without_any_tool_call(
@@ -2364,8 +2364,8 @@ def test_a_shortlist_answers_the_user_but_still_cannot_fetch_a_quote(
         arguments={"query": "高股息"},
         result=_resolver_payload(
             candidates=[
-                {"symbol": "601398.SH", "name": "工商银行", "source": "eastmoney"},
-                {"symbol": "600028.SH", "name": "中国石化", "source": "eastmoney"},
+                {"symbol": "601398.SH", "name": "工商银行", "source": "yahoo"},
+                {"symbol": "600028.SH", "name": "中国石化", "source": "yahoo"},
             ],
             query="高股息",
         ),
@@ -2528,13 +2528,13 @@ def test_price_validation_ignores_markdown_ordered_list_markers(
     observed OHLC range as a numeric_claim_conflict.
     """
     ledger = _screened_ledger(tmp_path)
-    symbol = "000543.SZ"  # populated by _screened_ledger
+    symbol = "AAPL.US"  # populated by _screened_ledger
 
     for draft in (
-        f"1. **原料药价格持续低迷**，{symbol} 现价 8.20 CNY（source: tencent）",
-        f"1. 原料药价格持续低迷\n2. 板块持续走强\n3. 建议关注 {symbol} 收盘价 8.20 CNY（source: tencent）",
-        f"  1. 第一项描述\n  2. 第二项描述，{symbol} 收盘价 8.20 CNY（source: tencent）",
-        f"结论如下：\n1) 原料药承压，{symbol} 8.20 CNY 可建仓（source: tencent）",
+        f"1. **原料药价格持续低迷**，{symbol} 现价 8.20 USD（source: yahoo）",
+        f"1. 原料药价格持续低迷\n2. 板块持续走强\n3. 建议关注 {symbol} 收盘价 8.20 USD（source: yahoo）",
+        f"  1. 第一项描述\n  2. 第二项描述，{symbol} 收盘价 8.20 USD（source: yahoo）",
+        f"结论如下：\n1) 原料药承压，{symbol} 8.20 USD 可建仓（source: yahoo）",
     ):
         result = ledger.validate_final_answer(draft)
         assert result.valid is True, (draft, result.issues)
@@ -2549,10 +2549,10 @@ def test_markdown_list_marker_mask_does_not_weaken_contradiction_check(
     span-local: it removes only the marker, not a contradicted price that follows.
     """
     ledger = _screened_ledger(tmp_path)
-    symbol = "000543.SZ"
+    symbol = "AAPL.US"
 
     result = ledger.validate_final_answer(
-        f"1. 原料药价格持续低迷，{symbol} 收盘价 42.00 CNY（source: tencent）"
+        f"1. 原料药价格持续低迷，{symbol} 收盘价 42.00 USD（source: yahoo）"
     )
 
     codes = [issue["code"] for issue in result.issues]
@@ -2576,7 +2576,7 @@ def test_in_text_decimal_is_never_read_as_a_list_marker(
     ledger = _screened_ledger(tmp_path)
 
     result = ledger.validate_final_answer(
-        "000543.SZ 目标价 1.5 CNY，收盘价 8.20 CNY（source: tencent）\n\n"
+        "AAPL.US 目标价 1.5 USD，收盘价 8.20 USD（source: yahoo）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "1.5 | proposed | 目标\n```"
     )
@@ -2584,7 +2584,7 @@ def test_in_text_decimal_is_never_read_as_a_list_marker(
     assert [issue["value"] for issue in result.issues] == ["1.5"]
 
     in_range = ledger.validate_final_answer(
-        "000543.SZ 变动 0.03 CNY，收盘价 8.20 CNY（source: tencent）\n\n"
+        "AAPL.US 变动 0.03 USD，收盘价 8.20 USD（source: yahoo）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
         "0.03 | derived | 8.50 - 8.47 | prices\n```"
     )
@@ -3445,32 +3445,18 @@ def _declared_currency_ledger(tmp_path: Path, symbol: str, quote_currency: str |
     return ledger
 
 
-def test_the_declared_quote_currency_is_the_one_an_answer_must_name(tmp_path: Path) -> None:
-    """A venue can list one issuer in two currencies (GGAL.BA ARS, GGALD.BA USD, #1566)."""
-    ledger = _declared_currency_ledger(tmp_path, "GGAL.BA", "USD")
-
-    assert ledger.validate_final_answer(
-        "GGAL.BA closed at 1.171 USD on 2026-06-24 (source: Yahoo)."
-    ).valid
-    wrong = ledger.validate_final_answer(
-        "GGAL.BA closed at 1.171 ARS on 2026-06-24 (source: Yahoo)."
-    )
-    assert "currency_not_surfaced" in {issue["code"] for issue in wrong.issues}
-
-
 @pytest.mark.parametrize(
     ("symbol", "answer"),
     [
-        ("VOD.L", "VOD.L closed at £1.171 on 2026-06-24 (source: Yahoo)."),
-        ("VIC.VN", "VIC.VN closed at 1.171₫ on 2026-06-24 (source: Yahoo)."),
-        ("GGAL.BA", "GGAL.BA closed at AR$1.171 on 2026-06-24 (source: Yahoo)."),
-        ("GGAL.BA", "GGAL.BA 2026-06-24 收盘 1.171 阿根廷比索，数据来源：雅虎。"),
+        ("AAPL.US", "AAPL.US closed at $1.171 on 2026-06-24 (source: Yahoo)."),
+        ("SHOP.TO", "SHOP.TO closed at C$1.171 on 2026-06-24 (source: Yahoo)."),
+        ("SHOP.TO", "SHOP.TO 2026-06-24 收盘 1.171 加元，数据来源：雅虎。"),
     ],
 )
 def test_a_currency_written_the_usual_way_counts_as_named(
     tmp_path: Path, symbol: str, answer: str
 ) -> None:
-    """.L / .VN / .BA gained a currency, so its sign must satisfy the gate like $ or ¥ do."""
+    """US/CA currency marks must satisfy the gate like $ or ¥ do."""
     result = _declared_currency_ledger(tmp_path, symbol, None).validate_final_answer(answer)
 
     assert result.valid is True, result.issues

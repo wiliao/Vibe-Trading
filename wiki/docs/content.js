@@ -1,13 +1,22 @@
-export const DOCS_DEFAULT_VERSION = "0.1.11";
+import { DOCS_STRUCTURE as EN_STRUCTURE } from "/docs/content.en.js?v=20260929e";
+import { DOCS_STRUCTURE as ZH_STRUCTURE } from "/docs/content.zh.js?v=20260929e";
+
+// One content set per language; every version alias renders the latest.
+export const DOCS_DEFAULT_VERSION = "0.1.16";
 export const DOCS_LATEST_ALIAS = "latest";
 export const DOCS_DEFAULT_PAGE = "getting-started/vibe-trading-overview";
+export const DOCS_DEFAULT_LANG = "en";
+
+// `segment` is the first path segment after /docs/: /docs/latest/<page> is
+// English, /docs/zh/<page> is Chinese. Any other segment (an old version
+// number) resolves to English.
+export const DOCS_LANGUAGES = {
+  en: { segment: DOCS_LATEST_ALIAS, htmlLang: "en", label: "English", structure: EN_STRUCTURE },
+  zh: { segment: "zh", htmlLang: "zh-CN", label: "中文", structure: ZH_STRUCTURE }
+};
 
 export const DOCS_VERSIONS = [
-  { name: "0.1.11", label: "0.1.11 (latest)" },
-  { name: "0.1.10", label: "0.1.10" },
-  { name: "0.1.9", label: "0.1.9" },
-  { name: "0.1.8", label: "0.1.8" },
-  { name: "0.1.7", label: "0.1.7" }
+  { name: DOCS_DEFAULT_VERSION, label: { en: `${DOCS_DEFAULT_VERSION} (latest)`, zh: `${DOCS_DEFAULT_VERSION}（最新）` } }
 ];
 
 export const DOCS_STRUCTURE = [
@@ -397,4 +406,4 @@ vibe-trading-mcp</code></pre>
       }
     ]
   }
-];
+};
