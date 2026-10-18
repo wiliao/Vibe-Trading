@@ -13,7 +13,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from src.config.paths import get_uploads_dir
+from src.config.paths import get_runtime_root, get_uploads_dir
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -93,18 +93,29 @@ def register_uploads_routes(
         host = _sys.modules.get("api_server") or _sys.modules.get("agent.api_server")
         return host._UPLOAD_CHUNK_SIZE if host else _UPLOAD_CHUNK_SIZE
 
+    @app.get("/api/reports/{report_id}", dependencies=[Depends(require_auth)])
+    async def get_generated_report(report_id: str):
+        """Download only a staged generated PDF via an opaque ID."""
+        from src.tools.report_artifacts import report_path
+        path = report_path(report_id)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return FileResponse(path, media_type="application/pdf", filename=path.name)
+
     @app.get("/shadow-reports/{shadow_id}", dependencies=[Depends(require_auth)])
     async def get_shadow_report(shadow_id: str, format: str = "html"):
         """Serve a rendered Shadow Account report.
 
-        Reports live under ``~/.vibe-trading/shadow_reports/<shadow_id>.{html,pdf}``.
+        Reports live under ``<runtime-root>/shadow_reports/<shadow_id>.{html,pdf}``
+        (``~/.vibe-trading`` unless ``VIBE_TRADING_HOME`` overrides it).
         """
         if not _SHADOW_ID_RE.match(shadow_id):
             raise HTTPException(status_code=400, detail="invalid shadow_id")
         if format not in ("html", "pdf"):
             raise HTTPException(status_code=400, detail="format must be html or pdf")
 
-        reports_dir = Path.home() / ".vibe-trading" / "shadow_reports"
+        # Same root the report writer uses, so VIBE_TRADING_HOME is honoured.
+        reports_dir = get_runtime_root() / "shadow_reports"
         path = reports_dir / f"{shadow_id}.{format}"
         if not path.exists():
             raise HTTPException(status_code=404, detail=f"Shadow report not found: {shadow_id}.{format}")

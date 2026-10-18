@@ -13,9 +13,10 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, NamedTuple
 
 from src.agent.context import ContextBuilder
+from src.agent.llm_usage import _normalize_llm_usage
 from src.agent.progress import HeartbeatTimer
 from src.agent.skills import SkillsLoader
 from src.agent.tools import BaseTool, ToolRegistry
@@ -168,19 +169,42 @@ def _filter_skill_descriptions(loader: SkillsLoader, skill_names: list[str]) -> 
     return "\n".join(lines) if lines else "(no matching skills)"
 
 
-def _estimate_tokens(
+class UsageMeasure(NamedTuple):
+    """Token usage of a single LLM call, with cache breakdown and provenance.
+
+    Attributes:
+        input_tokens: Input tokens — provider-reported or heuristic estimate.
+        output_tokens: Output tokens — provider-reported or heuristic estimate.
+        cache_read_tokens: Prompt-cache read tokens (0 when estimated).
+        cache_creation_tokens: Prompt-cache creation tokens (0 when estimated).
+        token_source: ``"provider"`` when the counts came from real
+            ``usage_metadata``, ``"estimated"`` when they came from the
+            ``len // 4`` heuristic.
+    """
+
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    token_source: str
+
+
+def _measure_usage(
     messages: list[dict],
     response: object,
-) -> tuple[int, int]:
-    """Return token usage for a single LLM call, real if available.
+) -> UsageMeasure:
+    """Return full token usage for a single LLM call, real if available.
 
     Prefers the provider-reported counts attached to the response by
-    :func:`ChatLLM._parse_response` (``usage_metadata``). Falls back to a
-    character-length heuristic (``len // 4``) only when the provider
-    didn't return usage data — keeps the behaviour contract for legacy
-    or partial responses while making per-run totals (which feed
-    ``SwarmRun.total_input_tokens`` / ``total_output_tokens``) reflect
-    real billing instead of a CJK-hostile char-count guess.
+    :func:`ChatLLM._parse_response` (``usage_metadata``), normalized through
+    :func:`src.agent.llm_usage._normalize_llm_usage` — the exact same
+    normalization the main agent loop applies behind ``llm_usage.json``, so
+    the swarm never grows a second cache-token accounting rule. Falls back to a
+    character-length heuristic (``len // 4``) only when the provider didn't
+    return usage data — keeps the behaviour contract for legacy or partial
+    responses while making per-run totals (which feed
+    ``SwarmRun.total_input_tokens`` / ``total_output_tokens`` and the cache
+    totals) reflect real billing instead of a CJK-hostile char-count guess.
 
     Args:
         messages: Messages sent to the LLM for this call. Used only for
@@ -190,18 +214,25 @@ def _estimate_tokens(
             ``ChatLLM.stream_chat``.
 
     Returns:
-        Tuple of (input_tokens, output_tokens). Either component may be
-        zero — that simply means the provider didn't report it and the
-        fallback couldn't compute it either (e.g. binary content).
+        :class:`UsageMeasure` with input/output tokens, the prompt-cache
+        breakdown (zero on the heuristic path — a cache count is never
+        estimated) and the ``token_source`` provenance label. Any token
+        component may be zero — that simply means the provider didn't
+        report it and the fallback couldn't compute it either (e.g.
+        binary content).
     """
     from src.providers.chat import LLMResponse
 
     if isinstance(response, LLMResponse) and response.usage_metadata:
-        usage = response.usage_metadata
-        real_input = int(usage.get("input_tokens") or 0)
-        real_output = int(usage.get("output_tokens") or 0)
-        if real_input or real_output:
-            return real_input, real_output
+        normalized = _normalize_llm_usage(response.usage_metadata)
+        if normalized is not None:
+            return UsageMeasure(
+                input_tokens=normalized["input_tokens"],
+                output_tokens=normalized["output_tokens"],
+                cache_read_tokens=normalized.get("cache_read_tokens", 0),
+                cache_creation_tokens=normalized.get("cache_creation_tokens", 0),
+                token_source="provider",
+            )
 
     # Fallback: provider didn't return usage_metadata. Estimate from
     # serialized message length and response content length. ~4 chars per
@@ -217,7 +248,36 @@ def _estimate_tokens(
     else:
         output_tokens = 0
 
-    return input_tokens, output_tokens
+    return UsageMeasure(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_tokens=0,
+        cache_creation_tokens=0,
+        token_source="estimated",
+    )
+
+
+def _estimate_tokens(
+    messages: list[dict],
+    response: object,
+) -> tuple[int, int]:
+    """Return (input_tokens, output_tokens) for a single LLM call.
+
+    Thin wrapper over :func:`_measure_usage` preserving the historical
+    2-tuple contract for existing callers and tests; the cache breakdown
+    and ``token_source`` provenance label are available from
+    :func:`_measure_usage` directly.
+
+    Args:
+        messages: Messages sent to the LLM for this call.
+        response: ``LLMResponse`` from ``ChatLLM.chat`` /
+            ``ChatLLM.stream_chat``.
+
+    Returns:
+        Tuple of (input_tokens, output_tokens).
+    """
+    measured = _measure_usage(messages, response)
+    return measured.input_tokens, measured.output_tokens
 
 
 def build_worker_prompt(
@@ -378,8 +438,8 @@ def build_worker_prompt(
     return "\n\n".join(prompt_parts)
 
 
-def agent_artifact_dir(run_dir: Path, agent_id: str) -> Path:
-    """Return the canonical artifacts directory for one agent within a run.
+def agent_artifact_dir(run_dir: Path, agent_id: str, task_id: str) -> Path:
+    """Return the canonical artifacts directory for one task within a run.
 
     The single source of truth for this path — shared with the retry loop
     in ``runtime.py`` so the two can never compute it differently and drift
@@ -388,41 +448,57 @@ def agent_artifact_dir(run_dir: Path, agent_id: str) -> Path:
     for ``mkdir``; validating the shared constructor protects both directory
     creation and recursive cleanup from the same path escape.
 
+    Keyed by ``(agent_id, task_id)`` rather than ``agent_id`` alone: a preset
+    where one agent handles multiple tasks (sequentially or, across workers,
+    concurrently) must not have those tasks share a directory. Sharing meant
+    a later task's read of the directory could pick up an earlier task's
+    still-there files, and clearing the shared directory before a later task
+    could delete an earlier, concurrently-running task's in-flight output.
+    A directory scoped to one task never has either problem, and earlier
+    tasks' artifacts simply stay in place under their own task_id once the
+    agent moves on, instead of being deleted.
+
     Args:
         run_dir: Root directory for the swarm run.
         agent_id: Single safe path segment identifying the agent.
+        task_id: Single safe path segment identifying the task.
 
     Raises:
-        ValueError: If ``agent_id`` is not a single safe path segment or the
-            resolved artifact directory is not exactly one level below the
-            resolved ``run_dir/artifacts`` directory.
+        ValueError: If ``agent_id`` or ``task_id`` is not a single safe path
+            segment, or the resolved artifact directory is not exactly two
+            levels below the resolved ``run_dir/artifacts`` directory.
     """
     artifact_root = run_dir / "artifacts"
-    if (
-        not isinstance(agent_id, str)
-        or not agent_id
-        or agent_id in {".", ".."}
-        or "/" in agent_id
-        or "\\" in agent_id
-    ):
-        raise ValueError(
-            f"Invalid swarm agent id {agent_id!r}: expected one safe path segment"
-        )
 
-    artifact_dir = artifact_root / agent_id
+    def _check(label: str, value: str) -> None:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value in {".", ".."}
+            or "/" in value
+            or "\\" in value
+        ):
+            raise ValueError(
+                f"Invalid swarm {label} {value!r}: expected one safe path segment"
+            )
+
+    _check("agent id", agent_id)
+    _check("task id", task_id)
+
+    artifact_dir = artifact_root / agent_id / task_id
     resolved_root = artifact_root.resolve()
     resolved_dir = artifact_dir.resolve()
     try:
         relative = resolved_dir.relative_to(resolved_root)
     except ValueError as exc:
         raise ValueError(
-            f"Invalid swarm agent id {agent_id!r}: artifact path escapes "
-            "the run artifacts directory"
+            f"Invalid swarm agent/task id {agent_id!r}/{task_id!r}: artifact "
+            "path escapes the run artifacts directory"
         ) from exc
-    if len(relative.parts) != 1:
+    if relative.parts != (agent_id, task_id):
         raise ValueError(
-            f"Invalid swarm agent id {agent_id!r}: artifact path must be "
-            "one level below the run artifacts directory"
+            f"Invalid swarm agent/task id {agent_id!r}/{task_id!r}: artifact "
+            "path must preserve its agent and task below the run artifacts directory"
         )
     return artifact_dir
 
@@ -533,7 +609,7 @@ def _run_worker_impl(
       2. Build system prompt with role + upstream summaries + filtered skills
       3. Resolve task.prompt_template with user_vars
       4. Run ReAct loop (for iteration in range(max_iterations))
-      5. Write summary to artifacts/{agent_id}/summary.md
+      5. Write summary to artifacts/{agent_id}/{task_id}/summary.md
       6. Return WorkerResult
 
     Args:
@@ -592,6 +668,15 @@ def _run_worker_impl(
         agent_spec, upstream_summaries, skill_desc, grounding_block=grounding_block,
     )
 
+    # Token accounting accumulators — initialized before the first exit path
+    # (template render failure) so every WorkerResult return below carries the
+    # accumulated cache breakdown and provenance label, never silent defaults.
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cache_read_tokens = 0
+    total_cache_creation_tokens = 0
+    token_source: str | None = None
+
     # 4. Resolve prompt template with user vars (missing vars → LLM infers)
     class _FallbackDict(dict):
         """Dict that hints LLM to infer missing template variables."""
@@ -607,7 +692,10 @@ def _run_worker_impl(
         _emit(event_callback, "worker_failed", agent_id, task_id, {"error": error_msg})
         return WorkerResult(
             status="failed", summary="", iterations=0, error=error_msg,
-            input_tokens=0, output_tokens=0,
+            input_tokens=total_input_tokens, output_tokens=total_output_tokens,
+            cache_read_tokens=total_cache_read_tokens,
+            cache_creation_tokens=total_cache_creation_tokens,
+            token_source=token_source,
         )
 
     # 5. Build initial messages
@@ -617,14 +705,12 @@ def _run_worker_impl(
     ]
 
     # 6. ReAct loop
-    artifact_dir = agent_artifact_dir(run_dir, agent_id)
+    artifact_dir = agent_artifact_dir(run_dir, agent_id, task_id)
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     t0 = time.monotonic()
     iteration = 0
     summary = ""
-    total_input_tokens = 0
-    total_output_tokens = 0
 
     # Threshold for injecting a "wrap up" nudge (80% of budget)
     wrap_up_at = max(1, int(max_iterations * 0.8))
@@ -655,10 +741,13 @@ def _run_worker_impl(
             return WorkerResult(
                 status="timeout",
                 summary=summary,
-                artifact_paths=_collect_artifacts(artifact_dir),
+                artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                 iterations=iteration,
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
+                cache_read_tokens=total_cache_read_tokens,
+                cache_creation_tokens=total_cache_creation_tokens,
+                token_source=token_source,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -674,10 +763,13 @@ def _run_worker_impl(
             return WorkerResult(
                 status="cancelled",
                 summary=summary,
-                artifact_paths=_collect_artifacts(artifact_dir),
+                artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                 iterations=iteration,
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
+                cache_read_tokens=total_cache_read_tokens,
+                cache_creation_tokens=total_cache_creation_tokens,
+                token_source=token_source,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -693,10 +785,13 @@ def _run_worker_impl(
             return WorkerResult(
                 status="token_limit",
                 summary=summary,
-                artifact_paths=_collect_artifacts(artifact_dir),
+                artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                 iterations=iteration,
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
+                cache_read_tokens=total_cache_read_tokens,
+                cache_creation_tokens=total_cache_creation_tokens,
+                token_source=token_source,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -839,10 +934,13 @@ def _run_worker_impl(
                 return WorkerResult(
                     status="cancelled",
                     summary=summary,
-                    artifact_paths=_collect_artifacts(artifact_dir),
+                    artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                     iterations=iteration,
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,
+                    cache_read_tokens=total_cache_read_tokens,
+                    cache_creation_tokens=total_cache_creation_tokens,
+                    token_source=token_source,
                     content_filter_warnings=compute_content_filter_warnings(
                         content_filter_count, iteration + 1,
                     ),
@@ -854,20 +952,33 @@ def _run_worker_impl(
             return WorkerResult(
                 status="failed",
                 summary=_resolve_summary(artifact_dir, last_assistant_content or ""),
-                artifact_paths=_collect_artifacts(artifact_dir),
+                artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                 iterations=iteration,
                 error=error_msg,
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
+                cache_read_tokens=total_cache_read_tokens,
+                cache_creation_tokens=total_cache_creation_tokens,
+                token_source=token_source,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
             )
 
-        # Accumulate token counts
-        iter_in, iter_out = _estimate_tokens(messages, response)
-        total_input_tokens += iter_in
-        total_output_tokens += iter_out
+        # Accumulate token counts (provider-reported when available, with the
+        # cache breakdown). The provenance label is sticky-estimated, mirroring
+        # runtime._merge_token_source: one heuristic iteration contaminates the
+        # cumulative total, so a partly-estimated sum never reads as billed.
+        measured = _measure_usage(messages, response)
+        total_input_tokens += measured.input_tokens
+        total_output_tokens += measured.output_tokens
+        total_cache_read_tokens += measured.cache_read_tokens
+        total_cache_creation_tokens += measured.cache_creation_tokens
+        token_source = (
+            "estimated"
+            if token_source == "estimated" or measured.token_source == "estimated"
+            else "provider"
+        )
 
         # Track last meaningful assistant content
         if response.content and len(response.content.strip()) > 20:
@@ -891,7 +1002,7 @@ def _run_worker_impl(
                 return WorkerResult(
                     status="failed",
                     summary=summary,
-                    artifact_paths=_collect_artifacts(artifact_dir),
+                    artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                     iterations=iteration + 1,
                     error=(
                         f"content_filter_circuit_breaker: "
@@ -900,6 +1011,9 @@ def _run_worker_impl(
                     ),
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,
+                    cache_read_tokens=total_cache_read_tokens,
+                    cache_creation_tokens=total_cache_creation_tokens,
+                    token_source=token_source,
                     content_filter_warnings=compute_content_filter_warnings(
                         content_filter_count, iteration + 1,
                     ),
@@ -936,11 +1050,14 @@ def _run_worker_impl(
                 return WorkerResult(
                     status="incomplete",
                     summary=summary,
-                    artifact_paths=_collect_artifacts(artifact_dir),
+                    artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                     iterations=iteration + 1,
                     error=f"output contract not met: {reason}",
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,
+                    cache_read_tokens=total_cache_read_tokens,
+                    cache_creation_tokens=total_cache_creation_tokens,
+                    token_source=token_source,
                     content_filter_warnings=compute_content_filter_warnings(
                         content_filter_count, iteration + 1,
                     ),
@@ -949,10 +1066,13 @@ def _run_worker_impl(
             return WorkerResult(
                 status="completed",
                 summary=summary,
-                artifact_paths=_collect_artifacts(artifact_dir),
+                artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                 iterations=iteration + 1,
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
+                cache_read_tokens=total_cache_read_tokens,
+                cache_creation_tokens=total_cache_creation_tokens,
+                token_source=token_source,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -1053,21 +1173,27 @@ def _run_worker_impl(
         return WorkerResult(
             status="incomplete",
             summary=summary,
-            artifact_paths=_collect_artifacts(artifact_dir),
+            artifact_paths=_collect_artifacts(run_dir, artifact_dir),
             iterations=max_iterations,
             error=f"hit iteration limit without a valid deliverable: {reason}",
             input_tokens=total_input_tokens,
             output_tokens=total_output_tokens,
+            cache_read_tokens=total_cache_read_tokens,
+            cache_creation_tokens=total_cache_creation_tokens,
+            token_source=token_source,
             content_filter_warnings=content_filter_warnings,
         )
     _emit(event_callback, "worker_iteration_limit", agent_id, task_id)
     return WorkerResult(
         status="completed",
         summary=summary,
-        artifact_paths=_collect_artifacts(artifact_dir),
+        artifact_paths=_collect_artifacts(run_dir, artifact_dir),
         iterations=max_iterations,
         input_tokens=total_input_tokens,
         output_tokens=total_output_tokens,
+        cache_read_tokens=total_cache_read_tokens,
+        cache_creation_tokens=total_cache_creation_tokens,
+        token_source=token_source,
         content_filter_warnings=content_filter_warnings,
     )
 
@@ -1316,7 +1442,7 @@ def _finalize_run(artifact_dir: Path, summary: str, messages: list[dict]) -> Non
     unchanged.
 
     Args:
-        artifact_dir: Path to artifacts/{agent_id}/ directory.
+        artifact_dir: Path to artifacts/{agent_id}/{task_id}/ directory.
         summary: Final summary text for this worker run.
         messages: Message history, including tool call arguments.
     """
@@ -1340,7 +1466,7 @@ def _write_summary(artifact_dir: Path, summary: str) -> None:
     """Write worker summary to artifacts directory.
 
     Args:
-        artifact_dir: Path to artifacts/{agent_id}/ directory.
+        artifact_dir: Path to artifacts/{agent_id}/{task_id}/ directory.
         summary: Summary text to write.
     """
     try:
@@ -1350,11 +1476,12 @@ def _write_summary(artifact_dir: Path, summary: str) -> None:
         logger.warning("Failed to write summary to %s", artifact_dir, exc_info=True)
 
 
-def _collect_artifacts(artifact_dir: Path) -> list[str]:
+def _collect_artifacts(run_dir: Path, artifact_dir: Path) -> list[str]:
     """Collect regular artifacts as deterministic run-relative paths.
 
     Args:
-        artifact_dir: Path to artifacts/{agent_id}/ directory.
+        run_dir: Root directory for the swarm run.
+        artifact_dir: Path to artifacts/{agent_id}/{task_id}/ directory.
 
     Returns:
         Sorted POSIX-style paths relative to the swarm run directory. Symlinks
@@ -1363,7 +1490,7 @@ def _collect_artifacts(artifact_dir: Path) -> list[str]:
     if not artifact_dir.exists():
         return []
 
-    run_dir = artifact_dir.parent.parent.resolve()
+    run_dir = run_dir.resolve()
     artifact_root = artifact_dir.resolve()
     if not artifact_root.is_relative_to(run_dir):
         return []

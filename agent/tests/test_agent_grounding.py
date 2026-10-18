@@ -198,6 +198,170 @@ def test_ok_false_tool_envelope_is_failure() -> None:
     assert _is_tool_success('{"ok": true, "data": {}}') is True
 
 
+def test_re_resolving_same_query_cannot_overwrite_a_locked_symbol(
+    tmp_path: Path,
+) -> None:
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="Analyze Acme")
+    first = {
+        "ok": True,
+        "data": {
+            "query": "Acme",
+            "candidates": [{"symbol": "AAA.US", "name": "Acme", "market": "us", "source": "yahoo"}],
+        },
+    }
+    second = {
+        "ok": True,
+        "data": {
+            "query": "Acme",
+            "candidates": [{"symbol": "BBB.US", "name": "Acme", "market": "us", "source": "yahoo"}],
+        },
+    }
+
+    ledger.ingest_tool_result(
+        tool_name="search_symbol", arguments={"query": "Acme"},
+        result=json.dumps(first), call_id="resolve-a", success=True,
+    )
+    assert ledger.authorized_symbols == {"AAA.US"}
+    ledger.authorize_tool_call(
+        "search_symbol", {"query": "Acme"},
+        batch_authorized_symbols=ledger.authorized_symbols, call_id="resolve-b",
+    )
+    ledger.ingest_tool_result(
+        tool_name="search_symbol", arguments={"query": "Acme"},
+        result=json.dumps(second), call_id="resolve-b", success=True,
+    )
+
+    assert ledger.identity_status == "conflicting"
+    assert ledger.authorized_symbols == set()
+
+
+def _resolve_candidate(
+    ledger: GroundingLedger, symbol: str, query: str, call_id: str
+) -> None:
+    """Drive one ``search_symbol`` resolution for ``query`` through the ledger."""
+    ledger.authorize_tool_call(
+        "search_symbol",
+        {"query": query},
+        batch_authorized_symbols=ledger.authorized_symbols,
+        call_id=call_id,
+    )
+    ledger.ingest_tool_result(
+        tool_name="search_symbol",
+        arguments={"query": query},
+        result=json.dumps(
+            {
+                "ok": True,
+                "data": {
+                    "query": query,
+                    "candidates": [
+                        {
+                            "symbol": symbol,
+                            "name": query,
+                            "market": "us",
+                            "source": "yahoo",
+                        }
+                    ],
+                },
+            }
+        ),
+        call_id=call_id,
+        success=True,
+    )
+
+
+def test_a_repeat_resolution_cannot_clear_a_conflict(tmp_path: Path) -> None:
+    """Re-answering one side of a contradiction is not evidence that settles it."""
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="Analyze Acme")
+    _resolve_candidate(ledger, "AAA.US", "Acme", "resolve-a")
+    _resolve_candidate(ledger, "BBB.US", "Acme", "resolve-b")
+    assert ledger.identity_status == "conflicting"
+
+    _resolve_candidate(ledger, "BBB.US", "Acme", "resolve-c")
+
+    assert ledger.identity_status == "conflicting"
+    assert ledger.authorized_symbols == set()
+
+
+def test_a_non_conclusive_step_cannot_clear_a_conflict(tmp_path: Path) -> None:
+    """A timeout after a contradiction leaves the contradiction standing."""
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="Analyze Acme")
+    _resolve_candidate(ledger, "AAA.US", "Acme", "resolve-a")
+    _resolve_candidate(ledger, "BBB.US", "Acme", "resolve-b")
+    assert ledger.identity_status == "conflicting"
+    ledger.authorize_tool_call(
+        "search_symbol",
+        {"query": "Acme"},
+        batch_authorized_symbols=ledger.authorized_symbols,
+        call_id="resolve-timeout",
+    )
+    ledger.ingest_tool_result(
+        tool_name="search_symbol",
+        arguments={"query": "Acme"},
+        result=json.dumps({"ok": False, "error": "timeout"}),
+        call_id="resolve-timeout",
+        success=False,
+    )
+
+    assert ledger.identity_status == "conflicting"
+
+
+@pytest.mark.parametrize(
+    ("payload", "success", "call_id"),
+    [
+        ({"ok": False, "error": "timeout"}, False, "resolve-flaky"),
+        ({"ok": False, "error": "rate limited"}, True, "resolve-refused"),
+        (
+            {
+                "ok": True,
+                "source": "symbol_search",
+                "data": {"query": "Acme", "count": 0, "candidates": []},
+            },
+            True,
+            "resolve-empty",
+        ),
+    ],
+)
+def test_a_non_conclusive_re_resolution_cannot_retract_a_locked_symbol(
+    tmp_path: Path, payload: dict[str, Any], success: bool, call_id: str
+) -> None:
+    """A timeout, a refusal or an empty list is not evidence against the lock."""
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="Analyze Acme")
+    resolved = {
+        "ok": True,
+        "data": {
+            "query": "Acme",
+            "candidates": [
+                {"symbol": "AAA.US", "name": "Acme", "market": "us", "source": "yahoo"}
+            ],
+        },
+    }
+    ledger.ingest_tool_result(
+        tool_name="search_symbol",
+        arguments={"query": "Acme"},
+        result=json.dumps(resolved),
+        call_id="resolve-locked",
+        success=True,
+    )
+    assert ledger.authorized_symbols == {"AAA.US"}
+
+    ledger.authorize_tool_call(
+        "search_symbol",
+        {"query": "Acme"},
+        batch_authorized_symbols=ledger.authorized_symbols,
+        call_id=call_id,
+    )
+    ledger.ingest_tool_result(
+        tool_name="search_symbol",
+        arguments={"query": "Acme"},
+        result=json.dumps(payload),
+        call_id=call_id,
+        success=success,
+    )
+
+    assert ledger.identity_status == "locked"
+    assert ledger.authorized_symbols == {"AAA.US"}
+
+
 def test_resolver_and_consumer_in_same_batch_cannot_race(
     tmp_path: Path,
 ) -> None:
@@ -939,6 +1103,8 @@ def test_weekday_suffixed_claim_dates_match_evidence() -> None:
     assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "08-10") is True
     assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "2026-08-10") is True
     assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "2026-08-10(一)") is True
+    assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "2025-08-10") is False
+    assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "2025-08-10(一)") is False
     assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "08-11") is False
     assert _timestamp_matches_claim_date("2026-08-10T00:00:00", "no-date") is False
 
@@ -1130,6 +1296,7 @@ class _CorrectingLLM:
         timeout: int | None = None,
         idle_timeout_s: float | None = None,
         should_cancel: Callable[[], bool] | None = None,
+        on_waiting_chunk=None,
     ) -> _Response:
         self.messages_history.append(list(messages))
         response = self.responses.pop(0)
@@ -1315,9 +1482,9 @@ def test_price_validation_ignores_symbol_date_and_quantity_digits(tmp_path: Path
 
     for draft in (
         "000543.SZ 截至 8 月 3 日收盘价 8.20 CNY（source: tencent）",
-        "000543.SZ 买入价 8.20 CNY（100 股成本 820 CNY；source: tencent）\n\n"
+        "000543.SZ 买入价 8.20 CNY（股数100，成本 820 CNY；source: tencent）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
-        "820 | derived | 100 × 8.20 | prices\n```",
+        "820 | derived | 100 × 8.20 | prices\n100 | count | 股数\n```",
         "000543.SZ 建议持有 1–4 周，买入价 8.20 CNY（source: tencent）",
     ):
         result = ledger.validate_final_answer(draft)
@@ -1522,9 +1689,9 @@ def test_screening_run_reaches_a_final_answer_through_the_agent_loop(
 
     assert market.calls == 1
     validation = agent._grounding.validate_final_answer(
-        "000543.SZ 买入价 8.20 CNY（100 股成本 820 CNY；source: tencent）\n\n"
+        "000543.SZ 买入价 8.20 CNY（股数100，成本 820 CNY；source: tencent）\n\n"
         "```figures\n8.20 | observed | close | prices\n"
-        "820 | derived | 100 × 8.20 | prices\n```"
+        "820 | derived | 100 × 8.20 | prices\n100 | count | 股数\n```"
     )
     assert validation.valid is True, validation.issues
 
@@ -1618,9 +1785,9 @@ def test_plan_level_alone_reaches_a_valid_answer(tmp_path: Path) -> None:
     assert inside_range.valid is True, inside_range.issues
 
     derived_outside = ledger.validate_final_answer(
-        "000543.SZ 收盘价 8.20 CNY（source: tencent）。目标位 9.02。\n\n"
+        "000543.SZ 收盘价 8.20 CNY（source: tencent）。目标位 9.02。选定系数110%。\n\n"
         "```figures\n8.20 | observed | close | prices\n"
-        "9.02 | proposed | 8.20 × 1.10 | prices\n```"
+        "9.02 | proposed | 8.20 × 1.10 | prices\n110% | count | 选定系数\n```"
     )
     assert derived_outside.valid is True, derived_outside.issues
 

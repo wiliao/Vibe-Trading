@@ -480,6 +480,8 @@ def _run_all_zoos_with_progress(
     total_alphas = sum(len(reg.list(zoo=z)) for z in zoos)
     all_rows: list[dict[str, Any]] = []
     all_skipped: list[dict[str, Any]] = []
+    all_excluded: list[str] = []
+    run_config: dict[str, Any] = {}
 
     def _run_zoo(z: str, base: int, update: Callable[[int, str], None] | None) -> None:
         cb: Callable[[int, int, str], None] | None = None
@@ -494,6 +496,10 @@ def _run_all_zoos_with_progress(
             on_progress=cb,
             registry=reg,
         )
+        if not run_config and "horizon" in sub:
+            run_config["horizon"] = sub["horizon"]
+            run_config["forward_return_sampling"] = sub.get("forward_return_sampling")
+        all_excluded.extend(sub.get("universe_excluded", []) or [])
         if sub.get("status") == "ok":
             all_rows.extend(sub.get("rows", []) or [])
             all_skipped.extend(sub.get("skipped", []) or [])
@@ -537,6 +543,8 @@ def _run_all_zoos_with_progress(
         "skipped": all_skipped,
         "n_alphas_tested": len(all_rows),
         "n_skipped": len(all_skipped),
+        **run_config,
+        **({"universe_excluded": all_excluded} if all_excluded else {}),
         "wall_seconds": round(time.monotonic() - start_ts, 2),
         **({"error": "no alphas produced IC across any zoo"} if not all_rows else {}),
     }
@@ -551,8 +559,26 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
     """
     _load_cli_env()
     try:
-        if (getattr(args, "oos_split", None) or getattr(args, "random_seeds", 5) != 5) and not getattr(args, "strict", False):
-            _err("alpha bench: --oos-split/--random-seeds only take effect with --strict.")
+        from src.tools.alpha_bench_tool import _MAX_HORIZON
+
+        horizon = getattr(args, "horizon", 1)
+        horizon = 1 if horizon is None else int(horizon)
+        if not 1 <= horizon <= _MAX_HORIZON:
+            # Usage error → argparse's exit-code convention (2), not a traceback.
+            _err(
+                f"alpha bench: --horizon must be an integer in 1..{_MAX_HORIZON} "
+                f"(got {horizon})."
+            )
+            return 2
+        if (
+            getattr(args, "oos_split", None)
+            or getattr(args, "training_cutoff", None)
+            or getattr(args, "random_seeds", 5) != 5
+        ) and not getattr(args, "strict", False):
+            _err(
+                "alpha bench: --oos-split/--training-cutoff/--random-seeds "
+                "only take effect with --strict."
+            )
             return 1
         try:
             if getattr(args, "strict", False):
@@ -563,9 +589,13 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
                     random_control=True,
                     n_random_seeds=max(1, int(getattr(args, "random_seeds", 5) or 5)),
                     oos_split=getattr(args, "oos_split", None),
+                    training_cutoff=getattr(args, "training_cutoff", None),
+                    horizon=horizon,
                 )
             else:
-                from src.factors.bench_runner import run_bench
+                from src.factors.bench_runner import run_bench as _run_bench_plain
+
+                run_bench = functools.partial(_run_bench_plain, horizon=horizon)
         except ImportError as exc:
             _err(f"alpha bench failed: bench_runner unavailable ({exc})")
             return 1
@@ -606,7 +636,13 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
 
         strict_banner = (
             " [strict: random control"
-            + (f", oos {args.oos_split}" if getattr(args, "oos_split", None) else "")
+            + (
+                f", OOS after {args.training_cutoff}"
+                if getattr(args, "training_cutoff", None)
+                else f", oos {args.oos_split}"
+                if getattr(args, "oos_split", None)
+                else ""
+            )
             + "]"
             if getattr(args, "strict", False)
             else ""
@@ -748,6 +784,12 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
             "top": top_rows,
             "wall_seconds": result.get("wall_seconds"),
         }
+        # Run-config disclosure: a saved envelope must state its own horizon,
+        # sampling and any universe-based exclusions — numbers that show
+        # where they came from.
+        for key in ("horizon", "forward_return_sampling", "universe_excluded"):
+            if key in result:
+                envelope[key] = result[key]
         if getattr(args, "strict", False):
             envelope["strict"] = True
             for key in ("confirmed_alive", "train_only", "reversed_strict", "noise"):
@@ -755,6 +797,8 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
                     envelope[key] = result[key]
             if result.get("oos_split") is not None:
                 envelope["oos_split"] = result["oos_split"]
+            if result.get("training_cutoff") is not None:
+                envelope["training_cutoff"] = result["training_cutoff"]
         if universe_meta:
             envelope["meta"] = universe_meta
         if report_path is not None:
@@ -910,6 +954,27 @@ def cmd_alpha_export_manifest(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 
 
+def _horizon_arg(value: str) -> int:
+    """argparse type for ``--horizon``: integer in 1.._MAX_HORIZON.
+
+    Raising ``ArgumentTypeError`` makes argparse exit with its usage-error
+    code (2) instead of letting a bad value reach the bench engine.
+    """
+    from src.tools.alpha_bench_tool import _MAX_HORIZON
+
+    try:
+        ivalue = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"--horizon expects an integer in 1..{_MAX_HORIZON}, got {value!r}"
+        ) from None
+    if not 1 <= ivalue <= _MAX_HORIZON:
+        raise argparse.ArgumentTypeError(
+            f"--horizon must be in 1..{_MAX_HORIZON} (got {ivalue})"
+        )
+    return ivalue
+
+
 _DISPATCH: dict[str, Callable[[argparse.Namespace], int]] = {
     "list": cmd_alpha_list,
     "show": cmd_alpha_show,
@@ -1003,6 +1068,17 @@ def add_subparser(subparsers: Any) -> argparse.ArgumentParser:
     )
     p_bench.add_argument("--top", type=int, default=20, help="Top-N alphas to keep (default: 20)")
     p_bench.add_argument(
+        "--horizon",
+        type=_horizon_arg,
+        default=1,
+        help=(
+            "Forward-return horizon in bars, range 1-252 (default: 1 = next-bar). "
+            "h>1 computes h-bar forward returns and samples IC non-overlapping "
+            "(end-anchored); 21 ≈ monthly, the conventional horizon for "
+            "fundamental factors."
+        ),
+    )
+    p_bench.add_argument(
         "--strict",
         action="store_true",
         help="Strict gate: mandatory same-universe random control (bench_runner_strict)",
@@ -1012,6 +1088,15 @@ def add_subparser(subparsers: Any) -> argparse.ArgumentParser:
         default=None,
         metavar="YYYY-MM-DD",
         help="Strict mode only: split train/test at this date for the OOS confirmation gate",
+    )
+    p_bench.add_argument(
+        "--training-cutoff",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help=(
+            "Strict mode only: use this model training cutoff as the "
+            "train/test boundary"
+        ),
     )
     p_bench.add_argument(
         "--random-seeds",

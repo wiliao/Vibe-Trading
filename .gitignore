@@ -59,6 +59,7 @@ agent/uploads/
 /swarm/
 /live/
 /uploads/
+/generated_reports/
 /imports/
 /workspace/
 /auth/
@@ -174,3 +175,8 @@ bench_report.json
 # Grounding ledger persisted by ad-hoc verification scripts into tests/
 agent/tests/artifacts/
 .idea/*
+
+/custom-llm-providers.json
+
+/pixel-office.sqlite3
+/pixel-office.sqlite3-*
