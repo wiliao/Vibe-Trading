@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Portfolio } from "@/pages/Portfolio";
 import { api } from "@/lib/api";
@@ -11,6 +11,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       getPortfolio: vi.fn(),
+      getPortfolioAnalysisContext: vi.fn(),
       refreshPortfolio: vi.fn(),
       getPortfolioRefreshStatus: vi.fn(),
       reconnectPortfolioSource: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/lib/api", async () => {
 
 const mocked = api as unknown as {
   getPortfolio: ReturnType<typeof vi.fn>;
+  getPortfolioAnalysisContext: ReturnType<typeof vi.fn>;
   refreshPortfolio: ReturnType<typeof vi.fn>;
   getPortfolioRefreshStatus: ReturnType<typeof vi.fn>;
   reconnectPortfolioSource: ReturnType<typeof vi.fn>;
@@ -133,6 +135,59 @@ const portfolioConfiguration = {
 };
 
 describe("Portfolio page", () => {
+  it("shows reported cash legs without replacing missing values or netting currencies", async () => {
+    mocked.getPortfolio.mockResolvedValue({ status: "ok", snapshot: {
+      ...snapshot,
+      accounts: [{ ...snapshot.accounts[1], balance_details: [{
+        currency: "CAD", max_finance_amount: 5000, remaining_finance_amount: 0,
+        cash_infos: [
+          { currency: "USD", available_cash: 1000, withdraw_cash: null, frozen_cash: 0, settling_cash: 0 },
+          { currency: "CAD", available_cash: -500, withdraw_cash: -600, frozen_cash: 500, settling_cash: -200 },
+        ],
+      }] }],
+    } });
+    render(<Portfolio />);
+    const summary = await screen.findByText(i18n.t("portfolio.accounts.cashDetails"));
+    const details = summary.closest("details")!;
+    fireEvent.click(summary);
+    expect(details.textContent).toContain("CAD");
+    expect(details.textContent).toContain("USD");
+    const amounts = within(details).getAllByText(i18n.t("portfolio.accounts.cashAvailable")).map((label) => label.nextElementSibling!);
+    expect(amounts[0].textContent).toContain("1,000");
+    expect(amounts[1].textContent).toMatch(/^-.*500\.00$/);
+    expect(amounts[1]).toHaveClass("text-danger");
+    expect(within(details).getAllByText(i18n.t("portfolio.accounts.cashWithdrawable"))[0].nextElementSibling).toHaveTextContent("—");
+    expect(within(details).getByText("Remaining financing").nextElementSibling).toHaveTextContent("0.00");
+  });
+
+  it("exports the displayed observation by id and reports a revoked snapshot", async () => {
+    const context = { snapshot_id: "snap-1", totals: { usd: 1000 }, read_identity: { mode: "pinned" } };
+    mocked.getPortfolioAnalysisContext.mockResolvedValue({ status: "ok", context });
+    const create = vi.fn(() => "blob:research");
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", class extends URL {
+      static createObjectURL = create;
+      static revokeObjectURL = revoke;
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      render(<Portfolio />);
+      const button = await screen.findByRole("button", { name: "Export research snapshot" });
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      await waitFor(() => expect(click).toHaveBeenCalledOnce());
+      expect(mocked.getPortfolioAnalysisContext).toHaveBeenCalledWith("snap-1");
+      expect(create).toHaveBeenCalledWith(expect.any(Blob));
+      expect(revoke).toHaveBeenCalledWith("blob:research");
+      mocked.getPortfolioAnalysisContext.mockRejectedValue(new Error("portfolio snapshot unavailable"));
+      fireEvent.click(button);
+      expect(await screen.findByText("portfolio snapshot unavailable")).toBeInTheDocument();
+      expect(click).toHaveBeenCalledOnce();
+    } finally {
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocked.getPortfolio.mockResolvedValue({ status: "ok", snapshot });

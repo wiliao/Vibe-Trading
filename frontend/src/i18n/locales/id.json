@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "Belum ada data harga untuk simbol ini",
     "noCorrelationData": "Pilih setidaknya dua simbol untuk dibandingkan",
-    "noEquityData": "Belum ada kurva nilai akun — jalankan backtest terlebih dahulu"
+    "noEquityData": "Belum ada kurva nilai akun — jalankan backtest terlebih dahulu",
+    "correlationUndefined": "belum terdefinisi (tidak ada variasi harga pada jendela)"
   },
   "layout": {
     "home": "Beranda",
@@ -207,16 +208,16 @@
     "deliveryChannelPlaceholder": "telegram, feishu, … (kosongkan agar hasil tetap di aplikasi)",
     "deliveryTargetLabel": "Target channel",
     "deliveryTargetPlaceholder": "ID chat / grup / pengguna",
-    "deliveryFormatLabel": "Email report format",
-    "deliveryFormatDefault": "Channel default (plain text)",
-    "deliveryFormatHtml": "HTML email",
-    "deliveryFormatPdf": "PDF attachment",
+    "deliveryFormatLabel": "Format laporan email",
+    "deliveryFormatDefault": "Bawaan saluran (teks biasa)",
+    "deliveryFormatHtml": "Email HTML",
+    "deliveryFormatPdf": "Lampiran PDF",
     "proposalPdfProtection": "Perlindungan PDF dengan kata sandi",
     "proposalPdfProtectionOn": "Aktif",
     "proposalPdfProtectionOff": "Nonaktif",
-    "deliveryFormatDefaultHint": "Keeps the existing plain-text delivery behavior.",
-    "deliveryFormatHtmlHint": "Shows the full report as sanitized HTML in the email body.",
-    "deliveryFormatPdfHint": "Attaches the full report as PDF and keeps only a short notice in the body.",
+    "deliveryFormatDefaultHint": "Mempertahankan perilaku pengiriman teks biasa yang ada.",
+    "deliveryFormatHtmlHint": "Menampilkan laporan lengkap sebagai HTML yang sudah disanitasi di isi email.",
+    "deliveryFormatPdfHint": "Melampirkan laporan lengkap sebagai PDF dan hanya menyisakan pemberitahuan singkat di isi email.",
     "deliveryHint": "Nonaktif secara default. Ringkasan dikirim setelah run selesai, bukan saat dijadwalkan.",
     "deliveryTargetRequired": "Pilih target untuk channel tersebut, atau kosongkan channel.",
     "delivery_none": "Akan dikirim ke {{channel}} setelah run berikutnya",
@@ -2114,7 +2115,15 @@
       "lastSuccess": "Terakhir berhasil dibaca {{time}}",
       "noSuccess": "Belum pernah berhasil dibaca",
       "reconnect": "Hubungkan ulang",
-      "retryRead": "Coba baca lagi"
+      "retryRead": "Coba baca lagi",
+      "cashDetails": "Kas dan pembiayaan",
+      "reportingCurrency": "Mata uang laporan",
+      "financingLimit": "Batas pembiayaan",
+      "financingRemaining": "Sisa pembiayaan",
+      "cashAvailable": "Kas tersedia",
+      "cashWithdrawable": "Kas yang dapat ditarik",
+      "cashFrozen": "Kas dibekukan",
+      "cashSettling": "Kas dalam penyelesaian"
     },
     "holdings": {
       "title": "Kepemilikan",

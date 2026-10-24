@@ -16,7 +16,7 @@ export function Correlation() {
   const [error, setError] = useState<string | null>(null);
 
   const [labels, setLabels] = useState<string[]>([]);
-  const [matrix, setMatrix] = useState<number[][]>([]);
+  const [matrix, setMatrix] = useState<(number | null)[][]>([]);
   const [regime, setRegime] = useState<CorrelationRegimeResponse | null>(null);
   const requestGeneration = useRef(0);
 

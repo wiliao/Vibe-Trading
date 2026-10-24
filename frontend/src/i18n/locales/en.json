@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "No price data for this symbol yet",
     "noCorrelationData": "Pick at least two symbols to compare",
-    "noEquityData": "No account-value curve yet — run a backtest first"
+    "noEquityData": "No account-value curve yet — run a backtest first",
+    "correlationUndefined": "undefined (no price variation in window)"
   },
   "layout": {
     "home": "Home",
@@ -2114,7 +2115,15 @@
       "lastSuccess": "Last successful read {{time}}",
       "noSuccess": "No successful read yet",
       "reconnect": "Reconnect",
-      "retryRead": "Retry read"
+      "retryRead": "Retry read",
+      "cashDetails": "Cash and financing",
+      "reportingCurrency": "Reporting currency",
+      "financingLimit": "Financing limit",
+      "financingRemaining": "Remaining financing",
+      "cashAvailable": "Available",
+      "cashWithdrawable": "Withdrawable",
+      "cashFrozen": "Frozen",
+      "cashSettling": "Settling"
     },
     "holdings": {
       "title": "Holdings",

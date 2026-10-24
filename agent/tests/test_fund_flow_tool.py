@@ -7,6 +7,8 @@ All HTTP is mocked at the Eastmoney client functions the tool imports
 from __future__ import annotations
 
 import json
+
+import pytest
 from unittest.mock import patch
 
 from src.tools.fund_flow_tool import FundFlowTool

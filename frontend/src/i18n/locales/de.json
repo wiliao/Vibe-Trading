@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "Noch keine Kursdaten für dieses Symbol",
     "noCorrelationData": "Wählen Sie mindestens zwei Symbole zum Vergleichen",
-    "noEquityData": "Noch keine Kontowert-Kurve — führen Sie zuerst einen Backtest durch"
+    "noEquityData": "Noch keine Kontowert-Kurve — führen Sie zuerst einen Backtest durch",
+    "correlationUndefined": "undefiniert (keine Preisbewegung im Zeitraum)"
   },
   "layout": {
     "home": "Startseite",
@@ -207,16 +208,16 @@
     "deliveryChannelPlaceholder": "telegram, feishu … (leer lassen, dann bleibt alles in der App)",
     "deliveryTargetLabel": "Ziel im Kanal",
     "deliveryTargetPlaceholder": "Chat- / Gruppen- / Benutzer-ID",
-    "deliveryFormatLabel": "Email report format",
-    "deliveryFormatDefault": "Channel default (plain text)",
-    "deliveryFormatHtml": "HTML email",
-    "deliveryFormatPdf": "PDF attachment",
+    "deliveryFormatLabel": "E-Mail-Berichtsformat",
+    "deliveryFormatDefault": "Kanalstandard (reiner Text)",
+    "deliveryFormatHtml": "HTML-E-Mail",
+    "deliveryFormatPdf": "PDF-Anhang",
     "proposalPdfProtection": "PDF-Passwortschutz",
     "proposalPdfProtectionOn": "Ein",
     "proposalPdfProtectionOff": "Aus",
-    "deliveryFormatDefaultHint": "Keeps the existing plain-text delivery behavior.",
-    "deliveryFormatHtmlHint": "Shows the full report as sanitized HTML in the email body.",
-    "deliveryFormatPdfHint": "Attaches the full report as PDF and keeps only a short notice in the body.",
+    "deliveryFormatDefaultHint": "Behält die bisherige Zustellung als reinen Text bei.",
+    "deliveryFormatHtmlHint": "Zeigt den vollständigen Bericht als bereinigtes HTML im Nachrichtentext.",
+    "deliveryFormatPdfHint": "Hängt den vollständigen Bericht als PDF an und lässt im Nachrichtentext nur einen kurzen Hinweis.",
     "deliveryHint": "Standardmäßig aus. Das Briefing wird **nach dem Lauf** gesendet, nicht bei der Planung.",
     "deliveryTargetRequired": "Geben Sie ein Ziel für diesen Kanal an, oder leeren Sie das Kanalfeld.",
     "delivery_none": "Wird nach dem nächsten Lauf an {{channel}} gesendet",
@@ -2114,7 +2115,15 @@
       "lastSuccess": "Letzter erfolgreicher Abruf {{time}}",
       "noSuccess": "Noch kein erfolgreicher Abruf",
       "reconnect": "Neu verbinden",
-      "retryRead": "Lesen wiederholen"
+      "retryRead": "Lesen wiederholen",
+      "cashDetails": "Barmittel und Finanzierung",
+      "reportingCurrency": "Berichtswährung",
+      "financingLimit": "Finanzierungslimit",
+      "financingRemaining": "Verbleibende Finanzierung",
+      "cashAvailable": "Verfügbares Guthaben",
+      "cashWithdrawable": "Auszahlbares Guthaben",
+      "cashFrozen": "Gesperrtes Guthaben",
+      "cashSettling": "Guthaben in Abwicklung"
     },
     "holdings": {
       "title": "Positionen",

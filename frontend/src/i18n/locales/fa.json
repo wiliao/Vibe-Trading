@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "هنوز داده قیمتی برای این نماد وجود ندارد",
     "noCorrelationData": "برای مقایسه حداقل دو نماد انتخاب کنید",
-    "noEquityData": "هنوز منحنی ارزش حسابی وجود ندارد — ابتدا یک بک‌تست اجرا کنید"
+    "noEquityData": "هنوز منحنی ارزش حسابی وجود ندارد — ابتدا یک بک‌تست اجرا کنید",
+    "correlationUndefined": "تعریف‌نشده (بدون نوسان قیمت در بازه)"
   },
   "navigation": {
     "menu": "مرور قابلیت‌ها",
@@ -2148,7 +2149,15 @@
       "lastSuccess": "آخرین خواندن موفق {{time}}",
       "noSuccess": "هنوز خواندن موفقی نداشته است",
       "reconnect": "اتصال دوباره",
-      "retryRead": "تلاش دوباره برای خواندن"
+      "retryRead": "تلاش دوباره برای خواندن",
+      "cashDetails": "وجه نقد و تأمین مالی",
+      "reportingCurrency": "ارز گزارش",
+      "financingLimit": "سقف تأمین مالی",
+      "financingRemaining": "تأمین مالی باقی‌مانده",
+      "cashAvailable": "وجه نقد در دسترس",
+      "cashWithdrawable": "وجه نقد قابل برداشت",
+      "cashFrozen": "وجه نقد مسدودشده",
+      "cashSettling": "وجه نقد در حال تسویه"
     },
     "holdings": {
       "title": "دارایی‌ها",

@@ -1,6 +1,6 @@
 ---
 name: vibe-trading
-version: 0.1.16
+version: 0.1.18
 description: Professional finance research toolkit — backtesting (2 engines + benchmark comparison panel), factor analysis, Alpha Zoo (281 pre-built alphas across qlib158/alpha101/academic/fundamental), options pricing, 58 finance skills, 25 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 10 market-data sources (yahoo, yfinance, stooq, sina, eastmoney, local, plus optional-key finnhub/alphavantage/tiingo/fmp).
 dependencies:
   python: ">=3.11"
@@ -184,7 +184,7 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `etf_holdings` | ETF look-through — SEC N-PORT filings for U.S.-listed funds | None |
 | `prediction_market` | Event-contract search/market/history as labelled implied probability | None |
 | `research_papers` | arXiv + OpenAlex search/read with source-anchored claim extraction | None |
-| `quantlib_call` | Pure-compute finance math — 265 functions across 19 quantlib modules | None |
+| `quantlib_call` | Pure-compute finance math — 308 functions across 24 quantlib modules | None |
 | `cashflow_performance` | XIRR / MOIC / DPI / TVPI / TWR / Modified Dietz over dated cash flows | None |
 | `sentiment` | Local lexicon text scoring + crypto Fear & Greed Index | None |
 | `technical_indicators` | RSI / MACD / Bollinger / SMA / EMA through the existing loaders | None* |

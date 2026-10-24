@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "Aún no hay datos de precio para este símbolo",
     "noCorrelationData": "Elige al menos dos símbolos para comparar",
-    "noEquityData": "Aún no hay curva de valor de cuenta — ejecuta primero un backtest"
+    "noEquityData": "Aún no hay curva de valor de cuenta — ejecuta primero un backtest",
+    "correlationUndefined": "indefinida (sin variación de precio en la ventana)"
   },
   "layout": {
     "home": "Inicio",
@@ -2114,7 +2115,15 @@
       "lastSuccess": "Última lectura correcta {{time}}",
       "noSuccess": "Todavía sin ninguna lectura correcta",
       "reconnect": "Volver a conectar",
-      "retryRead": "Reintentar lectura"
+      "retryRead": "Reintentar lectura",
+      "cashDetails": "Efectivo y financiación",
+      "reportingCurrency": "Moneda del informe",
+      "financingLimit": "Límite de financiación",
+      "financingRemaining": "Financiación disponible",
+      "cashAvailable": "Efectivo disponible",
+      "cashWithdrawable": "Efectivo retirable",
+      "cashFrozen": "Efectivo bloqueado",
+      "cashSettling": "Efectivo pendiente de liquidación"
     },
     "holdings": {
       "title": "Posiciones",

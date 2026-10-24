@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "Ainda não há dados de preço para este símbolo",
     "noCorrelationData": "Escolha pelo menos dois símbolos para comparar",
-    "noEquityData": "Ainda não há curva de valor da conta – execute primeiro um backtest"
+    "noEquityData": "Ainda não há curva de valor da conta – execute primeiro um backtest",
+    "correlationUndefined": "indefinida (sem variação de preço na janela)"
   },
   "layout": {
     "home": "Início",
@@ -207,16 +208,16 @@
     "deliveryChannelPlaceholder": "telegram, feishu,… (deixe em branco para manter os resultados no aplicativo)",
     "deliveryTargetLabel": "Segmentação do canal",
     "deliveryTargetPlaceholder": "chat / grupo / ID de usuário",
-    "deliveryFormatLabel": "Email report format",
-    "deliveryFormatDefault": "Channel default (plain text)",
-    "deliveryFormatHtml": "HTML email",
-    "deliveryFormatPdf": "PDF attachment",
+    "deliveryFormatLabel": "Formato do relatório por e-mail",
+    "deliveryFormatDefault": "Padrão do canal (texto simples)",
+    "deliveryFormatHtml": "E-mail em HTML",
+    "deliveryFormatPdf": "Anexo em PDF",
     "proposalPdfProtection": "Proteção do PDF por senha",
     "proposalPdfProtectionOn": "Ativada",
     "proposalPdfProtectionOff": "Desativada",
-    "deliveryFormatDefaultHint": "Keeps the existing plain-text delivery behavior.",
-    "deliveryFormatHtmlHint": "Shows the full report as sanitized HTML in the email body.",
-    "deliveryFormatPdfHint": "Attaches the full report as PDF and keeps only a short notice in the body.",
+    "deliveryFormatDefaultHint": "Mantém o comportamento atual de entrega em texto simples.",
+    "deliveryFormatHtmlHint": "Mostra o relatório completo como HTML sanitizado no corpo do e-mail.",
+    "deliveryFormatPdfHint": "Anexa o relatório completo em PDF e mantém apenas um aviso curto no corpo.",
     "deliveryHint": "Desativado por padrão. Um briefing é enviado assim que a execução termina, não quando está agendada.",
     "deliveryTargetRequired": "Escolha um alvo para esse canal ou limpe o canal.",
     "delivery_none": "Entregando para {{channel}} após a próxima execução",
@@ -2114,7 +2115,15 @@
       "lastSuccess": "Última leitura bem-sucedida {{time}}",
       "noSuccess": "Nenhuma leitura bem-sucedida ainda",
       "reconnect": "Reconectar",
-      "retryRead": "Tente ler novamente"
+      "retryRead": "Tente ler novamente",
+      "cashDetails": "Caixa e financiamento",
+      "reportingCurrency": "Moeda do relatório",
+      "financingLimit": "Limite de financiamento",
+      "financingRemaining": "Financiamento restante",
+      "cashAvailable": "Caixa disponível",
+      "cashWithdrawable": "Caixa para saque",
+      "cashFrozen": "Caixa bloqueado",
+      "cashSettling": "Caixa em liquidação"
     },
     "holdings": {
       "title": "Participações",

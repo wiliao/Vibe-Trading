@@ -527,7 +527,6 @@ def _eastmoney_candidate(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     suffix = _EASTMONEY_SUFFIX_BY_MARKET.get(market)
     if not suffix or not code:
         return None
-
     symbol = _format_symbol(code, suffix)
     if symbol is None:
         return None

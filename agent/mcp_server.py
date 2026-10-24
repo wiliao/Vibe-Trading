@@ -466,6 +466,7 @@ _lenient_str_list_opt = Annotated[list[str] | None, _lenient]
 _lenient_float_list_opt = Annotated[list[float] | None, _lenient]
 _lenient_dict_list = Annotated[list[dict[str, Any]], _lenient]
 _lenient_dict_list_opt = Annotated[list[dict[str, Any]] | None, _lenient]
+_lenient_dict_any = Annotated[dict[str, Any], _lenient]
 _lenient_dict_any_opt = Annotated[dict[str, Any] | None, _lenient]
 _lenient_dict_str_str = Annotated[dict[str, str], _lenient]
 
@@ -818,8 +819,6 @@ def backtest(run_dir: str) -> str:
     from src.tools.backtest_tool import run_backtest
 
     return run_backtest(run_dir)
-
-
 # ---------------------------------------------------------------------------
 # Factor analysis tool
 # ---------------------------------------------------------------------------
@@ -2974,7 +2973,8 @@ def main():
         action="store_true",
         help="Register bash / background_run / cancel_background (OS process "
         "control — RCE surface). OFF by default for every transport; equivalent "
-        "to setting VIBE_TRADING_ENABLE_SHELL_TOOLS=1.",
+        "to setting VIBE_TRADING_ENABLE_SHELL_TOOLS=1 in the process environment "
+        "(.env is not consulted for this switch).",
     )
     args = parser.parse_args()
 
@@ -2988,6 +2988,11 @@ def main():
         logging.getLogger(__name__).warning("Legacy state migration failed", exc_info=True)
 
     _include_shell_tools = _resolve_include_shell_tools(args.enable_shell_tools)
+    # After the shell-tool decision: that switch must come from the launch
+    # flag or process env, never from a .env written for the web server.
+    from src.providers.llm import _ensure_dotenv
+
+    _ensure_dotenv()
     _registry = None
     _get_registry()  # pre-warm: avoids deadlock when first tools/call lazy-inits inside FastMCP worker thread
 

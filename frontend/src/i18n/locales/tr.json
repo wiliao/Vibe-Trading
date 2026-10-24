@@ -1,11 +1,12 @@
 {
   "app": {
-    "version": "v0.1.16"
+    "version": "v0.1.18"
   },
   "charts": {
     "noPriceData": "Bu sembol için henüz fiyat verisi yok",
     "noCorrelationData": "Karşılaştırmak için en az iki sembol seçin",
-    "noEquityData": "Henüz hesap değeri eğrisi yok; önce geriye dönük test çalıştırın"
+    "noEquityData": "Henüz hesap değeri eğrisi yok; önce geriye dönük test çalıştırın",
+    "correlationUndefined": "tanımsız (pencerede fiyat değişimi yok)"
   },
   "layout": {
     "home": "Ana Sayfa",
@@ -2114,7 +2115,15 @@
       "lastSuccess": "Son başarılı okuma: {{time}}",
       "noSuccess": "Henüz başarılı okuma yok",
       "reconnect": "Yeniden bağlan",
-      "retryRead": "Okumayı yeniden dene"
+      "retryRead": "Okumayı yeniden dene",
+      "cashDetails": "Nakit ve finansman",
+      "reportingCurrency": "Raporlama para birimi",
+      "financingLimit": "Finansman limiti",
+      "financingRemaining": "Kalan finansman",
+      "cashAvailable": "Kullanılabilir nakit",
+      "cashWithdrawable": "Çekilebilir nakit",
+      "cashFrozen": "Bloke nakit",
+      "cashSettling": "Takas bekleyen nakit"
     },
     "holdings": {
       "title": "Varlıklar",

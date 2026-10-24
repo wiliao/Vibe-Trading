@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import Any
 
 from backtest.loaders.eastmoney_client import get_json, resolve_secid
@@ -81,6 +82,8 @@ def _parse_flow_row(raw: str) -> dict[str, Any] | None:
         values = [float(parts[i + 1]) for i in range(len(_BUCKETS))]
     except (ValueError, TypeError):
         return None
+    if not all(math.isfinite(value) for value in values):
+        return None
     row: dict[str, Any] = {"timestamp": timestamp}
     row.update(dict(zip(_BUCKETS, values)))
     return row
@@ -118,11 +121,9 @@ def _fetch_symbol_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]
         return {"symbol": symbol, "error": str(exc)}
 
     data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, dict):
-        return {"symbol": symbol, "secid": secid, "rows": []}
-    klines = data.get("klines")
+    klines = data.get("klines") if isinstance(data, dict) else None
     if not isinstance(klines, list):
-        return {"symbol": symbol, "secid": secid, "rows": []}
+        klines = []
 
     rows: list[dict[str, Any]] = []
     for raw in klines:
@@ -137,7 +138,7 @@ def _fetch_symbol_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]
     if len(rows) > _MAX_ROWS_PER_SYMBOL:
         rows = rows[-_MAX_ROWS_PER_SYMBOL:]
 
-    return {"symbol": symbol, "secid": secid, "rows": rows}
+    return {"symbol": symbol, "secid": secid, "source": "eastmoney", "rows": rows}
 
 
 class FundFlowTool(BaseTool):
@@ -218,6 +219,11 @@ class FundFlowTool(BaseTool):
             symbol: _fetch_symbol_flow(symbol, period=period, days=days)
             for symbol in (c.strip() for c in codes)
         }
+        sources = {
+            result["source"] for result in results.values()
+            if result.get("rows") and result.get("source")
+        }
+        source = next(iter(sources)) if len(sources) == 1 else ("mixed" if sources else None)
         envelope = {
             "ok": True,
             "market": "stock",
