@@ -539,6 +539,105 @@ class TestTickerNameQueryYahooSkip:
 
 
 # --------------------------------------------------------------------------
+# U.S. venue suffix in the query: providers match Yahoo-native spellings,
+# so ``SPCX.US`` must be searched as ``SPCX`` — otherwise a live listing
+# answers zero rows and the caller warns "本次未取价 … not_found".
+# --------------------------------------------------------------------------
+
+
+class TestUsSuffixQuery:
+    """A ``.US``-suffixed ticker query is searched without the suffix."""
+
+    def test_us_suffixed_ticker_searches_bare_code(self):
+        """Yahoo and Eastmoney both receive the bare ticker, not ``SPCX.US``."""
+        with patch.object(
+            ss.eastmoney_client,
+            "get_json",
+            return_value=_eastmoney_payload(),
+        ) as em_get, patch.object(
+            ss.yahoo_client, "search", return_value=_yahoo_quotes()
+        ) as search, patch.object(
+            ss.sec_edgar_client, "cik_for", return_value="0000320193"
+        ):
+            data = json.loads(
+                ss.SymbolSearchTool().execute(query="SPCX.US")
+            )["data"]
+
+        assert search.call_args.args[0] == "SPCX"
+        assert em_get.call_args.kwargs["params"]["input"] == "SPCX"
+        # The envelope echoes the caller's query, not the rewritten lookup.
+        assert data["query"] == "SPCX.US"
+
+    def test_class_share_dots_fold_to_hyphen(self):
+        """``BRK.B.US`` searches as ``BRK-B``, Yahoo's class-share spelling."""
+        with patch.object(
+            ss.eastmoney_client,
+            "get_json",
+            return_value={"QuotationCodeTable": {"Data": []}},
+        ), patch.object(
+            ss.yahoo_client,
+            "search",
+            return_value=[
+                {
+                    "symbol": "BRK-B",
+                    "shortname": "Berkshire Hathaway Inc Class B",
+                    "exchange": "NYQ",
+                    "quoteType": "EQUITY",
+                }
+            ],
+        ) as search, patch.object(
+            ss.sec_edgar_client, "cik_for", return_value="0001067983"
+        ):
+            data = json.loads(
+                ss.SymbolSearchTool().execute(query="BRK.B.US")
+            )["data"]
+
+        assert search.call_args.args[0] == "BRK-B"
+        symbols = [c["symbol"] for c in data["candidates"]]
+        assert symbols == ["BRK-B"]
+
+    def test_us_suffixed_query_resolves_project_symbol_with_cik(self):
+        """A bare Yahoo hit re-suffixes to ``.US`` and gets its SEC CIK."""
+        with patch.object(
+            ss.eastmoney_client,
+            "get_json",
+            return_value={"QuotationCodeTable": {"Data": []}},
+        ), patch.object(
+            ss.yahoo_client,
+            "search",
+            return_value=[
+                {
+                    "symbol": "SPCX",
+                    "shortname": "SpaceX",
+                    "exchange": "NCM",
+                    "quoteType": "EQUITY",
+                }
+            ],
+        ), patch.object(
+            ss.sec_edgar_client, "cik_for", return_value="0001181412"
+        ):
+            data = json.loads(
+                ss.SymbolSearchTool().execute(query="SPCX.US")
+            )["data"]
+
+        candidate = data["candidates"][0]
+        assert candidate["symbol"] == "SPCX.US"
+        assert candidate["cik"] == "0001181412"
+        assert data["sources"]["sec_edgar"] == "ok"
+
+    def test_suffix_only_query_is_left_alone(self):
+        """A lone ``.US`` has no ticker to search; pass it through verbatim."""
+        assert ss._search_query(".US") == ".US"
+
+    @pytest.mark.parametrize(
+        "query", ["TD.TO", "PNG.V", "BTC-USD", "^GSPC", "apple", "XOM ExxonMobil"]
+    )
+    def test_other_query_shapes_unchanged(self, query):
+        """Canadian, crypto, index and free-text queries are never rewritten."""
+        assert ss._search_query(query) == query
+
+
+# --------------------------------------------------------------------------
 # Pair spellings + index symbols: the crypto pair classifier is now the only
 # pair path. Forex is a removed market, so a pair string off the crypto
 # whitelist is not canonicalized at all (no FX fallback).

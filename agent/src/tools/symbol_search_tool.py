@@ -55,6 +55,14 @@ _EASTMONEY_SUGGEST_URL = "https://searchapi.eastmoney.com/api/suggest/get"
 # left to the normal fan-out.
 _CANADIAN_SYMBOL_RE = re.compile(r"^[A-Z0-9&.\-]+\.(?:TO|V)\b", re.IGNORECASE)
 
+# The project's venue suffix for U.S. listings (``AAPL.US``, ``BRK.B.US``).
+# That spelling is OURS, not the search providers': Yahoo serves US tickers
+# bare and Eastmoney takes the bare code as its suggest input, so both answer
+# ``SPCX.US`` with zero rows — a live listing would read as "not listed" (the
+# warning this rewrite exists to kill). Canadian suffixes need no rewrite:
+# ``TD.TO`` *is* Yahoo's native spelling and matches as given.
+_US_SUFFIX = ".US"
+
 # Explicit exchange-pair spellings are not equity/name searches. Restrict the
 # quote leg to assets used by the crypto connectors so an equity such as
 # ``BRK-B`` is never misclassified as a pair. The full set is split into
@@ -137,8 +145,10 @@ class SymbolSearchTool(BaseTool):
         "Canada TD.TO/PNG.V, plus crypto/index from Yahoo). Exact crypto "
         "pairs are checked against the active Binance profile; other queries "
         "search Eastmoney (US names and tickers) and Yahoo, and for U.S. "
-        "equities the SEC CIK is attached. Use this to turn an ambiguous name "
-        "into a concrete symbol before calling get_market_data or "
+        "equities the SEC CIK is attached. A U.S. ticker query may carry or "
+        "omit the .US suffix (SPCX.US and SPCX search identically). Use this "
+        "to turn an ambiguous name into a concrete symbol before calling "
+        "get_market_data or "
         'get_sec_filings. Example: search_symbol(query="apple", limit=5).'
     )
     parameters = {
@@ -186,12 +196,17 @@ class SymbolSearchTool(BaseTool):
 
         limit = _clamp_limit(kwargs.get("limit", _DEFAULT_LIMIT))
 
+        # Search providers match Yahoo-native spellings, so a U.S. ticker
+        # query arrives here without the project's ``.US`` venue suffix; the
+        # envelope keeps echoing the caller's original query.
+        search_query = _search_query(query)
+
         candidates: List[Dict[str, Any]] = []
         sources: Dict[str, str] = {}
 
         crypto_pair = _canonical_crypto_pair(query)
         connector_hits, connector_source, connector_status = (
-            _search_selected_connector(query, limit)
+            _search_selected_connector(search_query, limit)
         )
         if connector_source is not None and connector_status is not None:
             sources[connector_source] = connector_status
@@ -203,10 +218,10 @@ class SymbolSearchTool(BaseTool):
                 "data": {"query": query, "count": len(connector_hits[:limit]),
                          "candidates": connector_hits[:limit], "sources": sources},
             }, ensure_ascii=False)
-        em_hits, sources["eastmoney"] = _search_eastmoney(query)
+        em_hits, sources["eastmoney"] = _search_eastmoney(search_query)
         candidates.extend(em_hits)
 
-        yh_hits, sources["yahoo"] = _search_yahoo(query)
+        yh_hits, sources["yahoo"] = _search_yahoo(search_query)
         candidates.extend(yh_hits)
 
         if crypto_pair is not None:
@@ -271,6 +286,33 @@ def _clamp_limit(value: Any) -> int:
     except (TypeError, ValueError, OverflowError):
         return _DEFAULT_LIMIT
     return max(1, min(n, _MAX_LIMIT))
+
+
+def _search_query(query: str) -> str:
+    """Rewrite a query into the spelling the search providers can match.
+
+    Args:
+        query: The caller's free-text query, in project convention.
+
+    Returns:
+        ``query`` unchanged, except that a query whose first token ends in
+        the project's U.S. venue suffix (``SPCX.US``, ``BRK.B.US``) drops it
+        (``SPCX``, ``BRK.B``): both providers index US listings under the
+        bare ticker and answer the suffixed spelling with zero rows, which a
+        caller deciding whether an entity exists would read as "not listed".
+        The candidates those searches return carry the project convention
+        back on their own (``_from_yahoo_symbol`` re-appends ``.US``), so
+        only the lookup spelling changes, never the reported symbols.
+    """
+    text = (query or "").strip()
+    head, sep, tail = text.partition(" ")
+    if head.upper().endswith(_US_SUFFIX) and len(head) > len(_US_SUFFIX):
+        # Same translation the data layer applies to a whole symbol: drop
+        # the venue suffix and fold class-share dots to hyphens (``BRK.B.US``
+        # -> ``BRK-B``), which is also what the SEC CIK table keys on.
+        head = head[: -len(_US_SUFFIX)].replace(".", "-")
+        return f"{head}{sep}{tail}".strip()
+    return query
 
 
 def _is_canadian_symbol(text: str) -> bool:

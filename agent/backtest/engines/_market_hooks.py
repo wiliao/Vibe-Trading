@@ -41,6 +41,97 @@ _MARKET_CURRENCY = {
     "index": "USD",
 }
 
+# ── Crypto-pair recognition (classification only, never routing) ──────────
+#
+# Crypto is a removed market in this US/CA build: no loader chain, no engine,
+# no settlement-currency row. But the symbol layers above still speak crypto —
+# symbol search returns Yahoo-native pairs like BTC-USD verbatim (labelled
+# "global") and the grounding identity scanner knows their spellings — so a
+# pair like BTC-USD used to fall into the generic "unsupported symbol format:
+# expected a US ticker …" error, i.e. it was *treated as a stock symbol* that
+# happened to be malformed. Recognizing the shape here keeps classification
+# honest (BTC-USD is crypto, not an equity) and lets ``_detect_market`` answer
+# with a clear "crypto is not a supported market" instead.
+#
+# Mirrors ``src.tools.symbol_search_tool._canonical_crypto_pair`` (kept
+# independent so this module stays dependency-free for subprocess entry
+# points): stablecoin quotes accept any alphanumeric base — no real-world
+# asset except crypto ones trades quoted in stablecoins — while a USD/BTC/ETH/
+# BNB quote is gated on the whitelist of major coins below. A pair whose BOTH
+# legs are fiat (GBP-USD, EUR/USD) is forex, never crypto.
+
+_CRYPTO_STABLECOIN_QUOTES = ("FDUSD", "USDT", "USDC", "BUSD", "TUSD")
+_CRYPTO_QUOTE_ASSETS = _CRYPTO_STABLECOIN_QUOTES + ("BTC", "ETH", "BNB", "USD")
+# Bases that may pair with USD/BTC/ETH/BNB and still count as a crypto pair —
+# majors listed on the big spot exchanges. XAU/EUR/etc are deliberately out.
+_CRYPTO_QUOTE_BASES = frozenset(
+    {
+        "BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "DOGE", "TRX", "DOT",
+        "MATIC", "AVAX", "LINK", "LTC", "BCH", "ETC", "XLM", "ATOM",
+        "FIL", "APT", "NEAR", "ALGO", "SAND", "MANA", "AXS", "XAUT",
+        "PAXG",
+    }
+)
+# Fiat ISO codes: a pair whose both legs are fiat is an FX pair, never crypto.
+_FIAT_LEG_CODES = frozenset(
+    {
+        "USD", "EUR", "GBP", "JPY", "CHF", "CNY", "CNH", "HKD", "AUD", "NZD",
+        "CAD", "KRW", "INR", "SGD", "SEK", "NOK", "DKK", "MXN", "BRL", "ZAR",
+        "TRY", "RUB", "PLN", "THB", "MYR", "IDR", "PHP", "VND", "ILS", "AED",
+        "SAR", "EGP", "CZK", "HUF", "RON", "CLP", "COP", "PEN", "TWD", "CUP",
+    }
+)
+# BASE-QUOTE / BASE/QUOTE spelling, e.g. BTC-USD, ETH/USDT.
+_CRYPTO_SEPARATED_RE = re.compile(
+    r"^([A-Z0-9]{2,15})[-/]([A-Z]{3,5})$", re.I
+)
+# Joined alnum spelling, e.g. a base run straight into its quote (no
+# separator). The stablecoin quotes come first so the longest quote wins on a
+# suffix collision (…USD vs …USDT).
+_CRYPTO_JOINED_RE = re.compile(
+    r"^([A-Z0-9]{2,15})(?:" + "|".join(_CRYPTO_QUOTE_ASSETS) + r")$",
+    re.I,
+)
+
+
+def _is_crypto_pair(symbol: str) -> bool:
+    """Return whether *symbol* is spelled as a crypto pair.
+
+    Recognizes the dashed/slash form (``BTC-USD``, ``ETH/USDT``) and the
+    joined form (a base run straight into its quote, no separator). The quote
+    leg must be a stablecoin (any base accepted) or one of USD/BTC/ETH/BNB
+    paired with a whitelisted major coin; both legs fiat is forex, not crypto.
+
+    Args:
+        symbol: Bare symbol without any ``local:`` routing prefix.
+
+    Returns:
+        ``True`` when the spelling is a crypto pair.
+    """
+    upper = symbol.strip().upper()
+    if not upper:
+        return False
+    matched = _CRYPTO_SEPARATED_RE.fullmatch(upper)
+    if matched:
+        base, quote = matched.group(1), matched.group(2)
+    else:
+        matched = _CRYPTO_JOINED_RE.fullmatch(upper)
+        if not matched:
+            return False
+        # The joined regex only anchors the tail; recover the split so the
+        # fiat-leg and whitelist gates see the real base/quote legs.
+        for quote in _CRYPTO_QUOTE_ASSETS:
+            if upper.endswith(quote) and len(upper) > len(quote) + 1:
+                base, quote = upper[: -len(quote)], quote
+                break
+        else:
+            return False
+    if quote in _FIAT_LEG_CODES and base in _FIAT_LEG_CODES:
+        # Both legs fiat is an FX pair (GBP-USD, EUR-USD), never crypto.
+        return False
+    if quote in _CRYPTO_STABLECOIN_QUOTES:
+        return True
+    return quote in ("USD", "BTC", "ETH", "BNB") and base in _CRYPTO_QUOTE_BASES
 
 
 def strip_local_prefix(code: str) -> str:
@@ -74,12 +165,22 @@ def _detect_market(code: str) -> str:
         silently misrouting to a removed market.
 
     Raises:
-        ValueError: The symbol matches no supported US/CA/index pattern.
+        ValueError: The symbol names crypto, a removed market with no data
+            source here, or matches no supported US/CA/index pattern at all.
     """
     symbol = strip_local_prefix(code)
     for pattern, market in _MARKET_PATTERNS:
         if pattern.match(symbol):
             return market
+    if _is_crypto_pair(symbol):
+        # A crypto pair is NOT a malformed stock ticker: say so instead of
+        # telling the caller to use a US/CA ticker format. Crypto has no
+        # loader chain or engine in this build, so it stays fail-loud.
+        raise ValueError(
+            f"Crypto symbol {code!r} is not a supported market: this build "
+            "routes US tickers (bare or .US), Canadian tickers (.TO/.V), and "
+            "^-prefixed indexes only."
+        )
     raise ValueError(
         f"Unsupported symbol format {code!r}: expected a US ticker "
         f"(bare or .US), a Canadian ticker (.TO/.V), or a ^-prefixed index."

@@ -184,7 +184,18 @@ def fetch_market_data(
     groups: dict[tuple[str, str], list[str]] = {}
     for code in codes:
         src = detect_source(code) if source == "auto" else source
-        groups.setdefault((src, _detect_market(code)), []).append(code)
+        try:
+            market = _detect_market(code)
+        except ValueError as exc:
+            # A crypto pair (BTC-USD, …) or other removed-market symbol is not
+            # a fetchable US/CA listing. Record it as unresolved with the
+            # classifier's own message instead of aborting the whole call —
+            # sibling symbols in the same request still get their bars.
+            diagnostics[code] = [
+                {"source": src, "status": "fetch_failed", "error": str(exc)}
+            ]
+            continue
+        groups.setdefault((src, market), []).append(code)
 
     def _chain_for(src: str, market: str) -> list[str]:
         """Return the ordered fallback chain for ``src``.

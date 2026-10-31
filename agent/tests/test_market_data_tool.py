@@ -455,3 +455,30 @@ def test_market_data_tool_asks_only_a_us_equity_for_its_suffix():
             mod.MarketDataTool().execute(codes=["AAPL"], start_date="2026-08-20", end_date="2026-08-21")
         )
     assert refused["ok"] is False and "AAPL.US" in refused["error"]
+
+
+def test_market_data_tool_names_crypto_instead_of_a_ticker_format_error():
+    """BTC-USD must not surface as "unsupported symbol format ... US ticker".
+
+    The pair reaches ``fetch_market_data`` where the classifier rejects it as
+    crypto; the tool envelope has to name crypto (and keep the sibling equity
+    of a mixed request served), never a stock-ticker format complaint or a
+    traceback.
+    """
+    from src.market_data import fetch_market_data, fetch_market_data_json
+
+    payload = fetch_market_data(
+        codes=["BTC-USD", "AAPL.US"],
+        start_date="2026-01-01",
+        end_date="2026-01-02",
+    )
+    assert payload.get("_unresolved") == ["BTC-USD"]
+    attempts = payload["_diagnostics"]["BTC-USD"]["attempts"]
+    error = attempts[0]["error"]
+    assert "Crypto symbol" in error and "not a supported market" in error
+    assert "expected a US ticker" not in error
+
+    text = fetch_market_data_json(codes=["BTC-USD"], start_date="2026-01-01", end_date="2026-01-02")
+    envelope = json.loads(text)
+    assert envelope["status"] == "error"
+    assert "Crypto symbol" in envelope["_diagnostics"]["BTC-USD"]["attempts"][0]["error"]

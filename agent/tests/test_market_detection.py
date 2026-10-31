@@ -80,6 +80,38 @@ class TestDetectMarket:
         with pytest.raises(ValueError):
             _detect_market(code)
 
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "BTC-USD", "ETH-USD", "BTC/USD", "BTC-USDT", "BTCUSDT",
+            "ETH/USDT", "SOL-USD", "DOGE-USD", "XAUT-USD", "PAXG-USD",
+            "SHIB-USDT", "local:BTC-USD",
+        ],
+    )
+    def test_crypto_pairs_are_not_stock_symbols(self, code: str) -> None:
+        """The reported bug: BTC-USD was rejected as a malformed US ticker.
+
+        A crypto pair must be recognized as crypto and answered with a
+        message that names crypto — never "expected a US ticker". It still
+        fails loud because this build has no crypto data source.
+        """
+        with pytest.raises(ValueError) as excinfo:
+            _detect_market(code)
+        message = str(excinfo.value)
+        assert "Crypto symbol" in message
+        assert "not a supported market" in message
+        assert "expected a US ticker" not in message
+
+    @pytest.mark.parametrize(
+        "code", ["EUR/USD", "EURUSD", "GBP-USD", "XAU-USD", "JPY=X", "GC=F"]
+    )
+    def test_forex_metal_futures_stay_generic(self, code: str) -> None:
+        # The crypto recognizer must not swallow FX/metal/futures spellings:
+        # a fiat-vs-fiat pair (GBP-USD) or an unlisted metal base (XAU-USD)
+        # keeps the generic format error.
+        with pytest.raises(ValueError, match="Unsupported symbol format"):
+            _detect_market(code)
+
 
 class TestCodeCurrency:
     @pytest.mark.parametrize(
