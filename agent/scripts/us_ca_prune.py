@@ -3,8 +3,15 @@
 After an upstream sync re-introduces region-only files, re-run this script to
 re-apply the deletions:
 
-    python agent/scripts/us_ca_prune.py --check     # list + verify (default)
-    python agent/scripts/us_ca_prune.py --apply     # delete the listed paths
+    python agent/scripts/us_ca_prune.py --check            # list + verify (default)
+    python agent/scripts/us_ca_prune.py --apply            # delete the listed paths
+    python agent/scripts/us_ca_prune.py --check-preserved  # verify PRESERVED exists
+
+``DELETIONS`` records what this branch must *not* carry. ``PRESERVED`` records
+the mirror-image decision: files that a sync must carry even when the upstream
+change looked region-scoped, because shipped code imports them. ``--check``
+reports both; ``--check-preserved`` is the CI gate (tools/ci_grep_gates.sh gate
+(i)) and exits non-zero if a preserved path is missing.
 
 Each entry is ``(path, kind, phase, reason)`` where ``kind`` is ``"file"`` or
 ``"dir"`` and ``path`` is relative to the repository root. Phases map to the
@@ -193,6 +200,28 @@ DELETIONS: list[tuple[str, str, str, str]] = [
 ]
 
 
+# Files this branch must always carry, even when a sync did not adopt them.
+# (path, policy, reason)
+#
+# ``policy`` is how a future sync should treat the path:
+#   "adopt-then-trim"  - take the upstream file, then re-apply the US/CA trim
+#                        (shared shape kept, removed-market rows dropped), which
+#                        is the same rule used for `bench_runner.py`'s docstrings.
+#   "adopt-verbatim"   - take the upstream file unchanged.
+PRESERVED: list[tuple[str, str, str]] = [
+    (
+        "agent/src/factors/data_availability.py",
+        "adopt-then-trim",
+        "Shared alpha-bench availability contract: bench_runner.py and "
+        "bench_runner_strict.py import build_availability_contract from it, so "
+        "without the file alpha_compare drops out of the tool registry and the "
+        "bench meta loses data_availability. The upstream file also carries "
+        "removed-market adapter rows (csi300 / btc-usdt), so it is adopted and "
+        "trimmed to sp500 + the generic fallback rather than dropped.",
+    ),
+]
+
+
 def _resolve(path: str) -> Path:
     return REPO_ROOT / path
 
@@ -207,6 +236,27 @@ def check() -> int:
             missing += 1
         print(f"[{marker}] ({phase}) {kind:<4} {path:<55} {reason}")
     print(f"\n{len(DELETIONS)} deletions, {missing} already absent.")
+    return 0
+
+
+def check_preserved() -> int:
+    """Verify every PRESERVED path is present; non-zero if one is missing."""
+    missing = 0
+    for path, policy, reason in PRESERVED:
+        p = _resolve(path)
+        if p.exists():
+            print(f"[PRESENT] {path}  # {policy}")
+            continue
+        missing += 1
+        print(f"[MISSING] {path}  # {policy}")
+        print(f"          {reason}")
+    if missing:
+        print(
+            f"\n{missing} of {len(PRESERVED)} preserved path(s) missing. "
+            "Adopt them from upstream (policy above) before shipping."
+        )
+        return 1
+    print(f"\n{len(PRESERVED)} preserved path(s) present.")
     return 0
 
 
@@ -230,7 +280,14 @@ def apply_deletions() -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Replay the US/CA deletion set.")
     parser.add_argument("--apply", action="store_true", help="delete listed paths (default: check only)")
+    parser.add_argument(
+        "--check-preserved",
+        action="store_true",
+        help="verify every PRESERVED path exists (CI gate; ignores DELETIONS)",
+    )
     args = parser.parse_args(argv)
+    if args.check_preserved:
+        return check_preserved()
     return apply_deletions() if args.apply else check()
 
 

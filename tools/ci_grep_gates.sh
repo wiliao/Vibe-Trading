@@ -28,6 +28,14 @@
 #       `agent/tests/test_us_ca_scope_gate.py` (same JSON policy).
 #   (h) No internal documents in the Git index, even if force-added.
 #       Uses `tools/ci_private_files_gate.py`; ignored local files are allowed.
+#   (i) Every path in `PRESERVED` still exists. A sync that adopts an upstream
+#       file which imports a module it did not adopt is invisible until something
+#       imports it -- that is how alpha_compare silently left the tool registry
+#       on 2026-11-07 (agent/src/factors/data_availability.py). Uses
+#       `agent/scripts/us_ca_prune.py --check-preserved`.
+#   (j) Every `src.*` / `backtest.*` import in shipped code resolves to a file.
+#       Static (AST) check, no imports executed. Uses
+#       `tools/ci_missing_module_gate.py`.
 #
 # Exclusions: .git, node_modules, __pycache__, .venv, dist, build, this
 # script itself. The HTML scan in (c) is scoped to wiki/alpha-library/**
@@ -193,6 +201,36 @@ fi
 echo "[gate h] no tracked internal documents ..."
 if ! "$PY" tools/ci_private_files_gate.py; then
     FAILED=1
+fi
+
+# -------------------------------------------------------------- gate (i)
+# `--check-preserved` reads the PRESERVED table in us_ca_prune.py: files the
+# branch must carry even when a sync judged the upstream change region-scoped.
+echo "[gate i] preserved local modules are present ..."
+I_OUTPUT=$("$PY" agent/scripts/us_ca_prune.py --check-preserved 2>&1)
+I_RC=$?
+if [ "$I_RC" -ne 0 ]; then
+    echo "${RED}FAIL${NC}: a preserved module is missing:"
+    echo "$I_OUTPUT"
+    FAILED=1
+else
+    echo "$I_OUTPUT"
+    echo "${GREEN}ok${NC}"
+fi
+
+# -------------------------------------------------------------- gate (j)
+# The forward-looking half of (i): catches the general case, including a file
+# adopted for the first time that nothing has listed in PRESERVED yet.
+echo "[gate j] every src/backtest import resolves to a file ..."
+J_OUTPUT=$("$PY" tools/ci_missing_module_gate.py 2>&1)
+J_RC=$?
+if [ "$J_RC" -ne 0 ]; then
+    echo "${RED}FAIL${NC}: unresolved local imports in shipped code:"
+    echo "$J_OUTPUT"
+    FAILED=1
+else
+    echo "$J_OUTPUT"
+    echo "${GREEN}ok${NC}"
 fi
 
 # --------------------------------------------------------------- result
