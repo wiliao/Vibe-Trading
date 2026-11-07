@@ -207,6 +207,18 @@ def test_manifest_verify_hash_detects_tampering_after_deserialize() -> None:
     assert tampered.verify_hash() is False
 
 
+def test_manifest_verify_hash_detects_an_edited_tool_list() -> None:
+    original = build_run_manifest(**_base_manifest_kwargs())
+    data = original.to_dict()
+    # Tamper: add a tool name while keeping the stored tools_hash/manifest_hash.
+    data["tools"]["tool_names"].append("zz_injected_tool")
+    assert RunManifest.from_dict(data).verify_hash() is False
+
+    data = original.to_dict()
+    data["tools"]["tool_names"] = data["tools"]["tool_names"][1:]
+    assert RunManifest.from_dict(data).verify_hash() is False
+
+
 def test_manifest_rejects_duplicate_skill_names_in_sequence_form() -> None:
     from src.governance.manifest import SkillRecord
 
@@ -382,6 +394,17 @@ def test_only_asserting_untampered_pass_would_be_insufficient_so_also_assert_ok_
     path = tmp_path / "chain.jsonl"
     _write_five_records(path)
     assert verify_chain(path) == ChainVerificationResult(ok=True, record_count=5, first_break=None)
+
+
+def test_append_record_keeps_unicode_line_separator_in_payload(tmp_path: Path) -> None:
+    path = tmp_path / "chain.jsonl"
+    append_record(path, {"note": "before\u2028after\u2029end"})
+    append_record(path, {"note": "second"})
+
+    result = verify_chain(path)
+    assert result == ChainVerificationResult(ok=True, record_count=2, first_break=None)
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
+    assert records[0]["note"] == "before\u2028after\u2029end"
 
 
 def test_append_record_refuses_to_extend_an_already_broken_chain(tmp_path: Path) -> None:

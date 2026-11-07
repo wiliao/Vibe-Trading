@@ -36,7 +36,8 @@
     "mainNavigation": "Navegação principal",
     "about": "Sobre",
     "sessionsLoadFailed": "Não foi possível carregar as conversas.",
-    "pixelOffice": "Escritório pixel"
+    "pixelOffice": "Escritório pixel",
+    "researchArtifacts": "Artefatos de pesquisa"
   },
   "runtime": {
     "monitorBadge": "Monitor de Runtime",
@@ -385,7 +386,8 @@
       "researchPrompt": "Pesquise AAPL com os dados atuais disponíveis: resuma o negócio, os resultados financeiros recentes e os principais riscos. Informe fontes, datas e informações ausentes.",
       "backtestPrompt": "Faça um backtest da estratégia de médias móveis de 20/60 dias de AAPL no último ano. Compare retorno e quedas com comprar e manter, incluindo custos de negociação. Apenas pesquisa.",
       "portfolioPrompt": "Resuma minhas contas conectadas e posições, concentração e riscos da carteira. Se não houver conta conectada, explique primeiro como configurar uma. Não envie nem altere ordens."
-    }
+    },
+    "featured": "Exemplos em destaque"
   },
   "settings": {
     "title": "Configurações",
@@ -1054,7 +1056,10 @@
     "authentication": "Autenticação",
     "apiKey": "Chave de API",
     "reasoningEffortXhigh": "Muito alto",
-    "reasoningEffortReset": "O modelo selecionado não suporta {{level}}; redefinido para o padrão do provedor."
+    "reasoningEffortReset": "O modelo selecionado não suporta {{level}}; redefinido para o padrão do provedor.",
+    "reasoningEffortMinimal": "Mínimo",
+    "reasoningEffortUltra": "Ultra",
+    "reasoningEffortPersistent": "Persistente"
   },
   "qveris": {
     "title": "Mercado de ferramentas QVeris",
@@ -2240,7 +2245,10 @@
       "accountDefault": " · padrão da corretora",
       "accountDeactivated": " · desativada",
       "accountSave": "Usar esta conta",
-      "accountSaved": "Conta salva."
+      "accountSaved": "Conta salva.",
+      "deleteInUse": "Remova esta conexão de “Posições das contas” e salve as alterações antes de excluí-la.",
+      "host": "Servidor",
+      "port": "Porta"
     },
     "imports": {
       "title": "Importar extraETF Investments",
@@ -2265,7 +2273,8 @@
       "current": "Valor atual",
       "targetValue": "Valor-alvo",
       "change": "Alteração de valor"
-    }
+    },
+    "quoteAsOf": "Cotação em {{time}}"
   },
   "navigation": {
     "menu": "Explorar recursos",
@@ -2287,7 +2296,8 @@
       "scheduled": "Repita uma pesquisa em horários definidos.",
       "runtime": "Confira conexões de corretoras e o estado de execução das operações.",
       "settings": "Configure modelos, fontes de dados e conexões de corretoras.",
-      "pixelOffice": "Planeje e atribua tarefas de pesquisa. A atribuição não inicia a execução; os cargos são rótulos e não concedem permissões de negociação."
+      "pixelOffice": "Planeje e atribua tarefas de pesquisa. A atribuição não inicia a execução; os cargos são rótulos e não concedem permissões de negociação.",
+      "researchArtifacts": "Salve e reutilize análises baseadas em evidências entre sessões."
     },
     "instructions": {
       "reports": "Primeiro peça ao assistente um backtest de uma estratégia e abra os resultados aqui. Baixe PDFs e documentos gerados no chat na conversa original.",
@@ -2298,7 +2308,8 @@
       "scheduled": "Informe a instrução de pesquisa, escolha a frequência e salve. O agendador local deve estar habilitado para executar tarefas; a entrega também requer um canal configurado.",
       "runtime": "Primeiro configure uma conexão de corretora em Configurações ou Carteira. As operações disponíveis dependem dos recursos da corretora e da sua autorização.",
       "settings": "Configure um modelo para começar. Adicione dados ou conexões de corretoras conforme necessário; pesquisas com dados públicos de mercado não exigem conta em corretora.",
-      "pixelOffice": "Planeje e atribua tarefas de pesquisa. A atribuição não inicia a execução; os cargos são rótulos e não concedem permissões de negociação."
+      "pixelOffice": "Planeje e atribua tarefas de pesquisa. A atribuição não inicia a execução; os cargos são rótulos e não concedem permissões de negociação.",
+      "researchArtifacts": "Pesquise análises anteriores, abra qualquer revisão ou crie uma revisão vinculada com novas evidências. Conclusões antigas permanecem inalteradas."
     }
   },
   "analysis": {
@@ -2437,5 +2448,38 @@
     "limitsNote": "Cada decisão usa uma nova conversa. Os limites são verificados após a resposta e podem exceder pelo valor dessa resposta. Uso desconhecido ou excesso aciona a parada de emergência existente.",
     "pricesNote": "Os preços são estimativas do operador. Use a maior tarifa de entrada/gravação em cache; descontos de cache e chamadas auxiliares não estão incluídos.",
     "stopToEdit": "Pare o executor antes de alterar as configurações."
+  },
+  "researchArtifacts": {
+    "subject": "Assunto da pesquisa",
+    "dataAsOf": "Dados em",
+    "saving": "Salvando…",
+    "saveError": "Não foi possível salvar o artefato de pesquisa.",
+    "evidenceMissing": "Nenhuma referência de evidência anexada",
+    "createdNotice": "Revisão {{id}} criada.",
+    "emptyHint": "Salve uma análise para reutilizar suas conclusões e evidências em outra sessão.",
+    "emptyTitle": "Ainda não há artefatos de pesquisa",
+    "save": "Salvar pesquisa",
+    "universe": "Universo (opcional)",
+    "loadError": "Não foi possível carregar os artefatos de pesquisa.",
+    "formTitleNew": "Salvar pesquisa",
+    "verification": "Verificação",
+    "additionalEvidence": "URIs de evidência adicionais (uma por linha)",
+    "revise": "Revisar a partir desta revisão",
+    "completeness": "Completude",
+    "searchPlaceholder": "Pesquisar assunto, universo ou conteúdo",
+    "newResearch": "Nova pesquisa",
+    "formTitleRevision": "Criar revisão vinculada",
+    "content": "Conteúdo da pesquisa",
+    "subtitle": "Reutilize análises baseadas em evidências entre sessões sem sobrescrever revisões anteriores.",
+    "history": "Histórico de revisões",
+    "optionalLinks": "IDs vinculados opcionais",
+    "title": "Artefatos de pesquisa",
+    "close": "Fechar",
+    "idempotentNotice": "Conteúdo e proveniência idênticos já existem em {{id}}.",
+    "evidence": "Referências de evidências",
+    "hypothesis_id": "ID da hipótese",
+    "goal_id": "ID do objetivo",
+    "session_id": "ID da sessão",
+    "run_id": "ID da execução"
   }
 }

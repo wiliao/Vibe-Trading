@@ -71,6 +71,8 @@ if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
 from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import Middleware
 from pydantic import BeforeValidator
 
 from cli._version import __version__ as APP_VERSION
@@ -84,6 +86,27 @@ from src.market_data import (
 mcp = FastMCP("Vibe-Trading", version=APP_VERSION)
 
 logger = logging.getLogger(__name__)
+
+
+class _ToolPolicyMiddleware(Middleware):
+    """Apply the tool deny-list to every MCP tool."""
+
+    async def on_list_tools(self, context: Any, call_next: Any) -> Any:
+        from src.providers.tool_policy import _deny_prefixes
+
+        prefixes = _deny_prefixes()
+        return [tool for tool in await call_next(context) if not tool.name.startswith(prefixes)]
+
+    async def on_call_tool(self, context: Any, call_next: Any) -> Any:
+        from src.providers.tool_policy import _deny_prefixes
+
+        name = context.message.name
+        if name.startswith(_deny_prefixes()):
+            raise ToolError(f"{name} is disabled by the active tool policy")
+        return await call_next(context)
+
+
+mcp.add_middleware(_ToolPolicyMiddleware())
 
 
 # ---------------------------------------------------------------------------

@@ -9,12 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
+import numpy as np
 import pandas as pd
 
+from backtest.engines._market_hooks import _detect_market, strip_local_prefix
 from backtest.loaders.base import resample_bars, source_interval
 from backtest.loaders.registry import is_no_network_fallback_source
 from backtest.loaders.yfinance_loader import DataLoader as YfinanceLoader
-from backtest.metrics import bar_returns, buy_and_hold_return
+from backtest.metrics import bar_returns, buy_and_hold_return, entry_returns
 
 
 # -------------------------------------------------------------------
@@ -33,6 +35,7 @@ class BenchmarkResult:
     ret_series: pd.Series       # per-bar returns, index = timestamps
     total_ret: float          # total return over the FETCHED period
     close:      pd.Series       # benchmark closes, index = timestamps
+    open:       Optional[pd.Series] = None  # benchmark opens, same index
 
     def total_return_over(self, dates: pd.DatetimeIndex) -> Optional[float]:
         """Return the buy-and-hold return restricted to ``dates``.
@@ -57,7 +60,30 @@ class BenchmarkResult:
         window = self.close.reindex(dates).dropna()
         if len(window) < 2:
             return None
+        entry = self._entry_open(window.index[0])
+        if entry is not None:
+            last = float(window.iloc[-1])
+            return last / entry - 1.0 if np.isfinite(last) else None
         return buy_and_hold_return(window)
+
+    def returns_over(self, dates: pd.DatetimeIndex) -> pd.Series:
+        """Return benchmark bars from the first evaluated open.
+
+        Args:
+            dates: The evaluated bar index.
+
+        Returns:
+            Per-bar returns aligned with ``dates``.
+        """
+        close = self.close.reindex(dates)
+        opens = self.open.reindex(dates) if self.open is not None else None
+        return entry_returns(close, opens, label=f"benchmark {self.ticker}")
+
+    def _entry_open(self, timestamp: Any) -> Optional[float]:
+        if self.open is None or timestamp not in self.open.index:
+            return None
+        value = float(self.open.loc[timestamp])
+        return value if np.isfinite(value) and value > 0 else None
 
 
 def resolve_benchmark(
@@ -87,7 +113,7 @@ def resolve_benchmark(
         BenchmarkResult with return series and total return, or None if no
         benchmark applies (forex, or fetch failure).
     """
-    ticker = _resolve_ticker(strategy_codes, source, explicit)
+    ticker = explicit or default_benchmark(strategy_codes, source)
     if ticker is None:
         return None
 
@@ -122,8 +148,9 @@ def resolve_benchmark(
     if total is None:
         return None
 
+    opens = bench_df["open"].reindex(close.index) if "open" in bench_df.columns else None
     return BenchmarkResult(
-        ticker=ticker, ret_series=ret_series, total_ret=total, close=close
+        ticker=ticker, ret_series=ret_series, total_ret=total, close=close, open=opens
     )
 
 
@@ -131,35 +158,36 @@ def resolve_benchmark(
 # Internal helpers
 # -------------------------------------------------------------------
 
-def _resolve_ticker(
-    codes:     list[str],
-    source:    str,
-    explicit:  Optional[str],
-) -> Optional[str]:
-    """Pick the benchmark ticker to use."""
+def default_benchmark(codes: list[str], source: str) -> Optional[str]:
+    """Choose a default benchmark when every code identifies the same market.
 
-    if explicit:
-        return explicit
+    Args:
+        codes: Strategy tickers.
+        source: Configured data source; retained for API compatibility.
 
-    # Infer market from the first code's suffix
-    market = _infer_market(codes, source)
-    return MARKET_BENCHMARKS.get(market)
-
-
-def _infer_market(codes: list[str], source: str) -> str:
-    """Market inference from symbol patterns.
-
-    Only the two settled markets exist in this build; ``source`` is accepted for
-    call-site compatibility and no longer changes the answer.
+    Returns:
+        A supported market's benchmark, or ``None`` for mixed or unknown codes.
     """
+    market = _infer_market(codes, source)
+    return MARKET_BENCHMARKS.get(market) if market else None
+
+
+def _infer_market(codes: list[str], source: str) -> Optional[str]:
+    """Infer a market only when all strategy tickers agree."""
+    del source
     if not codes:
-        return "us_equity"
+        return None
 
-    first = codes[0].upper()
+    markets: set[str] = set()
+    for code in codes:
+        try:
+            markets.add(_detect_market(strip_local_prefix(code).strip().upper()))
+        except ValueError:
+            return None
+    if len(markets) != 1:
+        return None
 
-    if first.endswith((".TO", ".V")):
-        return "ca_equity"
-    return "us_equity"
+    return markets.pop()
 
 
 def _fetch_benchmark(

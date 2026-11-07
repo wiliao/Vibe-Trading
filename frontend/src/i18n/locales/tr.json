@@ -36,7 +36,8 @@
     "mainNavigation": "Ana gezinme",
     "about": "Hakkında",
     "sessionsLoadFailed": "Konuşmalar yüklenemiyor.",
-    "pixelOffice": "Piksel Ofis"
+    "pixelOffice": "Piksel Ofis",
+    "researchArtifacts": "Araştırma çıktıları"
   },
   "runtime": {
     "monitorBadge": "Çalışma durumu izleyicisi",
@@ -385,7 +386,8 @@
       "researchPrompt": "AAPL’ı araştır: Güncel verilerle işini, son finansal performansını ve temel risklerini özetle. Kaynakları ve tarihleri belirt; eksik bilgileri işaretle.",
       "backtestPrompt": "AAPL üzerinde son bir yıl için 20/60 günlük hareketli ortalama stratejisini geriye dönük test et. Getiri ve düşüşleri al-tut ile karşılaştır, işlem maliyetlerini dahil et. Yalnızca araştırma yap.",
       "portfolioPrompt": "Bağlı hesaplarımı ve varlıklarımı, yoğunlaşma ve portföy riskleriyle birlikte özetle. Bağlı hesap yoksa önce kurulumunu açıkla. Emir verme veya değiştirme."
-    }
+    },
+    "featured": "Öne çıkan örnekler"
   },
   "settings": {
     "title": "Ayarlar",
@@ -1054,7 +1056,10 @@
     "authentication": "Kimlik doğrulama",
     "apiKey": "API anahtarı",
     "reasoningEffortXhigh": "Çok yüksek",
-    "reasoningEffortReset": "Seçilen model {{level}} düzeyini desteklemiyor; sağlayıcı varsayılanına sıfırlandı."
+    "reasoningEffortReset": "Seçilen model {{level}} düzeyini desteklemiyor; sağlayıcı varsayılanına sıfırlandı.",
+    "reasoningEffortMinimal": "En düşük",
+    "reasoningEffortUltra": "Çok yüksek",
+    "reasoningEffortPersistent": "Sürekli"
   },
   "qveris": {
     "title": "QVeris araç pazarı",
@@ -2240,7 +2245,10 @@
       "accountDefault": " · aracı kurum varsayılanı",
       "accountDeactivated": " · devre dışı",
       "accountSave": "Bu hesabı kullan",
-      "accountSaved": "Hesap kaydedildi."
+      "accountSaved": "Hesap kaydedildi.",
+      "deleteInUse": "Bu bağlantıyı silmeden önce Portföy'den kaldırın ve değişiklikleri kaydedin.",
+      "host": "Sunucu",
+      "port": "Bağlantı noktası"
     },
     "imports": {
       "title": "extraETF Investments içe aktar",
@@ -2265,7 +2273,8 @@
       "current": "Mevcut değer",
       "targetValue": "Hedef değer",
       "change": "Değer değişimi"
-    }
+    },
+    "quoteAsOf": "{{time}} itibarıyla fiyat"
   },
   "navigation": {
     "menu": "Özelliklere göz at",
@@ -2287,7 +2296,8 @@
       "scheduled": "Bir araştırma görevini zamanlayarak tekrarlayın.",
       "runtime": "Aracı kurum bağlantılarını ve işlem çalışma durumunu kontrol edin.",
       "settings": "Modelleri, veri kaynaklarını ve aracı kurum bağlantılarını yapılandırın.",
-      "pixelOffice": "Araştırma görevlerini planlayın ve atayın. Atama yürütmeyi başlatmaz; rütbeler yalnızca etikettir ve işlem yetkisi vermez."
+      "pixelOffice": "Araştırma görevlerini planlayın ve atayın. Atama yürütmeyi başlatmaz; rütbeler yalnızca etikettir ve işlem yetkisi vermez.",
+      "researchArtifacts": "Kanıta dayalı analizleri oturumlar arasında kaydedin ve yeniden kullanın."
     },
     "instructions": {
       "reports": "Önce araştırma asistanından bir stratejiyi geriye dönük test etmesini isteyin, ardından sonuçları burada açın. PDF ve diğer sohbet belgelerini özgün konuşmadan indirin.",
@@ -2298,7 +2308,8 @@
       "scheduled": "Araştırma talimatını girin, sıklığını seçip kaydedin. Çalıştırma için yerel zamanlayıcı etkin olmalıdır; gönderim için de yapılandırılmış bir kanal gerekir.",
       "runtime": "Önce Ayarlar veya Portföy’de bir aracı kurum bağlantısı kurun. Kullanılabilir işlemler, kurumun yeteneklerine ve verdiğiniz yetkiye bağlıdır.",
       "settings": "Başlamak için bir model yapılandırın. Gerektikçe veri kaynakları veya aracı kurum bağlantıları ekleyin; kamuya açık piyasa araştırması için aracı kurum hesabı gerekmez.",
-      "pixelOffice": "Araştırma görevlerini planlayın ve atayın. Atama yürütmeyi başlatmaz; rütbeler yalnızca etikettir ve işlem yetkisi vermez."
+      "pixelOffice": "Araştırma görevlerini planlayın ve atayın. Atama yürütmeyi başlatmaz; rütbeler yalnızca etikettir ve işlem yetkisi vermez.",
+      "researchArtifacts": "Önceki analizleri arayın, herhangi bir revizyonu açın veya yeni kanıtla bağlantılı revizyon oluşturun. Eski sonuçlar değişmez."
     }
   },
   "analysis": {
@@ -2437,5 +2448,38 @@
     "limitsNote": "Her karar yeni bir konuşma başlatır. Sınırlar yanıttan sonra kontrol edilir ve o yanıt kadar aşılabilir. Eksik kullanım veya aşım mevcut durdurma anahtarını tetikler.",
     "pricesNote": "Fiyatlar operatör tahminidir. En yüksek girdi/önbellek yazma ücretini kullanın; önbellek indirimleri ve yardımcı çağrılar dahil değildir.",
     "stopToEdit": "Ayarları değiştirmeden önce çalıştırıcıyı durdurun."
+  },
+  "researchArtifacts": {
+    "completeness": "Tamlık",
+    "optionalLinks": "İsteğe bağlı bağlantılı kimlikler",
+    "formTitleNew": "Araştırmayı kaydet",
+    "verification": "Doğrulama",
+    "subject": "Araştırma konusu",
+    "createdNotice": "{{id}} revizyonu oluşturuldu.",
+    "emptyHint": "Sonraki oturumlarda sonuçlarını ve kanıtlarını yeniden kullanmak için bir analiz kaydedin.",
+    "newResearch": "Yeni araştırma",
+    "emptyTitle": "Henüz araştırma çıktısı yok",
+    "save": "Araştırmayı kaydet",
+    "evidenceMissing": "Kanıt referansı eklenmemiş",
+    "saveError": "Araştırma çıktısı kaydedilemedi.",
+    "additionalEvidence": "Ek kanıt URI’leri (satır başına bir)",
+    "subtitle": "Önceki revizyonların üzerine yazmadan kanıta dayalı analizleri oturumlar arasında yeniden kullanın.",
+    "revise": "Bu revizyondan yola çıkarak düzenle",
+    "history": "Revizyon geçmişi",
+    "searchPlaceholder": "Konu, evren veya içerik ara",
+    "loadError": "Araştırma çıktıları yüklenemedi.",
+    "close": "Kapat",
+    "universe": "Evren (isteğe bağlı)",
+    "title": "Araştırma çıktıları",
+    "dataAsOf": "Veri tarihi",
+    "content": "Araştırma içeriği",
+    "saving": "Kaydediliyor…",
+    "idempotentNotice": "Aynı içerik ve kaynak bilgisi {{id}} içinde zaten var.",
+    "formTitleRevision": "Bağlantılı revizyon oluştur",
+    "evidence": "Kanıt referansları",
+    "hypothesis_id": "Hipotez kimliği",
+    "goal_id": "Hedef kimliği",
+    "session_id": "Oturum kimliği",
+    "run_id": "Çalıştırma kimliği"
   }
 }

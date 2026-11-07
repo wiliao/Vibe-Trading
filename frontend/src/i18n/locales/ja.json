@@ -30,7 +30,8 @@
     "mainNavigation": "メインナビゲーション",
     "about": "概要",
     "sessionsLoadFailed": "会話を読み込めません。",
-    "pixelOffice": "ピクセルオフィス"
+    "pixelOffice": "ピクセルオフィス",
+    "researchArtifacts": "リサーチ成果物"
   },
   "runtime": {
     "monitorBadge": "取引モニター",
@@ -379,7 +380,8 @@
       "researchPrompt": "AAPL の事業、最近の財務成績、主なリスクを現在利用できるデータで調べてください。出典と日付を示し、不足する情報を明記してください。",
       "backtestPrompt": "AAPL の過去1年で20日・60日移動平均戦略をバックテストし、売買コストを含めて買い持ちとリターンやドローダウンを比較してください。リサーチのみです。",
       "portfolioPrompt": "接続済み口座の保有資産、集中度、ポートフォリオのリスクをまとめてください。口座未接続なら設定方法を先に説明してください。注文の発注や変更はしないでください。"
-    }
+    },
+    "featured": "おすすめの例"
   },
   "settings": {
     "title": "設定",
@@ -1048,7 +1050,10 @@
     "authentication": "認証",
     "apiKey": "APIキー",
     "reasoningEffortXhigh": "超高",
-    "reasoningEffortReset": "選択したモデルは {{level}} に対応していないため、プロバイダーのデフォルトに戻しました。"
+    "reasoningEffortReset": "選択したモデルは {{level}} に対応していないため、プロバイダーのデフォルトに戻しました。",
+    "reasoningEffortMinimal": "最小",
+    "reasoningEffortUltra": "超高",
+    "reasoningEffortPersistent": "持続"
   },
   "qveris": {
     "title": "QVeris ツールマーケットプレイス",
@@ -2240,7 +2245,10 @@
       "accountDefault": "・ブローカーの既定",
       "accountDeactivated": "・無効化済み",
       "accountSave": "この口座を使う",
-      "accountSaved": "口座を保存しました。"
+      "accountSaved": "口座を保存しました。",
+      "deleteInUse": "この接続を「口座の保有資産」から外して変更を保存してから、接続を削除してください。",
+      "host": "ホスト",
+      "port": "ポート"
     },
     "imports": {
       "title": "extraETF Investments をインポート",
@@ -2265,7 +2273,8 @@
       "current": "現在の評価額",
       "targetValue": "目標額",
       "change": "変更額"
-    }
+    },
+    "quoteAsOf": "{{time}} 時点の価格"
   },
   "navigation": {
     "menu": "機能を見る",
@@ -2287,7 +2296,8 @@
       "scheduled": "リサーチを指定した周期で繰り返します。",
       "runtime": "ブローカーの接続と取引の稼働状況を確認します。",
       "settings": "モデル、データソース、ブローカー接続を設定します。",
-      "pixelOffice": "調査タスクを計画・割り当てます。割り当てでは実行は始まりません。役職はラベルであり、取引権限を付与しません。"
+      "pixelOffice": "調査タスクを計画・割り当てます。割り当てでは実行は始まりません。役職はラベルであり、取引権限を付与しません。",
+      "researchArtifacts": "証拠に基づく分析をセッション間で保存して再利用します。"
     },
     "instructions": {
       "reports": "まずアシスタントに戦略のバックテストを依頼し、ここで結果を開きます。会話で作成した PDF などは元の会話からダウンロードします。",
@@ -2298,7 +2308,8 @@
       "scheduled": "リサーチ指示と周期を入力して保存します。実行にはローカルのスケジューラーを有効にする必要があり、配信にはチャネル設定も必要です。",
       "runtime": "先に設定または保有資産ページでブローカーを接続します。利用できる取引操作はブローカーの機能とあなたの許可に依存します。",
       "settings": "まずモデルを設定します。必要に応じてデータソースやブローカー接続を追加します。公開市場のリサーチにはブローカー口座は不要です。",
-      "pixelOffice": "調査タスクを計画・割り当てます。割り当てでは実行は始まりません。役職はラベルであり、取引権限を付与しません。"
+      "pixelOffice": "調査タスクを計画・割り当てます。割り当てでは実行は始まりません。役職はラベルであり、取引権限を付与しません。",
+      "researchArtifacts": "過去の分析を検索し、任意のリビジョンを開くか、新しい証拠で関連リビジョンを作成します。古い結論は変更されません。"
     }
   },
   "analysis": {
@@ -2437,5 +2448,38 @@
     "limitsNote": "判断ごとに新しい会話を使います。応答後に上限を確認するため、その応答分を超過する場合があります。使用量不明や超過時は既存の停止スイッチが作動します。",
     "pricesNote": "料金は利用者が設定する推定値です。入力・キャッシュ書込の最高料金を使ってください。キャッシュ割引と補助モデル呼び出しは推定に含みません。",
     "stopToEdit": "変更する前にランナーを停止してください。"
+  },
+  "researchArtifacts": {
+    "subject": "研究主題",
+    "dataAsOf": "データ基準日",
+    "saving": "保存中…",
+    "saveError": "リサーチ成果物を保存できません。",
+    "evidenceMissing": "証拠参照がありません",
+    "createdNotice": "リビジョン {{id}} を作成しました。",
+    "emptyHint": "分析を保存すると、後のセッションで結論と証拠を再利用できます。",
+    "emptyTitle": "リサーチ成果物はまだありません",
+    "save": "リサーチを保存",
+    "universe": "ユニバース（任意）",
+    "loadError": "リサーチ成果物を読み込めません。",
+    "formTitleNew": "リサーチを保存",
+    "verification": "検証状態",
+    "additionalEvidence": "追加の証拠 URI（1行に1件）",
+    "revise": "このリビジョンから新しいリビジョンを作成",
+    "completeness": "完全性",
+    "searchPlaceholder": "主題・ユニバース・本文を検索",
+    "newResearch": "新規リサーチ",
+    "formTitleRevision": "関連リビジョンを作成",
+    "content": "研究本文",
+    "subtitle": "証拠に基づく分析をセッション間で再利用し、過去のリビジョンを上書きしません。",
+    "history": "リビジョン履歴",
+    "optionalLinks": "任意の関連 ID",
+    "title": "リサーチ成果物",
+    "close": "閉じる",
+    "idempotentNotice": "同一の内容と 出典情報 は {{id}} に既に存在します。",
+    "evidence": "根拠資料",
+    "hypothesis_id": "仮説 ID",
+    "goal_id": "目標 ID",
+    "session_id": "セッション ID",
+    "run_id": "実行 ID"
   }
 }

@@ -28,7 +28,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
                 "TIMEOUT_SECONDS=90",
                 "MAX_RETRIES=3",
                 "LANGCHAIN_REASONING_EFFORT=max",
-                "FINNHUB_API_KEY=your-finnhub-key",
+                "TUSHARE_TOKEN=your-tushare-token",
             ]
         )
         + "\n",
@@ -37,6 +37,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(api_server, "ENV_PATH", env_path)
     monkeypatch.setattr(api_server, "LEGACY_ENV_PATH", tmp_path / "legacy" / ".env", raising=False)
     monkeypatch.setattr(api_server, "ENV_EXAMPLE_PATH", env_example)
+    monkeypatch.setattr(api_server, "_baostock_supported", lambda: False)
+    monkeypatch.setattr(api_server, "_baostock_installed", lambda: False)
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
     return TestClient(api_server.app, client=("127.0.0.1", 50000))
 
@@ -73,13 +75,6 @@ def test_extract_model_ids_normalizes_openai_compatible_payloads() -> None:
         (
             {"provider": "openrouter", "base_url": "https://openrouter.ai/api/v1"},
             "api_key_required",
-        ),
-        (
-            {
-                "provider": "openai-codex",
-                "base_url": "https://chatgpt.com/backend-api/codex/responses",
-            },
-            "oauth_discovery_unsupported",
         ),
         # gh_cli used to build "gh_cli_discovery_unsupported", which the response
         # model rejects; it shares the OAuth code instead.
@@ -331,7 +326,7 @@ def test_settings_write_migrates_legacy_env_to_canonical_path(
     legacy_path = tmp_path / "legacy" / ".env"
     legacy_path.parent.mkdir()
     legacy_path.write_text(
-        "LANGCHAIN_PROVIDER=openrouter\nFINNHUB_API_KEY=legacy-token\n",
+        "LANGCHAIN_PROVIDER=openrouter\nTUSHARE_TOKEN=legacy-token\n",
         encoding="utf-8",
     )
 
@@ -348,7 +343,7 @@ def test_settings_write_migrates_legacy_env_to_canonical_path(
     assert response.status_code == 200
     canonical_text = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "LANGCHAIN_PROVIDER=deepseek" in canonical_text
-    assert "FINNHUB_API_KEY=legacy-token" in canonical_text
+    assert "TUSHARE_TOKEN=legacy-token" in canonical_text
     assert legacy_path.read_text(encoding="utf-8").startswith("LANGCHAIN_PROVIDER=openrouter")
 
 
@@ -398,19 +393,17 @@ def test_update_nvidia_settings_persists_provider_namespace(
     assert "NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1" in env_text
 
 
-def test_get_data_source_settings_exposes_only_surviving_fields(
+def test_get_data_source_settings_treats_placeholder_as_unconfigured(
     client: TestClient, tmp_path: Path,
 ) -> None:
     response = client.get("/settings/data-sources")
 
     assert response.status_code == 200
     body = response.json()
-    # The removed-market credential surface is gone; the JSON shape is pinned
-    # so a reintroduced tushare/gildata/baostock field fails here.
-    assert set(body) == {
-        "env_path",
-        "source_orders",
-    }
+    assert body["tushare_token_configured"] is False
+    assert body["tushare_token_hint"] is None
+    assert body["baostock_supported"] is False
+    assert body["baostock_installed"] is False
     assert not Path(body["env_path"]).is_absolute()
     assert body["env_path"].endswith(".env")
     assert not (tmp_path / ".env").exists()
@@ -424,7 +417,7 @@ def test_settings_response_never_exposes_configured_secret_hints(
             [
                 "LANGCHAIN_PROVIDER=openrouter",
                 "OPENROUTER_API_KEY=or-secret-private-value",
-                "QVERIS_API_KEY=qveris-secret-private-token",
+                "TUSHARE_TOKEN=ts-secret-private-token",
             ]
         )
         + "\n",
@@ -440,12 +433,12 @@ def test_settings_response_never_exposes_configured_secret_hints(
     data_body = data_response.json()
     assert llm_body["api_key_configured"] is True
     assert llm_body["api_key_hint"] is None
-    assert not any("api_key" in key or "token" in key for key in data_body)
+    assert data_body["tushare_token_configured"] is True
+    assert data_body["tushare_token_hint"] is None
     assert "or-secret-private-value" not in llm_response.text
     assert "or-s...alue" not in llm_response.text
-    # The data-source payload owns no credential secrets at all now.
-    assert "qveris-secret-private-token" not in data_response.text
-    assert "qve...oken" not in data_response.text
+    assert "ts-secret-private-token" not in data_response.text
+    assert "ts-s...oken" not in data_response.text
 
 
 def test_settings_reads_reject_remote_dev_mode_clients(
@@ -458,7 +451,7 @@ def test_settings_reads_reject_remote_dev_mode_clients(
             [
                 "LANGCHAIN_PROVIDER=openrouter",
                 "OPENROUTER_API_KEY=or-secret-value",
-                "QVERIS_API_KEY=qveris-secret-value",
+                "TUSHARE_TOKEN=ts-secret-token",
             ]
         )
         + "\n",
@@ -476,7 +469,7 @@ def test_settings_reads_reject_remote_dev_mode_clients(
     assert llm_response.status_code == 403
     assert data_source_response.status_code == 403
     assert "or-s...alue" not in llm_response.text
-    assert "qveris-secret-value" not in data_source_response.text
+    assert "ts-s...oken" not in data_source_response.text
 
 
 def test_settings_reads_require_bearer_on_loopback_when_api_auth_key_configured(
@@ -516,34 +509,65 @@ def test_settings_reads_require_bearer_on_loopback_when_api_auth_key_configured(
     assert "or-s...alue" not in authenticated_response.text
 
 
-def test_desktop_secure_mode_never_persists_injected_secret(
-    client: TestClient,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    _reset_source_order_env,
+def test_update_data_source_settings_persists_tushare_token(
+    client: TestClient, tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("VIBE_TRADING_DESKTOP_SECURE_CREDENTIALS", "1")
-    monkeypatch.setenv("QVERIS_API_KEY", "dpapi-qveris-token")
-
     response = client.put(
         "/settings/data-sources",
-        json={
-            "source_orders": [
-                {
-                    "market": "us_equity",
-                    "order": [
-                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
-                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
-                    ],
-                },
-            ],
-        },
+        json={"tushare_token": "ts-secret-token"},
     )
 
     assert response.status_code == 200
+    body = response.json()
+    assert body["tushare_token_configured"] is True
+    assert body["tushare_token_hint"] is None
+    assert "ts-secret-token" not in response.text
+    assert "ts-s...oken" not in response.text
+
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "dpapi-qveris-token" not in env_text
-    assert "QVERIS_API_KEY=" in env_text
+    assert "TUSHARE_TOKEN=ts-secret-token" in env_text
+
+
+def test_update_data_source_settings_persists_gildata_token(
+    client: TestClient, tmp_path: Path,
+) -> None:
+    response = client.put(
+        "/settings/data-sources",
+        json={"gildata_token": "gd-secret-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gildata_token_configured"] is True
+    assert body["gildata_token_hint"] is None
+    assert "gd-secret-token" not in response.text
+    assert "gd-s...oken" not in response.text
+
+    env_text = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "GILDATA_TOKEN=gd-secret-token" in env_text
+
+    cleared = client.put(
+        "/settings/data-sources", json={"clear_gildata_token": True},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["gildata_token_configured"] is False
+
+
+def test_desktop_secure_mode_never_persists_injected_tushare_token(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VIBE_TRADING_DESKTOP_SECURE_CREDENTIALS", "1")
+    monkeypatch.setenv("TUSHARE_TOKEN", "dpapi-tushare-token")
+
+    response = client.put("/settings/data-sources", json={})
+
+    assert response.status_code == 200
+    assert response.json()["tushare_token_configured"] is True
+    env_text = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "dpapi-tushare-token" not in env_text
+    assert "TUSHARE_TOKEN=" in env_text
 
 
 def test_settings_writes_reject_remote_dev_mode_clients(
@@ -557,29 +581,22 @@ def test_settings_writes_reject_remote_dev_mode_clients(
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
     remote_client = TestClient(api_server.app, client=("203.0.113.10", 50000))
 
-    response = remote_client.put("/settings/data-sources", json={})
+    response = remote_client.put(
+        "/settings/data-sources",
+        json={"tushare_token": "ts-secret-token"},
+    )
 
     assert response.status_code == 403
     assert not env_path.exists()
 
 
 def test_update_settings_writes_env_file_with_0600_mode(
-    client: TestClient, tmp_path: Path, _reset_source_order_env,
+    client: TestClient, tmp_path: Path,
 ) -> None:
     """A Web-UI settings write must leave agent/.env owner-read/write only."""
     response = client.put(
         "/settings/data-sources",
-        json={
-            "source_orders": [
-                {
-                    "market": "us_equity",
-                    "order": [
-                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
-                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
-                    ],
-                },
-            ],
-        },
+        json={"tushare_token": "ts-secret-token"},
     )
 
     assert response.status_code == 200
@@ -667,16 +684,20 @@ def test_get_data_source_settings_lists_default_source_orders(
     assert response.status_code == 200
     entries = response.json()["source_orders"]
     orders = {entry["market"]: entry for entry in entries}
-    assert set(orders) == {"us_equity", "ca_equity", "index"}
-    us_equity = orders["us_equity"]
-    assert us_equity["env_var"] == "MARKET_DATA_ORDER_US_EQUITY"
-    assert us_equity["override"] is None
-    assert us_equity["override_invalid"] is False
-    assert us_equity["effective_order"] == us_equity["default_order"]
-    assert us_equity["default_order"][0] == "yahoo"
-    ca_equity = orders["ca_equity"]
-    assert ca_equity["env_var"] == "MARKET_DATA_ORDER_CA_EQUITY"
-    assert ca_equity["default_order"][0] == "yahoo"
+    assert set(orders) == {
+        "a_share", "us_equity", "hk_equity", "india_equity", "kr_equity",
+        "ca_equity", "ar_equity", "br_equity", "vietnam_equity", "uk_equity", "crypto", "futures",
+        "fund", "macro", "forex", "index",
+    }
+    a_share = orders["a_share"]
+    assert a_share["env_var"] == "MARKET_DATA_ORDER_A_SHARE"
+    assert a_share["override"] is None
+    assert a_share["override_invalid"] is False
+    assert a_share["effective_order"] == a_share["default_order"]
+    assert a_share["default_order"][0] == "tencent"
+    uk_equity = orders["uk_equity"]
+    assert uk_equity["env_var"] == "MARKET_DATA_ORDER_UK_EQUITY"
+    assert uk_equity["default_order"][0] == "yahoo"
 
 
 def test_update_source_orders_persists_and_hot_applies(
@@ -691,10 +712,10 @@ def test_update_source_orders_persists_and_hot_applies(
         json={
             "source_orders": [
                 {
-                    "market": "us_equity",
+                    "market": "a_share",
                     "order": [
-                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
-                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
+                        "tushare", "tencent", "eastmoney",
+                        "baostock", "akshare", "local",
                     ],
                 },
             ],
@@ -703,19 +724,19 @@ def test_update_source_orders_persists_and_hot_applies(
 
     assert response.status_code == 200
     entry = next(
-        e for e in response.json()["source_orders"] if e["market"] == "us_equity"
+        e for e in response.json()["source_orders"] if e["market"] == "a_share"
     )
     # Response reports the new effective order...
-    assert entry["effective_order"][0] == "stooq"
+    assert entry["effective_order"][0] == "tushare"
     assert entry["override"] is not None
-    assert entry["override"][0] == "stooq"
+    assert entry["override"][0] == "tushare"
     # ...persisted to the dotenv...
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "MARKET_DATA_ORDER_US_EQUITY=stooq,yahoo,sina" in env_text
+    assert "MARKET_DATA_ORDER_A_SHARE=tushare,tencent,eastmoney" in env_text
     # ...synced into the running process env...
-    assert os.environ.get("MARKET_DATA_ORDER_US_EQUITY", "").startswith("stooq,")
+    assert os.environ.get("MARKET_DATA_ORDER_A_SHARE", "").startswith("tushare,")
     # ...and hot-applied to the live registry chain.
-    assert registry.FALLBACK_CHAINS["us_equity"][0] == "stooq"
+    assert registry.FALLBACK_CHAINS["a_share"][0] == "tushare"
 
 
 def test_update_source_orders_reset_clears_override(
@@ -730,10 +751,10 @@ def test_update_source_orders_reset_clears_override(
         json={
             "source_orders": [
                 {
-                    "market": "us_equity",
+                    "market": "a_share",
                     "order": [
-                        "stooq", "yahoo", "sina", "eastmoney", "yfinance",
-                        "tiingo", "fmp", "finnhub", "alphavantage", "local",
+                        "tushare", "tencent", "eastmoney",
+                        "baostock", "akshare", "local",
                     ],
                 },
             ],
@@ -743,18 +764,18 @@ def test_update_source_orders_reset_clears_override(
 
     reset = client.put(
         "/settings/data-sources",
-        json={"source_orders": [{"market": "us_equity", "order": None}]},
+        json={"source_orders": [{"market": "a_share", "order": None}]},
     )
 
     assert reset.status_code == 200
     entry = next(
-        e for e in reset.json()["source_orders"] if e["market"] == "us_equity"
+        e for e in reset.json()["source_orders"] if e["market"] == "a_share"
     )
     assert entry["override"] is None
     assert entry["effective_order"] == entry["default_order"]
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "MARKET_DATA_ORDER_US_EQUITY=\n" in env_text  # cleared, not deleted
-    assert registry.FALLBACK_CHAINS["us_equity"] == entry["default_order"]
+    assert "MARKET_DATA_ORDER_A_SHARE=\n" in env_text  # cleared, not deleted
+    assert registry.FALLBACK_CHAINS["a_share"] == entry["default_order"]
 
 
 def test_update_source_orders_rejects_non_permutation(
@@ -764,7 +785,7 @@ def test_update_source_orders_rejects_non_permutation(
 ) -> None:
     response = client.put(
         "/settings/data-sources",
-        json={"source_orders": [{"market": "us_equity", "order": ["yahoo", "stooq"]}]},
+        json={"source_orders": [{"market": "crypto", "order": ["okx", "binance"]}]},
     )
 
     assert response.status_code == 400
@@ -885,3 +906,83 @@ def test_other_providers_still_reject_xhigh(client: TestClient) -> None:
     response = client.put("/settings/llm", json=payload)
 
     assert response.status_code == 400
+
+
+def test_codex_model_discovery_uses_fixed_oauth_catalog_not_form_url(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = []
+
+    async def fake_catalog(provider):
+        called.append(provider.name)
+        return settings_routes.LLMModelsResponse(
+            provider=provider.name,
+            models=["openai-codex/gpt-6-sol"],
+            source="provider",
+            model_labels={"openai-codex/gpt-6-sol": "GPT-6 Sol"},
+            effort_levels={"openai-codex/gpt-6-sol": ["low", "medium", "ultra"]},
+            default_effort_levels={"openai-codex/gpt-6-sol": "medium"},
+        )
+
+    monkeypatch.setattr(settings_routes, "_list_openai_codex_models", fake_catalog)
+    response = client.post(
+        "/settings/llm/models",
+        json={
+            "provider": "openai-codex",
+            "base_url": "https://untrusted.example/should-not-receive-token",
+            "api_key": "untrusted-form-value",
+        },
+    )
+    assert response.status_code == 200
+    assert called == ["openai-codex"]
+    assert response.json()["models"] == ["openai-codex/gpt-6-sol"]
+    assert response.json()["model_labels"]["openai-codex/gpt-6-sol"] == "GPT-6 Sol"
+    assert response.json()["effort_levels"]["openai-codex/gpt-6-sol"] == ["low", "medium", "ultra"]
+    assert response.json()["default_effort_levels"]["openai-codex/gpt-6-sol"] == "medium"
+
+
+def test_gildata_upgrade_and_feature_isolation(client, monkeypatch, tmp_path):
+    """An old token grants none of the four capabilities until individually enabled."""
+    from src.config.gildata_features import FEATURES_ENV
+    from src.tools import gildata_identity
+    from src.tools.gildata_fin_query_tool import GildataFinQueryTool
+    from src.tools.gildata_stock_selection_tool import GildataStockSelectionTool
+    from src.tools import gildata_srv
+    from unittest.mock import Mock
+
+    monkeypatch.delenv(FEATURES_ENV, raising=False)
+    monkeypatch.setenv("GILDATA_TOKEN", "old-token")
+    (tmp_path / ".env").write_text("GILDATA_TOKEN=old-token\n")
+    vendor = Mock(return_value=[])
+    monkeypatch.setattr(gildata_identity, "_call_tool_results", vendor)
+    monkeypatch.setattr(gildata_srv, "_call_srv", vendor)
+    url = "/settings/data-sources"
+    assert client.get(url).json()["gildata_features"] == []
+    from backtest.loaders.gildata_loader import DataLoader
+
+    retained_tool = GildataFinQueryTool()
+    for index, feature in enumerate([None, "symbol_search", "fin_query", "stock_selection", "shannon", "market_quotes", None]):
+        if index:
+            selected = [feature] if feature else []
+            response = client.put(url, json={"gildata_features": selected})
+            assert response.status_code == 200
+            assert response.json()["gildata_features"] == selected
+            assert f"{FEATURES_ENV}={feature or ''}\n" in (tmp_path / ".env").read_text()
+        assert DataLoader().is_available() == (feature == "market_quotes")
+        assert retained_tool.check_available() == (feature == "fin_query")
+        assert GildataStockSelectionTool.check_available() == (feature == "stock_selection")
+        before = vendor.call_count
+        gildata_identity.search_candidates("AAPL", 5)
+        assert vendor.call_count == before + (feature == "symbol_search")
+        assert client.get("/api/shannon/status").json()["configured"] == (feature == "shannon")
+        if feature != "shannon":
+            assert client.get("/api/shannon/catalog").status_code == 503
+            assert client.post("/api/shannon/diagnosis", json={
+                "holdings": [{"code": "600000.SH"}]
+            }).status_code == 503
+        if feature != "fin_query":
+            assert '"ok": false' in retained_tool.execute(query="revenue")
+        if feature != "stock_selection":
+            assert '"ok": false' in GildataStockSelectionTool().execute(query="top stocks")
+        assert vendor.call_count == before + (feature == "symbol_search")
+    assert client.put(url, json={"gildata_features": ["*"]}).status_code == 422

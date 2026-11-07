@@ -62,34 +62,20 @@ describe("WelcomeScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("hands off all four quick-action prompts unchanged", async () => {
+  it("hands off all three quick-action prompts unchanged", async () => {
     const actions = [
-      {
-        label: "Check if a stock is expensive",
-        prompt:
-          "Use the financial_rigor tool to verify Apple's valuation: price 230, EPS 6.5, book value per share 4.5 — compute PE, PB, ROE exactly, then a three-scenario valuation (growth 12%/8%/0%, PE 32/26/20, 3 years)",
-      },
-      {
-        label: "Options risk check (Greeks)",
-        prompt:
-          "Calculate option Greeks using Black-Scholes: spot=100, strike=105, risk-free rate=3%, vol=25%, expiry=90 days, analyze Delta/Gamma/Theta/Vega",
-      },
-      {
-        label: "Balance a 3-stock portfolio",
-        prompt:
-          "Build a risk-parity portfolio with AAPL.US, MSFT.US, RY.TO, backtest for the full year of 2024, and compare with equal-weighted benchmark",
-      },
-      {
-        label: "Buy or sell? Let a committee debate",
-        prompt:
-          "[Swarm Team Mode] Use the investment_committee preset to evaluate whether to go long or short on AAPL.US given current market conditions",
-      },
-    ];
+      ["research", "researchPrompt"],
+      ["backtest", "backtestPrompt"],
+      ["portfolio", "portfolioPrompt"],
+    ].map(([labelKey, promptKey]) => ({
+      label: i18n.t(`welcome.tasks.${labelKey}`),
+      prompt: i18n.t(`welcome.tasks.${promptKey}`),
+    }));
     const user = userEvent.setup();
     render(<WelcomeScreen onExample={onExample} />);
 
     const quickActions = screen.getByRole("group", { name: "Quick actions" });
-    expect(within(quickActions).getAllByRole("button")).toHaveLength(4);
+    expect(within(quickActions).getAllByRole("button")).toHaveLength(3);
 
     for (const [index, action] of actions.entries()) {
       await user.click(
@@ -97,7 +83,7 @@ describe("WelcomeScreen", () => {
       );
       expect(onExample).toHaveBeenNthCalledWith(index + 1, action.prompt);
     }
-    expect(onExample).toHaveBeenCalledTimes(4);
+    expect(onExample).toHaveBeenCalledTimes(3);
   });
 
   it("marks the clicked quick action as selected and moves the selection", async () => {
@@ -111,22 +97,22 @@ describe("WelcomeScreen", () => {
       expect(button).not.toHaveClass("text-primary");
     }
 
-    const committee = within(quickActions).getByRole("button", {
-      name: "Buy or sell? Let a committee debate",
+    const research = within(quickActions).getByRole("button", {
+      name: i18n.t("welcome.tasks.research"),
     });
-    await user.click(committee);
-    expect(committee).toHaveAttribute("aria-pressed", "true");
-    expect(committee).toHaveClass("text-primary");
+    await user.click(research);
+    expect(research).toHaveAttribute("aria-pressed", "true");
+    expect(research).toHaveClass("text-primary");
     expect(onExample).toHaveBeenCalledTimes(1);
 
-    const valuation = within(quickActions).getByRole("button", {
-      name: "Check if a stock is expensive",
+    const backtest = within(quickActions).getByRole("button", {
+      name: i18n.t("welcome.tasks.backtest"),
     });
-    await user.click(valuation);
-    expect(committee).toHaveAttribute("aria-pressed", "false");
-    expect(committee).not.toHaveClass("text-primary");
-    expect(valuation).toHaveAttribute("aria-pressed", "true");
-    expect(valuation).toHaveClass("text-primary");
+    await user.click(backtest);
+    expect(research).toHaveAttribute("aria-pressed", "false");
+    expect(research).not.toHaveClass("text-primary");
+    expect(backtest).toHaveAttribute("aria-pressed", "true");
+    expect(backtest).toHaveClass("text-primary");
     expect(onExample).toHaveBeenCalledTimes(2);
   });
 
@@ -189,6 +175,35 @@ describe("WelcomeScreen", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(library).toHaveAttribute("aria-hidden", "true");
     expect(trigger).toHaveFocus();
+  });
+
+  it("lists featured examples under their own category and fills their prompts", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeScreen onExample={onExample} />);
+
+    const featured = screen.getByRole("region", { name: "Featured examples" });
+    const cards = within(featured).getAllByRole("button");
+    expect(cards).toHaveLength(3);
+
+    const expected = [
+      ["earningsReport", "docWebResearch"],
+      ["crossMarketPortfolio", "multiMarketBacktest"],
+      ["thesisTracker", "valueInvesting"],
+    ];
+    for (const [index, [example, category]] of expected.entries()) {
+      expect(cards[index]).toHaveTextContent(i18n.t(`welcome.categories.${category}`));
+      expect(cards[index]).toHaveTextContent(i18n.t(`welcome.examples.${example}`));
+      await user.click(cards[index]);
+      expect(onExample).toHaveBeenLastCalledWith(i18n.t(`welcome.examples.${example}Prompt`));
+    }
+    expect(onExample).toHaveBeenCalledTimes(3);
+  });
+
+  it("states the fill hint once and leaves the page's main landmark to the page", () => {
+    const { container } = render(<WelcomeScreen onExample={onExample} />);
+
+    expect(screen.getAllByText(i18n.t("welcome.tasks.hint"))).toHaveLength(1);
+    expect(container.querySelector("main")).toBeNull();
   });
 
   it("does not render capability chips", () => {

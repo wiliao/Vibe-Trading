@@ -36,7 +36,8 @@
     "about": "Über",
     "portfolio": "Kontopositionen",
     "sessionsLoadFailed": "Gespräche können nicht geladen werden.",
-    "pixelOffice": "Pixelbüro"
+    "pixelOffice": "Pixelbüro",
+    "researchArtifacts": "Recherche-Artefakte"
   },
   "runtime": {
     "monitorBadge": "Runtime-Monitor",
@@ -385,7 +386,8 @@
       "researchPrompt": "Recherchiere AAPL mit aktuell verfügbaren Daten: Fasse Geschäft, jüngste Finanzentwicklung und wesentliche Risiken zusammen. Nenne Quellen und Daten und kennzeichne fehlende Informationen.",
       "backtestPrompt": "Teste eine 20/60-Tage-Durchschnittsstrategie für AAPL im vergangenen Jahr historisch. Vergleiche Renditen und Drawdowns mit Kaufen und Halten und berücksichtige Handelskosten. Nur Recherche.",
       "portfolioPrompt": "Fasse Positionen, Konzentration und Portfoliorisiken meiner verbundenen Konten zusammen. Erkläre zuerst die Einrichtung, falls kein Konto verbunden ist. Keine Orders aufgeben oder ändern."
-    }
+    },
+    "featured": "Ausgewählte Beispiele"
   },
   "settings": {
     "title": "Einstellungen",
@@ -1054,7 +1056,10 @@
     "authentication": "Authentifizierung",
     "apiKey": "API-Schlüssel",
     "reasoningEffortXhigh": "Sehr hoch",
-    "reasoningEffortReset": "Das gewählte Modell unterstützt {{level}} nicht; auf den Anbieter-Standard zurückgesetzt."
+    "reasoningEffortReset": "Das gewählte Modell unterstützt {{level}} nicht; auf den Anbieter-Standard zurückgesetzt.",
+    "reasoningEffortMinimal": "Minimal",
+    "reasoningEffortUltra": "Ultra",
+    "reasoningEffortPersistent": "Anhaltend"
   },
   "qveris": {
     "title": "QVeris-Tool-Marktplatz",
@@ -2240,7 +2245,10 @@
       "accountDefault": " · Broker-Standard",
       "accountDeactivated": " · deaktiviert",
       "accountSave": "Dieses Konto verwenden",
-      "accountSaved": "Konto gespeichert."
+      "accountSaved": "Konto gespeichert.",
+      "deleteInUse": "Entferne diese Verbindung aus „Kontopositionen“ und speichere die Änderungen, bevor du sie löschst.",
+      "host": "Host",
+      "port": "Port"
     },
     "imports": {
       "title": "extraETF Investments importieren",
@@ -2265,7 +2273,8 @@
       "current": "Aktueller Wert",
       "targetValue": "Zielwert",
       "change": "Wertänderung"
-    }
+    },
+    "quoteAsOf": "Kursstand: {{time}}"
   },
   "navigation": {
     "menu": "Funktionen entdecken",
@@ -2287,7 +2296,8 @@
       "scheduled": "Eine Recherche nach Zeitplan wiederholen.",
       "runtime": "Brokerverbindungen und den Betriebsstatus des Handels prüfen.",
       "settings": "Modelle, Datenquellen und Brokerverbindungen konfigurieren.",
-      "pixelOffice": "Plane und verteile Rechercheaufgaben. Eine Zuweisung startet keine Ausführung. Ränge sind Bezeichnungen und erteilen keine Handelsrechte."
+      "pixelOffice": "Plane und verteile Rechercheaufgaben. Eine Zuweisung startet keine Ausführung. Ränge sind Bezeichnungen und erteilen keine Handelsrechte.",
+      "researchArtifacts": "Beleggestützte Analysen sitzungsübergreifend speichern und wiederverwenden."
     },
     "instructions": {
       "reports": "Bitte den Assistenten zuerst um einen Strategie-Backtest und öffne hier die Ergebnisse. Im Chat erstellte PDFs und andere Dokumente lädst du in der ursprünglichen Unterhaltung herunter.",
@@ -2298,7 +2308,8 @@
       "scheduled": "Gib einen Rechercheauftrag ein, wähle die Häufigkeit und speichere. Für die Ausführung muss der lokale Planer aktiviert sein; zur Zustellung ist ein eingerichteter Kanal nötig.",
       "runtime": "Richte zuerst unter Einstellungen oder Portfolio eine Brokerverbindung ein. Verfügbare Handelsaktionen hängen von den Brokerfunktionen und deiner Autorisierung ab.",
       "settings": "Richte zunächst ein Modell ein. Ergänze Datenquellen oder Brokerverbindungen nach Bedarf; für öffentliche Marktrecherche ist kein Brokerkonto nötig.",
-      "pixelOffice": "Plane und verteile Rechercheaufgaben. Eine Zuweisung startet keine Ausführung. Ränge sind Bezeichnungen und erteilen keine Handelsrechte."
+      "pixelOffice": "Plane und verteile Rechercheaufgaben. Eine Zuweisung startet keine Ausführung. Ränge sind Bezeichnungen und erteilen keine Handelsrechte.",
+      "researchArtifacts": "Frühere Analysen suchen, Revisionen öffnen oder mit neuen Belegen eine verknüpfte Revision erstellen. Ältere Schlussfolgerungen bleiben unverändert."
     }
   },
   "analysis": {
@@ -2437,5 +2448,38 @@
     "limitsNote": "Jede Entscheidung beginnt eine neue Unterhaltung. Limits werden nach der Antwort geprüft und können um diese Antwort überschritten werden. Fehlender Verbrauch oder eine Überschreitung löst den vorhandenen Notstopp aus.",
     "pricesNote": "Preise sind Betreiberschätzungen. Den höchsten Eingabe-/Cache-Schreibpreis verwenden; Cache-Rabatte und zusätzliche Modellaufrufe sind nicht enthalten.",
     "stopToEdit": "Vor Änderungen den Runner stoppen."
+  },
+  "researchArtifacts": {
+    "subject": "Forschungsthema",
+    "dataAsOf": "Datenstand",
+    "saving": "Speichern…",
+    "saveError": "Recherche-Artefakt konnte nicht gespeichert werden.",
+    "evidenceMissing": "Keine Belegreferenzen vorhanden",
+    "createdNotice": "Revision {{id}} erstellt.",
+    "emptyHint": "Speichere eine Analyse, um ihre Schlussfolgerungen und Belege in späteren Sitzungen wiederzuverwenden.",
+    "emptyTitle": "Noch keine Recherche-Artefakte",
+    "save": "Recherche speichern",
+    "universe": "Universum (optional)",
+    "loadError": "Recherche-Artefakte konnten nicht geladen werden.",
+    "formTitleNew": "Recherche speichern",
+    "verification": "Verifizierung",
+    "additionalEvidence": "Zusätzliche Beleg-URIs (eine pro Zeile)",
+    "revise": "Ausgehend von dieser Revision überarbeiten",
+    "completeness": "Vollständigkeit",
+    "searchPlaceholder": "Thema, Universum oder Inhalt suchen",
+    "newResearch": "Neue Recherche",
+    "formTitleRevision": "Verknüpfte Revision erstellen",
+    "content": "Inhalt der Recherche",
+    "subtitle": "Beleggestützte Analysen sitzungsübergreifend wiederverwenden, ohne frühere Revisionen zu überschreiben.",
+    "history": "Revisionsverlauf",
+    "optionalLinks": "Optionale verknüpfte IDs",
+    "title": "Recherche-Artefakte",
+    "close": "Schließen",
+    "idempotentNotice": "Identischer Inhalt und identische Provenienz existieren bereits in {{id}}.",
+    "evidence": "Belegquellen",
+    "hypothesis_id": "Hypothesen-ID",
+    "goal_id": "Ziel-ID",
+    "session_id": "Sitzungs-ID",
+    "run_id": "Lauf-ID"
   }
 }

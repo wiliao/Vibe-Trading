@@ -12,34 +12,113 @@ from backtest.correlation import (
 
 
 class TestInferMarket:
+    def test_crypto_usdt(self):
+        assert infer_market("BTC-USDT") == "crypto"
+        assert infer_market("ETH-USDT") == "crypto"
+
+    def test_a_share(self):
+        assert infer_market("000001.SZ") == "a_share"
+        assert infer_market("600519.SH") == "a_share"
+
     def test_us_equity(self):
         assert infer_market("AAPL") == "us_equity"
         assert infer_market("SPY") == "us_equity"
-        assert infer_market("AAPL.US") == "us_equity"
-        assert infer_market("BRK.B.US") == "us_equity"
 
-    def test_canada_equity(self):
+    def test_hk_leading_zero_tickers(self):
+        # Leading-zero HK tickers like 0700.HK / 0005.HK must be classified as
+        # hk_equity, NOT a_share (which also starts with 0)
+        assert infer_market("0700.HK") == "hk_equity"
+        assert infer_market("0005.HK") == "hk_equity"
+        assert infer_market("0000.HK") == "hk_equity"
+        assert infer_market("9988.HK") == "hk_equity"
+
+    def test_hk_suffix_before_a_share_prefix(self):
+        # .HK suffix should be checked before A-share numeric prefix checks
+        assert infer_market("000001.HK") == "hk_equity"
+
+    def test_bare_hk_tickers_by_digit_length(self):
+        # HK codes are <=5 digits; A-share codes are exactly 6 digits. A bare
+        # short numeric code must classify as HK, not A-share / US.
+        assert infer_market("0700") == "hk_equity"   # 腾讯
+        assert infer_market("0005") == "hk_equity"   # 汇丰
+        assert infer_market("0001") == "hk_equity"   # 长和
+        assert infer_market("0388") == "hk_equity"   # 港交所
+        assert infer_market("3690") == "hk_equity"   # 美团
+        assert infer_market("9988") == "hk_equity"   # 阿里 (starts with 9)
+        assert infer_market("700") == "hk_equity"    # unpadded form
+
+    def test_bare_a_share_tickers_by_digit_length(self):
+        # Exactly-6-digit bare codes are A-share regardless of prefix.
+        assert infer_market("600000") == "a_share"   # 浦发银行 沪
+        assert infer_market("000001") == "a_share"   # 平安银行 深
+        assert infer_market("300750") == "a_share"   # 宁德时代 创业板
+        assert infer_market("688981") == "a_share"   # 中芯国际 科创板
+        assert infer_market("830799") == "a_share"   # 北交所
+        assert infer_market("399001") == "a_share"   # 深证成指
+
+    def test_explicit_suffix_always_wins(self):
+        assert infer_market("600519.SH") == "a_share"
+        assert infer_market("000001.SZ") == "a_share"
+        assert infer_market("830799.BJ") == "a_share"
+        assert infer_market("AAPL.US") == "us_equity"
+        assert infer_market("9988.HK") == "hk_equity"
         assert infer_market("TD.TO") == "ca_equity"
-        assert infer_market("BBD-B.TO") == "ca_equity"
         assert infer_market("PNG.V") == "ca_equity"
 
-    def test_index(self):
-        assert infer_market("^SPX") == "index"
-        assert infer_market("^GSPC") == "index"
+    def test_precious_metals_classify_as_forex(self):
+        # Bare 6-letter precious-metal symbols are spot / OTC markets. The
+        # underlying asset is XAU / XAG / XPT / XPD (ISO 4217 metals); the
+        # quote is USD. Engines (ForexEngine._METAL_SPECS) already handle the
+        # correct pip / lot conventions; the classifier just has to land on
+        # ``forex`` so the forex fallback chain (mt5, tickerall,
+        # yfinance) is engaged instead of the a_share chain.
+        assert infer_market("XAUUSD") == "forex"
+        assert infer_market("XAGUSD") == "forex"
+        assert infer_market("XPTUSD") == "forex"
+        assert infer_market("XPDUSD") == "forex"
 
-    @pytest.mark.parametrize(
-        "code",
-        [
-            "BTC-USDT", "BTCUSDT", "ETH/USDT",  # crypto
-            "000001.SZ", "600519.SH", "830799.BJ",  # A-share
-            "0700.HK", "9988.HK",  # HK
-            "XAUUSD", "EURUSD", "GC=F",  # metals / FX / futures
-            "RELIANCE.NS", "005930.KS",  # India / Korea
-        ],
-    )
-    def test_removed_markets_fail_loud(self, code: str) -> None:
-        with pytest.raises(ValueError):
-            infer_market(code)
+    def test_g10_fx_pairs_classify_as_forex(self):
+        # G10 currency pairs in their bare 6-letter form. Same routing as
+        # metals above: bare code, no separator, must reach the forex chain.
+        assert infer_market("EURUSD") == "forex"
+        assert infer_market("GBPUSD") == "forex"
+        assert infer_market("USDJPY") == "forex"
+        assert infer_market("USDCHF") == "forex"
+        assert infer_market("AUDUSD") == "forex"
+        assert infer_market("NZDUSD") == "forex"
+        assert infer_market("USDCAD") == "forex"
+
+    def test_yahoo_equals_notation_routes_to_underlying_market(self):
+        # Yahoo's continuous-front-month futures form ``=F`` and forex form
+        # ``=X`` must reach the underlying market's chain instead of falling
+        # through to the a_share default.
+        assert infer_market("GC=F") == "futures"   # COMEX Gold
+        assert infer_market("CL=F") == "futures"   # NYMEX Crude
+        assert infer_market("SI=F") == "futures"   # COMEX Silver
+        assert infer_market("HG=F") == "futures"   # COMEX Copper
+        assert infer_market("MGC=F") == "futures"  # Micro Gold
+        assert infer_market("XAUUSD=X") == "forex"
+        assert infer_market("EURUSD=X") == "forex"
+
+    def test_6char_metals_whitelist_does_not_over_match_us_equities(self):
+        # A bare 6-letter US ticker that happens to start with a 3-letter
+        # word NOT in the metals/G10 whitelist must not be re-routed. The
+        # whitelist's whole point is to be conservative; length-only patterns
+        # were rejected for this reason.
+        assert infer_market("NFLXLI") != "forex"  # not a real ticker, but illustrative
+        assert infer_market("AMZNLY") != "forex"
+        # GLD (3 letters) is gold ETF, not a metal pair; stays us_equity.
+        assert infer_market("GLD") == "us_equity"
+        # Tokenized gold is crypto, not metal forex.
+        assert infer_market("XAUT-USDT") == "crypto"
+        assert infer_market("PAXG-USDT") == "crypto"
+
+    def test_btcusdt_style_joined_pairs_stay_crypto(self):
+        # A bare joined crypto pair must still classify as crypto. This
+        # guards the new whitelist against over-aggressive skipping.
+        assert infer_market("BTCUSDT") == "crypto"
+        assert infer_market("ETHUSDT") == "crypto"
+        assert infer_market("SOLUSDT") == "crypto"
 
 
 class TestNormalizeSymbol:
@@ -49,11 +128,34 @@ class TestNormalizeSymbol:
         assert _normalize_symbol("AAPL", "us_equity") == "AAPL.US"
         assert _normalize_symbol("SPY", "us_equity") == "SPY.US"
 
+    def test_bare_a_share_gets_exchange_suffix(self):
+        assert _normalize_symbol("600000", "a_share") == "600000.SH"
+        assert _normalize_symbol("000001", "a_share") == "000001.SZ"
+        assert _normalize_symbol("300750", "a_share") == "300750.SZ"
+        assert _normalize_symbol("830799", "a_share") == "830799.BJ"
+
+    def test_bare_a_share_follows_the_tushare_prefix_rule(self):
+        # Beijing's current 920xxx codes used to fall through to Shenzhen, and
+        # so did Shanghai funds (5xxxxx) and B shares (9xxxxx).
+        assert _normalize_symbol("920002", "a_share") == "920002.BJ"
+        assert _normalize_symbol("430047", "a_share") == "430047.BJ"
+        assert _normalize_symbol("510300", "a_share") == "510300.SH"
+        assert _normalize_symbol("900901", "a_share") == "900901.SH"
+        assert _normalize_symbol("200002", "a_share") == "200002.SZ"
+        assert _normalize_symbol("159915", "a_share") == "159915.SZ"
+
     def test_already_suffixed_passes_through(self):
         assert _normalize_symbol("AAPL.US", "us_equity") == "AAPL.US"
+        assert _normalize_symbol("600000.SH", "a_share") == "600000.SH"
+        assert _normalize_symbol("0700.HK", "hk_equity") == "0700.HK"
         assert _normalize_symbol("TD.TO", "ca_equity") == "TD.TO"
-        assert _normalize_symbol("PNG.V", "ca_equity") == "PNG.V"
-        assert _normalize_symbol("^SPX", "index") == "^SPX"
+
+    def test_crypto_passes_through(self):
+        assert _normalize_symbol("BTC-USDT", "crypto") == "BTC-USDT"
+        assert _normalize_symbol("ETH-USDT", "crypto") == "ETH-USDT"
+
+    def test_bare_hk_gets_hk_suffix(self):
+        assert _normalize_symbol("0700", "hk_equity") == "0700.HK"
 
     def test_case_and_whitespace_normalized(self):
         assert _normalize_symbol(" aapl ", "us_equity") == "AAPL.US"
@@ -212,6 +314,26 @@ class TestRollingCorrelationMatrix:
         }
         labels, matrix = _rolling_correlation_matrix(price_series, window=30, method="pearson")
         i, j = labels.index("GAP"), labels.index("PEER")
+        assert matrix[i][j] == pytest.approx(1.0)
+
+    def test_weekend_bars_do_not_shift_the_return_interval(self):
+        # A 7-day crypto series paired with a weekday equity series: the
+        # equity Monday return spans Fri->Mon, so the crypto return paired
+        # with it must too. COIN closes at twice EQ on every shared date and
+        # wanders only on weekends, so on shared dates they are identical.
+        days = pd.date_range("2024-01-01", periods=56, freq="D")
+        rng = np.random.default_rng(3)
+        eq = pd.Series(100.0 * np.cumprod(1.0 + rng.normal(0, 0.01, len(days))), index=days)
+        coin = 2.0 * eq
+        coin[days.dayofweek == 5] *= 1.08
+        coin[days.dayofweek == 6] *= 0.93
+        weekdays = days[days.dayofweek < 5]
+        price_series = {
+            "COIN": pd.DataFrame({"close": coin.to_numpy()}, index=pd.Index(days, name="trade_date")),
+            "EQ": pd.DataFrame({"close": eq[weekdays].to_numpy()}, index=pd.Index(weekdays, name="trade_date")),
+        }
+        labels, matrix = _rolling_correlation_matrix(price_series, window=100, method="pearson")
+        i, j = labels.index("COIN"), labels.index("EQ")
         assert matrix[i][j] == pytest.approx(1.0)
 
     def test_empty_dict_returns_empty(self):

@@ -1,7 +1,8 @@
 """Tests for the stock-news tool.
 
-No request leaves the process: the Yahoo
-:func:`backtest.loaders.yahoo_client.search_news` helper is mocked so the real
+No request leaves the process: the Eastmoney HTTP boundary
+(:func:`backtest.loaders.eastmoney_client.throttled_get_json`) and the Yahoo
+:func:`backtest.loaders.yahoo_client.search_news` helper are mocked so the real
 client + tool parsing run fully offline.
 """
 
@@ -11,7 +12,8 @@ import json
 from typing import Any
 from unittest.mock import patch
 
-from backtest.loaders import yahoo_client
+
+from backtest.loaders import eastmoney_client, yahoo_client
 from src.tools.stock_news_tool import (
     StockNewsTool,
     _bare_query,
@@ -19,6 +21,30 @@ from src.tools.stock_news_tool import (
     _snippet,
     _suffix_of,
 )
+
+
+def _em_news_payload() -> dict[str, Any]:
+    """An Eastmoney search payload carrying two CMS articles."""
+    return {
+        "result": {
+            "cmsArticleWebOld": [
+                {
+                    "title": "贵州茅台一季度净利大增",
+                    "url": "https://finance.eastmoney.com/a/1.html",
+                    "mediaName": "东方财富",
+                    "date": "2024-04-30 08:00:00",
+                    "content": "公司披露一季报，营收同比增长 " * 30,
+                },
+                {
+                    "title": "白酒板块全线走强",
+                    "url": "https://finance.eastmoney.com/a/2.html",
+                    "mediaName": "证券时报",
+                    "date": "2024-04-29 18:30:00",
+                    "content": "市场情绪回暖",
+                },
+            ]
+        }
+    }
 
 
 def _yahoo_news() -> list[dict[str, Any]]:
@@ -86,15 +112,48 @@ class TestToolContract:
         assert tool.name == "get_stock_news"
         assert tool.is_readonly is True
         assert tool.parameters["required"] == []
-        assert tool.parameters["properties"]["scope"]["enum"] == ["stock"]
-        # Description must advertise the article contract the tool returns.
+        assert tool.parameters["properties"]["scope"]["enum"] == ["stock", "global"]
+        # Description must advertise the shared article contract for every market.
         desc = tool.description.lower()
-        assert "yahoo finance" in desc
-        assert "title/url/source/published/snippet" in desc
+        assert "yahoo finance news articles" in desc
         assert "matches" not in desc
 
 
 class TestExecuteSuccess:
+    def test_a_share_stock_news(self) -> None:
+        tool = StockNewsTool()
+        with patch.object(
+            eastmoney_client, "throttled_get_json", return_value=_em_news_payload()
+        ) as http:
+            out = json.loads(tool.execute(code="600519.SH", scope="stock", limit=10))
+
+        http.assert_called_once()
+        _, kwargs = http.call_args
+        assert kwargs["host_key"] == "eastmoney"
+
+        assert out["ok"] is True
+        assert out["market"] == "a_share"
+        assert out["source"] == "eastmoney"
+        assert out["data"]["code"] == "600519.SH"
+        assert len(out["data"]["articles"]) == 2
+        first = out["data"]["articles"][0]
+        assert first["title"] == "贵州茅台一季度净利大增"
+        assert first["source"] == "东方财富"
+        assert first["snippet"].endswith("…")
+
+    def test_global_scope_needs_no_code(self) -> None:
+        tool = StockNewsTool()
+        with patch.object(
+            eastmoney_client, "throttled_get_json", return_value=_em_news_payload()
+        ):
+            out = json.loads(tool.execute(scope="global"))
+
+        assert out["ok"] is True
+        assert out["market"] == "global"
+        assert out["source"] == "eastmoney"
+        assert out["data"]["scope"] == "global"
+        assert len(out["data"]["articles"]) == 2
+
     def test_us_stock_via_yahoo_returns_articles(self) -> None:
         tool = StockNewsTool()
         with patch.object(
@@ -116,6 +175,19 @@ class TestExecuteSuccess:
             "snippet": ("Apple announced a new product lineup. " * 30)[:280].rstrip()
             + "…",
         }
+
+    def test_hk_stock_via_yahoo_returns_articles(self) -> None:
+        tool = StockNewsTool()
+        with patch.object(
+            yahoo_client, "search_news", return_value=_yahoo_news()[:1]
+        ) as srch:
+            out = json.loads(tool.execute(code="00700.HK"))
+
+        srch.assert_called_once_with("00700", 20)
+        assert out["ok"] is True
+        assert out["market"] == "hk"
+        assert out["source"] == "yahoo"
+        assert out["data"]["articles"][0]["title"] == "Apple unveils new products"
 
     def test_yahoo_empty_news_returns_empty_articles(self) -> None:
         with patch.object(yahoo_client, "search_news", return_value=[]):
@@ -148,13 +220,17 @@ class TestExecuteError:
         assert out["ok"] is False
         assert "unsupported market" in out["error"]
 
-    def test_non_us_suffix_is_rejected(self) -> None:
-        # Phase 5 removed every non-US news path, so a Hong Kong code the Yahoo
-        # branch used to serve is refused rather than silently rerouted.
-        out = json.loads(StockNewsTool().execute(code="00700.HK"))
+    def test_eastmoney_http_failure_envelope(self) -> None:
+        tool = StockNewsTool()
+        with patch.object(
+            eastmoney_client,
+            "throttled_get_json",
+            side_effect=RuntimeError("eastmoney banned"),
+        ):
+            out = json.loads(tool.execute(code="600519.SH"))
+
         assert out["ok"] is False
-        assert "unsupported market" in out["error"]
-        assert "expected suffix US" in out["error"]
+        assert "eastmoney banned" in out["error"]
 
     def test_yahoo_failure_envelope(self) -> None:
         tool = StockNewsTool()
@@ -166,3 +242,66 @@ class TestExecuteError:
         assert out["ok"] is False
         assert "yahoo 429" in out["error"]
         assert "yahoo news fetch failed" in out["error"]
+
+
+class TestEastmoneyDegradedIndex:
+    """A degraded Eastmoney answer must not read as "this stock has no news".
+
+    Eastmoney serves its Guba user index (``passportWeb``) instead of the CMS
+    article index when it distrusts the caller, and that degraded answer is
+    shaped like a valid but empty one (see issue #2081).
+    """
+
+    def test_degraded_user_index_raises_instead_of_empty(self) -> None:
+        payload = {"code": 0, "result": {"passportWeb": [], "userWeb": []}}
+        with patch.object(eastmoney_client, "throttled_get_json", return_value=payload), patch.object(
+            eastmoney_client, "throttled_browser_get_json", return_value=payload
+        ):
+            out = json.loads(StockNewsTool().execute(code="600519.SH"))
+
+        assert out["ok"] is False
+        assert "degraded" in out["error"]
+
+    def test_empty_cms_section_is_a_clean_empty_result(self) -> None:
+        payload = {"code": 0, "result": {"cmsArticleWebOld": []}}
+        with patch.object(eastmoney_client, "throttled_get_json", return_value=payload):
+            out = json.loads(StockNewsTool().execute(code="600519.SH"))
+
+        assert out["ok"] is True
+        assert out["data"]["articles"] == []
+
+    def test_jsonp_enveloped_body_is_parsed_into_articles(self) -> None:
+        body = "jQuery3700123_456(" + json.dumps(_em_news_payload(), ensure_ascii=False) + ")"
+        with patch.object(eastmoney_client, "throttled_get_json", return_value=body):
+            out = json.loads(StockNewsTool().execute(code="600519.SH"))
+
+        assert out["ok"] is True
+        assert len(out["data"]["articles"]) == 2
+
+    def test_filtered_plain_client_recovers_through_one_browser_retry(self) -> None:
+        filtered = {"result": {"passportWeb": []}}
+        with patch.object(eastmoney_client, "throttled_get_json", return_value=filtered), patch.object(
+            eastmoney_client, "throttled_browser_get_json", return_value=_em_news_payload()
+        ) as browser:
+            out = json.loads(StockNewsTool().execute(code="600519.SH"))
+        assert out["ok"] is True
+        assert len(out["data"]["articles"]) == 2
+        browser.assert_called_once()
+        assert browser.call_args.kwargs["host_key"] == eastmoney_client._HOST_KEY
+
+    def test_genuine_empty_news_does_not_invoke_browser_transport(self) -> None:
+        with patch.object(eastmoney_client, "throttled_get_json", return_value={"result": {"cmsArticleWebOld": []}}), patch.object(
+            eastmoney_client, "throttled_browser_get_json"
+        ) as browser:
+            out = json.loads(StockNewsTool().execute(code="600519.SH"))
+        assert out["ok"] is True
+        assert out["data"]["articles"] == []
+        browser.assert_not_called()
+
+    def test_unavailable_browser_retry_is_an_error_not_empty_news(self) -> None:
+        with patch.object(eastmoney_client, "throttled_get_json", return_value={"result": {"passportWeb": []}}), patch.object(
+            eastmoney_client, "throttled_browser_get_json", side_effect=RuntimeError("install curl_cffi")
+        ):
+            out = json.loads(StockNewsTool().execute(code="600519.SH"))
+        assert out["ok"] is False
+        assert "install curl_cffi" in out["error"]

@@ -214,6 +214,39 @@ def bar_returns(close: Any, *, label: str = "") -> Any:
     return ret.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
 
+def entry_returns(
+    close: pd.Series,
+    open_: Optional[pd.Series] = None,
+    traded: Optional[pd.Series] = None,
+    *,
+    label: str = "",
+) -> pd.Series:
+    """Return each bar from a position entered at the first traded bar's open.
+
+    Args:
+        close: Closes over the evaluated window.
+        open_: Opens on the same index; invalid opens fall back to that bar's close.
+        traded: Bars on which the instrument traded; defaults to available closes.
+        label: Name used by :func:`bar_returns` when reporting undefined prices.
+
+    Returns:
+        Returns aligned to ``close``'s index, with zero before entry and an
+        open-to-close return on the entry bar.
+    """
+    ret = bar_returns(close, label=label)
+    traded = close.notna() if traded is None else traded.reindex(close.index).fillna(False).astype(bool)
+    if not traded.any():
+        return ret * 0.0
+    entry = int(np.argmax(traded.to_numpy()))
+    ret.iloc[:entry + 1] = 0.0
+    if open_ is not None:
+        entry_open = float(open_.reindex(close.index).iloc[entry])
+        entry_close = float(close.iloc[entry])
+        if np.isfinite(entry_open) and entry_open > 0 and np.isfinite(entry_close):
+            ret.iloc[entry] = entry_close / entry_open - 1.0
+    return ret
+
+
 def buy_and_hold_return(close: Any) -> Optional[float]:
     """Total buy-and-hold return as a price relative, not a compounded product.
 

@@ -36,7 +36,8 @@
     "mainNavigation": "Navegación principal",
     "about": "Acerca de",
     "sessionsLoadFailed": "No se pueden cargar las conversaciones.",
-    "pixelOffice": "Oficina de píxeles"
+    "pixelOffice": "Oficina de píxeles",
+    "researchArtifacts": "Artefactos de investigación"
   },
   "runtime": {
     "monitorBadge": "Monitor de Runtime",
@@ -385,7 +386,8 @@
       "researchPrompt": "Investiga AAPL con los datos actuales disponibles: resume su negocio, resultados financieros recientes y riesgos principales. Indica fuentes, fechas e información que falta.",
       "backtestPrompt": "Haz un backtest de una estrategia de medias móviles de 20/60 días en AAPL durante el último año. Compara rentabilidad y caídas con comprar y mantener e incluye costes de negociación. Solo investigación.",
       "portfolioPrompt": "Resume mis cuentas conectadas y posiciones, su concentración y riesgos de cartera. Si no hay cuentas conectadas, explica primero cómo configurarlas. No envíes ni modifiques órdenes."
-    }
+    },
+    "featured": "Ejemplos destacados"
   },
   "settings": {
     "title": "Configuración",
@@ -1054,7 +1056,10 @@
     "authentication": "Autenticación",
     "apiKey": "Clave de API",
     "reasoningEffortXhigh": "Muy alto",
-    "reasoningEffortReset": "El modelo seleccionado no admite {{level}}; se restableció el valor predeterminado del proveedor."
+    "reasoningEffortReset": "El modelo seleccionado no admite {{level}}; se restableció el valor predeterminado del proveedor.",
+    "reasoningEffortMinimal": "Mínimo",
+    "reasoningEffortUltra": "Ultra",
+    "reasoningEffortPersistent": "Persistente"
   },
   "qveris": {
     "title": "Mercado de herramientas QVeris",
@@ -2240,7 +2245,10 @@
       "accountDefault": " · predeterminada del bróker",
       "accountDeactivated": " · desactivada",
       "accountSave": "Usar esta cuenta",
-      "accountSaved": "Cuenta guardada."
+      "accountSaved": "Cuenta guardada.",
+      "deleteInUse": "Quita esta conexión de «Posiciones de cuentas» y guarda los cambios antes de eliminarla.",
+      "host": "Servidor",
+      "port": "Puerto"
     },
     "imports": {
       "title": "Importar extraETF Investments",
@@ -2265,7 +2273,8 @@
       "current": "Valor actual",
       "targetValue": "Valor objetivo",
       "change": "Cambio de valor"
-    }
+    },
+    "quoteAsOf": "Cotización a {{time}}"
   },
   "navigation": {
     "menu": "Explorar funciones",
@@ -2287,7 +2296,8 @@
       "scheduled": "Repite una investigación según un horario.",
       "runtime": "Comprueba conexiones de brókeres y el estado de ejecución de operaciones.",
       "settings": "Configura modelos, fuentes de datos y conexiones de brókeres.",
-      "pixelOffice": "Planifica y asigna tareas de investigación. La asignación no inicia la ejecución; los rangos son etiquetas y no conceden permisos de negociación."
+      "pixelOffice": "Planifica y asigna tareas de investigación. La asignación no inicia la ejecución; los rangos son etiquetas y no conceden permisos de negociación.",
+      "researchArtifacts": "Guarda y reutiliza análisis respaldados por evidencia entre sesiones."
     },
     "instructions": {
       "reports": "Primero pide al asistente un backtest de una estrategia y abre aquí sus resultados. Descarga los PDF y documentos generados en el chat desde la conversación original.",
@@ -2298,7 +2308,8 @@
       "scheduled": "Introduce la instrucción de investigación, elige la frecuencia y guarda. El programador local debe estar activado para ejecutar tareas; el envío requiere un canal configurado.",
       "runtime": "Primero configura una conexión de bróker en Ajustes o Cartera. Las operaciones disponibles dependen de sus capacidades y de tu autorización.",
       "settings": "Configura un modelo para empezar. Añade datos o conexiones de brókeres según lo necesites; investigar datos públicos de mercado no requiere una cuenta de bróker.",
-      "pixelOffice": "Planifica y asigna tareas de investigación. La asignación no inicia la ejecución; los rangos son etiquetas y no conceden permisos de negociación."
+      "pixelOffice": "Planifica y asigna tareas de investigación. La asignación no inicia la ejecución; los rangos son etiquetas y no conceden permisos de negociación.",
+      "researchArtifacts": "Busca análisis anteriores, abre cualquier revisión o crea una revisión vinculada con nueva evidencia. Las conclusiones anteriores no cambian."
     }
   },
   "analysis": {
@@ -2437,5 +2448,38 @@
     "limitsNote": "Cada decisión usa una conversación nueva. Los límites se comprueban tras la respuesta y pueden excederse en ese importe. El uso desconocido o un exceso activa el interruptor de parada existente.",
     "pricesNote": "Las tarifas son estimaciones del operador. Use la mayor tarifa de entrada/escritura en caché; se excluyen los descuentos de caché y las llamadas auxiliares.",
     "stopToEdit": "Detenga el ejecutor antes de cambiar estos ajustes."
+  },
+  "researchArtifacts": {
+    "subject": "Tema de investigación",
+    "dataAsOf": "Datos a fecha de",
+    "saving": "Guardando…",
+    "saveError": "No se pudo guardar el artefacto de investigación.",
+    "evidenceMissing": "No hay referencias de evidencia",
+    "createdNotice": "Revisión {{id}} creada.",
+    "emptyHint": "Guarda un análisis para reutilizar sus conclusiones y evidencia en otra sesión.",
+    "emptyTitle": "Aún no hay artefactos de investigación",
+    "save": "Guardar investigación",
+    "universe": "Universo (opcional)",
+    "loadError": "No se pudieron cargar los artefactos de investigación.",
+    "formTitleNew": "Guardar investigación",
+    "verification": "Verificación",
+    "additionalEvidence": "URI de evidencia adicionales (una por línea)",
+    "revise": "Revisar a partir de esta revisión",
+    "completeness": "Integridad",
+    "searchPlaceholder": "Buscar tema, universo o contenido",
+    "newResearch": "Nueva investigación",
+    "formTitleRevision": "Crear revisión vinculada",
+    "content": "Contenido de la investigación",
+    "subtitle": "Reutiliza análisis respaldados por evidencia entre sesiones sin sobrescribir revisiones anteriores.",
+    "history": "Historial de revisiones",
+    "optionalLinks": "ID vinculados opcionales",
+    "title": "Artefactos de investigación",
+    "close": "Cerrar",
+    "idempotentNotice": "El mismo contenido y procedencia ya existen en {{id}}.",
+    "evidence": "Referencias de evidencia",
+    "hypothesis_id": "ID de hipótesis",
+    "goal_id": "ID de objetivo",
+    "session_id": "ID de sesión",
+    "run_id": "ID de ejecución"
   }
 }

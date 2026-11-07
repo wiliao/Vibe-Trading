@@ -36,7 +36,8 @@
     "mainNavigation": "Main navigation",
     "about": "About",
     "sessionsLoadFailed": "Cannot load conversations.",
-    "pixelOffice": "Pixel Office"
+    "pixelOffice": "Pixel Office",
+    "researchArtifacts": "Research artifacts"
   },
   "runtime": {
     "monitorBadge": "Runtime Monitor",
@@ -385,7 +386,8 @@
       "researchPrompt": "Research AAPL: summarize its business, recent financial performance, and key risks using current data. State the sources and dates, and flag missing information.",
       "backtestPrompt": "Backtest a 20/60-day moving-average strategy on AAPL over the past year. Compare returns and drawdowns with buy-and-hold, and include trading costs. Keep this research-only.",
       "portfolioPrompt": "Summarize my connected accounts and holdings, including concentration and portfolio risks. If no account is connected, explain how to set one up first. Do not place or modify orders."
-    }
+    },
+    "featured": "Featured examples"
   },
   "settings": {
     "title": "Settings",
@@ -1054,7 +1056,10 @@
     "authentication": "Authentication",
     "apiKey": "API key",
     "reasoningEffortXhigh": "Extra high",
-    "reasoningEffortReset": "The selected model does not support {{level}}; reset to provider default."
+    "reasoningEffortReset": "The selected model does not support {{level}}; reset to provider default.",
+    "reasoningEffortMinimal": "Minimal",
+    "reasoningEffortUltra": "Ultra",
+    "reasoningEffortPersistent": "Persistent"
   },
   "qveris": {
     "title": "QVeris Tool Marketplace",
@@ -2240,7 +2245,10 @@
       "accountDefault": " · broker default",
       "accountDeactivated": " · deactivated",
       "accountSave": "Use this account",
-      "accountSaved": "Account saved."
+      "accountSaved": "Account saved.",
+      "deleteInUse": "Remove this connection from Account holdings and save your changes before deleting it.",
+      "host": "Host",
+      "port": "Port"
     },
     "imports": {
       "title": "Import extraETF Investments",
@@ -2265,7 +2273,8 @@
       "current": "Current value",
       "targetValue": "Target value",
       "change": "Value change"
-    }
+    },
+    "quoteAsOf": "Quote as of {{time}}"
   },
   "navigation": {
     "menu": "Browse features",
@@ -2287,7 +2296,8 @@
       "scheduled": "Repeat a research task on a schedule.",
       "runtime": "Check broker connections and trading runtime status.",
       "settings": "Configure models, data sources, and broker connections.",
-      "pixelOffice": "Plan and assign research tasks. Assignment does not start execution; ranks are labels and grant no trading permissions."
+      "pixelOffice": "Plan and assign research tasks. Assignment does not start execution; ranks are labels and grant no trading permissions.",
+      "researchArtifacts": "Save and reuse evidence-backed analyses across sessions."
     },
     "instructions": {
       "reports": "Ask the research assistant to backtest a strategy first, then open its results here. Download PDFs and other chat-generated documents from the original conversation.",
@@ -2298,7 +2308,8 @@
       "scheduled": "Enter a research instruction, choose its cadence, and save. The local scheduler must be enabled for jobs to run; delivery also needs a configured channel.",
       "runtime": "Configure a broker connection in Settings or Portfolio first. Available trading actions depend on that broker's capabilities and your authorization.",
       "settings": "Configure a model to start. Add data sources or broker connections as your task needs them; public-market research does not require a broker account.",
-      "pixelOffice": "Plan and assign research tasks. Assignment does not start execution; ranks are labels and grant no trading permissions."
+      "pixelOffice": "Plan and assign research tasks. Assignment does not start execution; ranks are labels and grant no trading permissions.",
+      "researchArtifacts": "Search previous analyses, open any revision, or create a linked revision with new evidence. Older conclusions stay unchanged."
     }
   },
   "analysis": {
@@ -2437,5 +2448,38 @@
     "limitsNote": "Each decision starts a fresh conversation. Usage limits stop after a response and may overshoot by that response. Missing usage or an exceeded budget trips the existing kill switch.",
     "pricesNote": "Prices are operator estimates. Use the highest applicable input/cache-write rate; cache discounts and auxiliary model calls are not included in the estimate.",
     "stopToEdit": "Stop the runner before editing these settings."
+  },
+  "researchArtifacts": {
+    "title": "Research artifacts",
+    "subtitle": "Save and reuse evidence-backed analyses across sessions without overwriting earlier revisions.",
+    "searchPlaceholder": "Search subject, universe, or content",
+    "emptyTitle": "No research artifacts yet",
+    "emptyHint": "Save an analysis to reuse its conclusions and evidence in a later session.",
+    "newResearch": "New research",
+    "formTitleNew": "Save research",
+    "formTitleRevision": "Create a linked revision",
+    "subject": "Research subject",
+    "universe": "Universe (optional)",
+    "dataAsOf": "Data as of",
+    "verification": "Verification",
+    "completeness": "Completeness",
+    "content": "Research content",
+    "additionalEvidence": "Additional evidence URIs (one per line)",
+    "optionalLinks": "Optional linked IDs",
+    "evidenceMissing": "No evidence references attached",
+    "history": "Revision history",
+    "revise": "Revise from this revision",
+    "save": "Save research",
+    "saving": "Saving...",
+    "createdNotice": "Created revision {{id}}.",
+    "idempotentNotice": "Identical content and provenance already exist in {{id}}.",
+    "close": "Close",
+    "loadError": "Unable to load research artifacts.",
+    "saveError": "Unable to save the research artifact.",
+    "evidence": "Evidence references",
+    "hypothesis_id": "Hypothesis ID",
+    "goal_id": "Goal ID",
+    "session_id": "Session ID",
+    "run_id": "Run ID"
   }
 }

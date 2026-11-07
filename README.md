@@ -1361,27 +1361,12 @@ Saves write the `channels.<name>` section of `~/.vibe-trading/agent.json` atomic
 
 ### Strategy & Backtesting
 
-**Daily paper trading** is available in the Web sidebar (`/paper-trading`),
-`vibe-trading paper`, and the authenticated `/api/paper-accounts` API. Start today
-or next session with configurable cash/positions; settle completed daily bars
-and inspect fills, rejections and NAV history. Strategy history stops before the
-execution date, and each day receives the ledger after preceding fills. The
-agent/MCP `paper_trade_step` remains a stateless research primitive.
-
-Execution uses raw prices (Tencent raw for A-shares/HK, raw-capable US providers).
-A-shares require a complete ClickHouse calendar. Unavailable data/calendar and
-unverified split-like events fail visibly without committing a saved ledger;
-price/volume ratios never authorize multiplying a position. Cash dividends and
-automatic corporate-action reconciliation are not implemented. See the
-[paper-trading guide](agent/src/tools/paper_trade/README.md) for CLI/API examples and model limits.
-
 Daily-engine backtests report engine-specific unused settings in the run-card
-warnings. For example, crypto reads `maker_rate` and `taker_rate`, so supplying
-the A-share `commission_rate` setting warns instead of silently implying that
-it configured crypto fees. Shared runner/loader settings and keys read by a
-composite engine's selected sub-engines remain accepted. This conservative
-source-reader check does not trace conditional branches inside an engine and
-does not change options-engine configuration handling.
+warnings instead of silently implying that an unsupported setting affected the
+run. Shared runner/loader settings and keys read by the selected engine remain
+accepted. This conservative source-reader check does not trace conditional
+branches inside an engine and does not change options-engine configuration
+handling.
 
 Average holding period includes completed same-bar trades (zero bars). The
 existing `avg_holding_days` compatibility key reports the engine's holding-bar

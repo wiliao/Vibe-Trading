@@ -26,18 +26,12 @@ async function run() {
       [
         "OPENAI_API_KEY=desktop-smoke-openai-secret",
         "MODELSCOPE_API_KEY=desktop-smoke-modelscope-secret",
+        "TUSHARE_TOKEN='desktop-smoke-tushare-secret'",
         "ANTHROPIC_API_KEY=sk-xxx",
+        "GILDATA_TOKEN=desktop-smoke-gildata-secret",
         "NON_SECRET_SETTING=preserved",
         "",
       ].join("\n"),
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(configDirectory, "qveris.json"),
-      `${JSON.stringify({
-        api_key: "desktop-smoke-qveris-secret",
-        enabled: true,
-      }, null, 2)}\n`,
       "utf8",
     );
 
@@ -50,19 +44,22 @@ async function run() {
       initialEnvironment.MODELSCOPE_API_KEY,
       "desktop-smoke-modelscope-secret",
     );
-    assert.equal(initialEnvironment.QVERIS_API_KEY, "desktop-smoke-qveris-secret");
+    assert.equal(initialEnvironment.TUSHARE_TOKEN, "desktop-smoke-tushare-secret");
+    assert.equal(initialEnvironment.GILDATA_TOKEN, "desktop-smoke-gildata-secret");
     assert.equal(initialEnvironment.ANTHROPIC_API_KEY, undefined);
 
     const status = store.status();
     assert.deepEqual(status.configured, [
+      "GILDATA_TOKEN",
       "MODELSCOPE_API_KEY",
       "OPENAI_API_KEY",
-      "QVERIS_API_KEY",
+      "TUSHARE_TOKEN",
     ]);
     assert.deepEqual(status.migrated, [
       "OPENAI_API_KEY",
       "MODELSCOPE_API_KEY",
-      "QVERIS_API_KEY",
+      "TUSHARE_TOKEN",
+      "GILDATA_TOKEN",
     ]);
 
     const encryptedFile = await fs.readFile(
@@ -76,15 +73,14 @@ async function run() {
     const migratedDotenv = await fs.readFile(path.join(configDirectory, ".env"), "utf8");
     assert.match(migratedDotenv, /OPENAI_API_KEY is stored by Vibe-Trading Desktop/u);
     assert.match(migratedDotenv, /MODELSCOPE_API_KEY is stored by Vibe-Trading Desktop/u);
+    assert.match(migratedDotenv, /TUSHARE_TOKEN is stored by Vibe-Trading Desktop/u);
     assert.match(migratedDotenv, /ANTHROPIC_API_KEY=sk-xxx/u);
     assert.match(migratedDotenv, /NON_SECRET_SETTING=preserved/u);
     assert.ok(!migratedDotenv.includes("desktop-smoke-openai-secret"));
     assert.ok(!migratedDotenv.includes("desktop-smoke-modelscope-secret"));
+    assert.ok(!migratedDotenv.includes("desktop-smoke-tushare-secret"));
 
-    const migratedQveris = JSON.parse(
-      await fs.readFile(path.join(configDirectory, "qveris.json"), "utf8"),
-    );
-    assert.deepEqual(migratedQveris, { enabled: true });
+    assert.ok(!migratedDotenv.includes("desktop-smoke-gildata-secret"));
 
     const reloadedStore = new SecureCredentialStore({ homeDirectory, userDataDirectory });
     await reloadedStore.initialize();
